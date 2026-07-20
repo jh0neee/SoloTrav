@@ -1,48 +1,33 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
+ * Solo Travel Mate
+ * 혼자 여행하는 사람을 위한 안전한 여행 가이드
  *
  * @format
  */
 
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
-
-// import { SafeAreaView, StyleSheet, Text, View } from 'react-native'
+import { StatusBar, StyleSheet } from 'react-native';
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+} from 'react-native-safe-area-context';
+import BottomTabNavigator from './src/navigation/BottomTabNavigator';
+import { colors } from './src/theme/colors';
 
 function App() {
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Solo Travel Mate</Text>
-        <Text style={styles.description}>
-          혼자 여행하는 사람을 위한 안전한 여행 가이드
-        </Text>
-      </View>
-    </SafeAreaView>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+        <BottomTabNavigator />
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  description: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
+    backgroundColor: colors.background,
   },
 });
 

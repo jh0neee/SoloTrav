@@ -1,0 +1,18 @@
+[
+  {
+    "sessionId": "caa9d075-789a-4a6b-824d-102042498992",
+    "reason": "other",
+    "endedAt": "2026-07-13T11:28:00.012Z",
+    "feature": null,
+    "phase": null,
+    "progress": null
+  },
+  {
+    "sessionId": "8ea12311-7c36-4792-aa3f-459f6cf90865",
+    "reason": "other",
+    "endedAt": "2026-07-20T08:58:54.452Z",
+    "feature": null,
+    "phase": null,
+    "progress": null
+  }
+]
