@@ -4,7 +4,7 @@
  * - variant 'center' 탭은 가운데 볼록 튀어나온 샛별이 버튼으로 렌더링됩니다.
  */
 import type { ComponentType } from 'react';
-import HomeScreen from '../screens/HomeScreen';
+import HomeStack from './HomeStack';
 import MapScreen from '../screens/MapScreen';
 import AssistantScreen from '../screens/AssistantScreen';
 import RecordScreen from '../screens/RecordScreen';
@@ -29,7 +29,7 @@ export type TabItem = {
 };
 
 export const TABS: TabItem[] = [
-  { key: 'home', label: '홈', variant: 'default', component: HomeScreen, Icon: HomeIcon },
+  { key: 'home', label: '홈', variant: 'default', component: HomeStack, Icon: HomeIcon },
   { key: 'map', label: '지도', variant: 'default', component: MapScreen, Icon: MapIcon },
   { key: 'assistant', label: '샛별이', variant: 'center', component: AssistantScreen },
   { key: 'record', label: '기록', variant: 'default', component: RecordScreen, Icon: RecordIcon },
