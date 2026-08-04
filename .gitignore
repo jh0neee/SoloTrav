@@ -73,3 +73,35 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# AI tooling (bkit / Claude Code)
+#
+.bkit/
+.claude/
+.claude-*/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.mcp.json
+
+# AI-generated docs (PDCA: plan / design / analysis / report)
+docs/
+
+# API 키
+src/config/kakao.ts
+
+# 환경변수 (나중에 쓰게 될 때 대비)
+.env
+.env.*
+!.env.example
+
+# 릴리스 서명 키 — 유출되면 앱 위조가 가능합니다. debug.keystore 는 위에서 예외 처리됨
+*.jks
+
+# Windows 탐색기 찌꺼기 (위의 .DS_Store 는 macOS 용)
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# TypeScript 증분 빌드 캐시
+*.tsbuildinfo
