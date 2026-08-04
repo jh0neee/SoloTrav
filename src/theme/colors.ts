@@ -57,6 +57,14 @@ export const colors = {
   // 슬라이더
   track: '#e5e2da',
   trackFill: '#1b2233',
+
+  // 취향 프롬프트 (위저드 · 홈 배너)
+  promptBanner: '#fbedc8', // 홈 '취향 설정하기' 카드
+  promptBannerBorder: '#f2ddab',
+  progressTrack: '#e7e1d4',
+  radioBorder: '#d6d1c4',
+  ctaDisabled: '#e3ded2',
+  ctaDisabledText: '#a79f8e',
 };
 
 /**

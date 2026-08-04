@@ -4,6 +4,7 @@
  * 안드로이드 하드웨어 back 으로도 pop 되게 처리합니다.
  *
  *   홈 → 도시 선택 → 취향 프롬프트
+ *   홈 → 취향 프롬프트 (홈 배너에서 바로 진입)
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { BackHandler } from 'react-native';
@@ -11,14 +12,19 @@ import HomeScreen from '../screens/home/HomeScreen';
 import CitySelectScreen from '../screens/home/CitySelectScreen';
 import PreferencePromptScreen from '../screens/home/PreferencePromptScreen';
 import type { City } from '../data/cities';
+import {
+  summarizePreferences,
+  type PreferenceAnswers,
+} from '../data/preferences';
 
 type Route =
   | { name: 'home' }
   | { name: 'citySelect' }
-  | { name: 'preference'; city: City };
+  | { name: 'preference'; city?: City };
 
 function HomeStack() {
   const [stack, setStack] = useState<Route[]>([{ name: 'home' }]);
+  const [preferences, setPreferences] = useState<PreferenceAnswers | null>(null);
   const current = stack[stack.length - 1];
 
   const push = useCallback(
@@ -55,7 +61,9 @@ function HomeStack() {
         <PreferencePromptScreen
           city={current.city}
           onBack={pop}
-          onGenerate={() => {
+          onComplete={answers => {
+            setPreferences(answers);
+            pop();
             // TODO: AI 코스 생성 결과 화면 연결
           }}
         />
@@ -64,6 +72,10 @@ function HomeStack() {
     default:
       return (
         <HomeScreen
+          preferenceSummary={
+            preferences ? summarizePreferences(preferences) : null
+          }
+          onOpenPreference={() => push({ name: 'preference' })}
           onOpenSearch={() => push({ name: 'citySelect' })}
           onSelectCity={city => push({ name: 'preference', city })}
         />

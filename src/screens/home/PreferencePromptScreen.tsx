@@ -1,223 +1,296 @@
 /**
- * 취향 프롬프트 화면.
- * 여행 기간/페이스(단일선택), 무드(다중선택), 하루 예산(슬라이더),
- * 자유 프롬프트(텍스트) + 안전 우선 큐레이션(토글)로 AI 코스 조건을 설정합니다.
+ * 취향 프롬프트 화면 (8단계 위저드).
+ * 상단 진행바 → 질문 카드 → 하단 '다음'/'건너뛰기' 구조로,
+ * 질문과 옵션은 data/preferences.ts 스키마를 그대로 렌더링합니다.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  BackHandler,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import type { City } from '../../data/cities';
+import {
+  PREFERENCE_STEPS,
+  createInitialAnswers,
+  isStepComplete,
+  type PreferenceAnswers,
+  type PreferenceField,
+} from '../../data/preferences';
 import { colors } from '../../theme/colors';
 import Chip from '../../components/Chip';
+import OptionCard from '../../components/OptionCard';
 import Slider from '../../components/Slider';
 import {
   Chevron,
   MicIcon,
-  ShieldIcon,
   SparkIcon,
 } from '../../components/icons/UiIcons';
 
 type Props = {
-  city: City;
+  /** 도시 카드에서 진입한 경우 여행 지역을 미리 채웁니다. */
+  city?: City;
   onBack: () => void;
-  onGenerate: () => void;
+  onComplete: (answers: PreferenceAnswers) => void;
 };
 
-const PERIODS = ['당일', '1박 2일', '2박 3일', '자유'];
-const PACES = ['느긋하게', '균형있게', '알차게'];
-const MOODS = [
-  '#감성사진',
-  '#조용한_카페',
-  '#야경_명소',
-  '#로컬_맛집',
-  '#박물관',
-  '#책방',
-  '#자연_트레킹',
-  '#아침일찍',
-  '#야시장',
-  '#액티비티',
-  '#한적한_골목',
-  '#전통시장',
-  '#와이너리',
-  '#휴양',
-];
-const MAX_TEXT = 300;
+const TOTAL = PREFERENCE_STEPS.length;
 
-function PreferencePromptScreen({ city, onBack, onGenerate }: Props) {
-  const [period, setPeriod] = useState('1박 2일');
-  const [pace, setPace] = useState('느긋하게');
-  const [moods, setMoods] = useState<string[]>(['#감성사진', '#조용한_카페']);
-  const [budget, setBudget] = useState(15);
-  const [freeText, setFreeText] = useState(
-    '아침은 늦게 일어나고 싶고, 야경 사진 찍을 수 있는 곳을 좋아해요. 사람 적은 골목 카페 좋아요.',
+function PreferencePromptScreen({ city, onBack, onComplete }: Props) {
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState<PreferenceAnswers>(() =>
+    createInitialAnswers(city?.name),
   );
-  const [safetyFirst, setSafetyFirst] = useState(true);
 
-  const toggleMood = (mood: string) =>
-    setMoods(prev =>
-      prev.includes(mood) ? prev.filter(m => m !== mood) : [...prev, mood],
-    );
+  const step = PREFERENCE_STEPS[index];
+  const isLast = index === TOTAL - 1;
+  const canNext = useMemo(() => isStepComplete(step, answers), [step, answers]);
+
+  const setAnswer = (id: string, value: PreferenceAnswers[string]) =>
+    setAnswers(prev => ({ ...prev, [id]: value }));
+
+  const toggleMulti = (id: string, option: string) =>
+    setAnswers(prev => {
+      const current = Array.isArray(prev[id]) ? (prev[id] as string[]) : [];
+      return {
+        ...prev,
+        [id]: current.includes(option)
+          ? current.filter(v => v !== option)
+          : [...current, option],
+      };
+    });
+
+  // 안드로이드 뒤로가기: 첫 단계가 아니면 이전 단계로 (첫 단계면 HomeStack 이 처리)
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (index === 0) {
+        return false;
+      }
+      setIndex(i => i - 1);
+      return true;
+    });
+    return () => sub.remove();
+  }, [index]);
+
+  const goPrev = () => (index === 0 ? onBack() : setIndex(i => i - 1));
+  const goNext = () =>
+    isLast ? onComplete(answers) : setIndex(i => Math.min(TOTAL - 1, i + 1));
 
   return (
-    <View style={styles.container}>
-      {/* 헤더 */}
-      <View style={styles.header}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* 진행바 */}
+      <View style={styles.topBar}>
         <Pressable
-          onPress={onBack}
+          onPress={goPrev}
           style={styles.backBtn}
           accessibilityRole="button"
-          accessibilityLabel="뒤로 가기">
+          accessibilityLabel="이전 단계">
           <Chevron direction="left" color={colors.textPrimary} size={22} />
         </Pressable>
-        <View>
-          <Text style={styles.headerTitle}>취향 프롬프트</Text>
-          <Text style={styles.headerSub}>{city.name} 맞춤 코스 설정</Text>
+        <View style={styles.progressTrack}>
+          <View
+            style={[
+              styles.progressFill,
+              { width: `${((index + 1) / TOTAL) * 100}%` },
+            ]}
+          />
         </View>
+        <Text style={styles.stepCount}>
+          {index + 1}/{TOTAL}
+        </Text>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        {/* 여행 기간 */}
-        <Section title="여행 기간">
-          <View style={styles.chipWrap}>
-            {PERIODS.map(p => (
-              <Chip
-                key={p}
-                label={p}
-                selected={period === p}
-                onPress={() => setPeriod(p)}
-              />
-            ))}
+        {/* 질문 */}
+        <View style={styles.titleRow}>
+          <View style={styles.mascot}>
+            <SparkIcon color={colors.goldDeep} size={20} />
           </View>
-        </Section>
-
-        {/* 여행 페이스 */}
-        <Section title="여행 페이스">
-          <View style={styles.chipWrap}>
-            {PACES.map(p => (
-              <Chip
-                key={p}
-                label={p}
-                selected={pace === p}
-                onPress={() => setPace(p)}
-              />
-            ))}
+          <View style={styles.titleTexts}>
+            <Text style={styles.title}>{step.title}</Text>
+            {step.subtitle ? (
+              <Text style={styles.subtitle}>{step.subtitle}</Text>
+            ) : null}
           </View>
-        </Section>
-
-        {/* 좋아하는 무드 */}
-        <Section title="좋아하는 무드" hint="여러 개 선택">
-          <View style={styles.chipWrap}>
-            {MOODS.map(m => (
-              <Chip
-                key={m}
-                label={m}
-                selected={moods.includes(m)}
-                onPress={() => toggleMood(m)}
-              />
-            ))}
-          </View>
-        </Section>
-
-        {/* 하루 예산 */}
-        <Section title="하루 예산" hint={`${budget}만원`}>
-          <Slider min={5} max={40} step={5} value={budget} onChange={setBudget} />
-          <View style={styles.scaleRow}>
-            <Text style={styles.scaleText}>5만</Text>
-            <Text style={styles.scaleText}>15만</Text>
-            <Text style={styles.scaleText}>25만</Text>
-            <Text style={styles.scaleText}>40만+</Text>
-          </View>
-        </Section>
-
-        {/* 자유 프롬프트 */}
-        <Section title="자유 프롬프트" hint="자연어로 자세히 적을수록 좋아요">
-          <View style={styles.textArea}>
-            <TextInput
-              style={styles.textInput}
-              value={freeText}
-              onChangeText={t => setFreeText(t.slice(0, MAX_TEXT))}
-              multiline
-              placeholder="가고 싶은 분위기나 하고 싶은 것을 적어주세요"
-              placeholderTextColor={colors.textSecondary}
-            />
-            <View style={styles.textAreaFoot}>
-              <View style={styles.textActions}>
-                <Pressable style={styles.smallBtn}>
-                  <SparkIcon color={colors.goldDeep} size={16} />
-                  <Text style={styles.smallBtnText}>예시 받기</Text>
-                </Pressable>
-                <Pressable style={styles.smallBtn}>
-                  <MicIcon color={colors.textPrimary} size={16} />
-                  <Text style={styles.smallBtnText}>음성</Text>
-                </Pressable>
-              </View>
-              <Text style={styles.counter}>
-                {freeText.length}/{MAX_TEXT}
-              </Text>
-            </View>
-          </View>
-        </Section>
-
-        {/* 생성 버튼 */}
-        <Pressable
-          style={styles.cta}
-          onPress={onGenerate}
-          accessibilityRole="button">
-          <Text style={styles.ctaText}>AI 코스 생성하기</Text>
-          <Chevron direction="right" color="#ffffff" size={18} />
-        </Pressable>
-
-        {/* 안전 우선 큐레이션 */}
-        <View style={styles.safetyRow}>
-          <View style={styles.safetyIcon}>
-            <ShieldIcon color={colors.goldDeep} size={18} />
-          </View>
-          <View style={styles.safetyTexts}>
-            <Text style={styles.safetyTitle}>안전 우선 큐레이션</Text>
-            <Text style={styles.safetySub}>
-              CCTV·가로등 밀집 지역, 안전등급 A 숙소 우선
-            </Text>
-          </View>
-          <Switch
-            value={safetyFirst}
-            onValueChange={setSafetyFirst}
-            trackColor={{ false: colors.track, true: colors.ink }}
-            thumbColor="#ffffff"
-          />
         </View>
+
+        {/* 항목 */}
+        {step.fields.map(field => (
+          <View key={field.id} style={styles.field}>
+            <View style={styles.fieldHead}>
+              <Text style={styles.fieldLabel}>{field.label}</Text>
+              {field.hint ? (
+                <Text style={styles.fieldHint}>{field.hint}</Text>
+              ) : null}
+            </View>
+            <FieldInput
+              field={field}
+              answers={answers}
+              onSet={setAnswer}
+              onToggle={toggleMulti}
+            />
+          </View>
+        ))}
       </ScrollView>
-    </View>
+
+      {/* 하단 액션 */}
+      <View style={styles.footer}>
+        <Pressable
+          onPress={goNext}
+          disabled={!canNext}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: !canNext }}
+          style={[styles.cta, !canNext && styles.ctaOff]}>
+          <Text style={[styles.ctaText, !canNext && styles.ctaTextOff]}>
+            {isLast ? '완료' : '다음'}
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => (isLast ? onComplete(answers) : setIndex(i => i + 1))}
+          accessibilityRole="button"
+          style={styles.skipBtn}>
+          <Text style={styles.skipText}>건너뛰기</Text>
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
-function Section({
-  title,
-  hint,
-  children,
+/** 항목 타입별 입력 UI */
+function FieldInput({
+  field,
+  answers,
+  onSet,
+  onToggle,
 }: {
-  title: string;
-  hint?: string;
-  children: React.ReactNode;
+  field: PreferenceField;
+  answers: PreferenceAnswers;
+  onSet: (id: string, value: PreferenceAnswers[string]) => void;
+  onToggle: (id: string, option: string) => void;
 }) {
-  return (
-    <View style={styles.section}>
-      <View style={styles.sectionHead}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {hint ? <Text style={styles.sectionHint}>{hint}</Text> : null}
-      </View>
-      {children}
-    </View>
-  );
+  const value = answers[field.id];
+
+  switch (field.type) {
+    case 'chips-single':
+      return (
+        <View style={styles.chipWrap}>
+          {field.options.map(option => (
+            <Chip
+              key={option}
+              label={option}
+              selected={value === option}
+              onPress={() => onSet(field.id, option)}
+            />
+          ))}
+        </View>
+      );
+
+    case 'chips-multi': {
+      const selected = Array.isArray(value) ? value : [];
+      return (
+        <View style={styles.chipWrap}>
+          {field.options.map(option => (
+            <Chip
+              key={option}
+              label={option}
+              selected={selected.includes(option)}
+              onPress={() => onToggle(field.id, option)}
+            />
+          ))}
+        </View>
+      );
+    }
+
+    case 'cards-single':
+      return (
+        <View>
+          {field.options.map(option => (
+            <OptionCard
+              key={option.value}
+              title={option.value}
+              desc={option.desc}
+              selected={value === option.value}
+              onPress={() => onSet(field.id, option.value)}
+            />
+          ))}
+        </View>
+      );
+
+    case 'slider': {
+      const current = typeof value === 'number' ? value : field.defaultValue;
+      return (
+        <View>
+          <View style={styles.budgetRow}>
+            <Text style={styles.budgetValue}>
+              {current}
+              {field.unit}
+              {current === field.max ? '+' : ''}
+            </Text>
+            <Text style={styles.budgetNote}>숙소 비용 제외</Text>
+          </View>
+          <Slider
+            min={field.min}
+            max={field.max}
+            step={field.step}
+            value={current}
+            onChange={v => onSet(field.id, v)}
+          />
+          <View style={styles.scaleRow}>
+            {field.scale.map(label => (
+              <Text key={label} style={styles.scaleText}>
+                {label}
+              </Text>
+            ))}
+          </View>
+        </View>
+      );
+    }
+
+    case 'text': {
+      const text = typeof value === 'string' ? value : '';
+      return (
+        <View style={styles.textArea}>
+          <TextInput
+            style={styles.textInput}
+            value={text}
+            onChangeText={t => onSet(field.id, t.slice(0, field.maxLength))}
+            multiline
+            placeholder={field.placeholder}
+            placeholderTextColor={colors.textSecondary}
+          />
+          <View style={styles.textAreaFoot}>
+            <View style={styles.textActions}>
+              <Pressable style={styles.smallBtn}>
+                <SparkIcon color={colors.goldDeep} size={16} />
+                <Text style={styles.smallBtnText}>예시 받기</Text>
+              </Pressable>
+              <Pressable style={styles.smallBtn}>
+                <MicIcon color={colors.textPrimary} size={16} />
+                <Text style={styles.smallBtnText}>음성</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.counter}>
+              {text.length}/{field.maxLength}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    default:
+      return null;
+  }
 }
 
 const styles = StyleSheet.create({
@@ -225,12 +298,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.cream,
   },
-  header: {
+
+  // 진행바
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 4,
+    gap: 12,
+    paddingLeft: 8,
+    paddingRight: 20,
+    paddingVertical: 10,
   },
   backBtn: {
     width: 36,
@@ -238,48 +314,104 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.textPrimary,
+  progressTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.progressTrack,
+    overflow: 'hidden',
   },
-  headerSub: {
+  progressFill: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.gold,
+  },
+  stepCount: {
     fontSize: 13,
+    fontWeight: '700',
     color: colors.textSecondary,
-    marginTop: 2,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 40,
   },
 
-  section: {
-    marginBottom: 24,
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 24,
   },
-  sectionHead: {
+
+  // 질문 헤더
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 26,
+  },
+  mascot: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.goldSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  titleTexts: {
+    flex: 1,
+    paddingTop: 2,
+  },
+  title: {
+    fontSize: 21,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    lineHeight: 29,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 6,
+    lineHeight: 19,
+  },
+
+  // 항목
+  field: {
+    marginBottom: 26,
+  },
+  fieldHead: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 16,
+  fieldLabel: {
+    fontSize: 15,
     fontWeight: '800',
     color: colors.textPrimary,
   },
-  sectionHint: {
-    fontSize: 13,
+  fieldHint: {
+    fontSize: 12,
     color: colors.textSecondary,
     fontWeight: '600',
   },
   chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
 
-  // 예산 눈금
+  // 예산
+  budgetRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  budgetValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  budgetNote: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
   scaleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -337,55 +469,38 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // CTA
+  // 하단 액션
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
+  },
   cta: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
     backgroundColor: colors.ink,
     borderRadius: 16,
     paddingVertical: 18,
-    marginBottom: 14,
+  },
+  ctaOff: {
+    backgroundColor: colors.ctaDisabled,
   },
   ctaText: {
     color: '#ffffff',
     fontSize: 16,
     fontWeight: '800',
   },
-
-  // 안전 우선
-  safetyRow: {
-    flexDirection: 'row',
+  ctaTextOff: {
+    color: colors.ctaDisabledText,
+  },
+  skipBtn: {
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 14,
+    paddingVertical: 14,
   },
-  safetyIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: colors.goldSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  safetyTexts: {
-    flex: 1,
-  },
-  safetyTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-  safetySub: {
-    fontSize: 12,
+  skipText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.textSecondary,
-    marginTop: 3,
-    lineHeight: 17,
   },
 });
 
