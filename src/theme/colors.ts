@@ -32,6 +32,9 @@ export const colors = {
   ink: '#1b2233', // 다크 버튼·선택 칩
   inkText: '#ffffff',
   badgeBg: '#2b3348', // 카드 위 배지
+  heroCard: '#252c40', // 히어로 위 통계 카드
+  heroCardBorder: 'rgba(255,255,255,0.08)',
+  heroTextMuted: '#aeb6c6',
 
   // 골드 액센트
   gold: '#e3b25c',
@@ -47,10 +50,26 @@ export const colors = {
   bonusBg: '#f3ecdd',
   bonusText: '#b8873a',
 
+  // 긴급/SOS
+  danger: '#d24b4b',
+  dangerSoft: '#fbeaea',
+
   // 슬라이더
   track: '#e5e2da',
   trackFill: '#1b2233',
 };
+
+/**
+ * 피드 사진 플레이스홀더 톤 (실제 사진 연동 전 사용).
+ * bg=하늘, ridge=능선, accent=달·불빛
+ */
+export const photoTones = {
+  night: { bg: '#1c2233', ridge: '#2a3247', accent: '#f0d9a6' },
+  dusk: { bg: '#33283a', ridge: '#453651', accent: '#f5c9a0' },
+  dawn: { bg: '#23364a', ridge: '#2f4a63', accent: '#cfe3f5' },
+};
+
+export type PhotoTone = keyof typeof photoTones;
 
 /** 도시 유형별 색상 (지도 칩·범례) */
 export const cityTypeColors = {

@@ -153,6 +153,170 @@ export function MicIcon({ color, size = 18 }: IconProps) {
   );
 }
 
+/** 하트 (찜하기) — 채움 스타일 */
+export function HeartIcon({ color, size = 20 }: IconProps) {
+  const lobe = size * 0.52;
+  return (
+    <View style={{ width: size, height: size }}>
+      <View style={{ position: 'absolute', left: 0, top: size * 0.06, width: lobe, height: lobe, borderRadius: lobe / 2, backgroundColor: color }} />
+      <View style={{ position: 'absolute', right: 0, top: size * 0.06, width: lobe, height: lobe, borderRadius: lobe / 2, backgroundColor: color }} />
+      <View
+        style={{
+          position: 'absolute',
+          left: size * 0.19,
+          top: size * 0.16,
+          width: size * 0.62,
+          height: size * 0.62,
+          backgroundColor: color,
+          borderBottomLeftRadius: 2,
+          transform: [{ rotate: '45deg' }],
+        }}
+      />
+    </View>
+  );
+}
+
+/** 자물쇠 (미획득 배지) */
+export function LockIcon({ color, size = 18 }: IconProps) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          width: size * 0.46,
+          height: size * 0.3,
+          borderWidth: 2,
+          borderBottomWidth: 0,
+          borderColor: color,
+          borderTopLeftRadius: size * 0.23,
+          borderTopRightRadius: size * 0.23,
+        }}
+      />
+      <View style={{ width: size * 0.66, height: size * 0.44, borderRadius: 3, backgroundColor: color }} />
+    </View>
+  );
+}
+
+/** 말풍선 (댓글) */
+export function CommentIcon({ color, size = 20 }: IconProps) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          width: size * 0.86,
+          height: size * 0.68,
+          marginBottom: size * 0.12,
+          borderWidth: 2,
+          borderColor: color,
+          borderRadius: size * 0.22,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          left: size * 0.26,
+          bottom: size * 0.06,
+          width: size * 0.2,
+          height: size * 0.2,
+          borderLeftWidth: 2,
+          borderBottomWidth: 2,
+          borderColor: color,
+          transform: [{ rotate: '-45deg' }],
+        }}
+      />
+    </View>
+  );
+}
+
+/** 종이비행기 (공유) */
+export function SendIcon({ color, size = 20 }: IconProps) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          width: 0,
+          height: 0,
+          borderLeftWidth: size * 0.3,
+          borderRightWidth: size * 0.3,
+          borderBottomWidth: size * 0.62,
+          borderLeftColor: 'transparent',
+          borderRightColor: 'transparent',
+          borderBottomColor: color,
+          transform: [{ rotate: '90deg' }],
+        }}
+      />
+    </View>
+  );
+}
+
+/**
+ * 북마크 (저장) — 채움 스타일.
+ * 아래쪽 V홈은 카드 배경색으로 덮어 그리므로 흰 카드가 아니면 notchColor 를 넘겨주세요.
+ */
+export function BookmarkIcon({
+  color,
+  size = 20,
+  notchColor = '#ffffff',
+}: IconProps & { notchColor?: string }) {
+  const w = size * 0.62;
+  const h = size * 0.8;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          width: w,
+          height: h,
+          backgroundColor: color,
+          borderRadius: 3,
+          overflow: 'hidden',
+          justifyContent: 'flex-end',
+        }}>
+        <View
+          style={{
+            alignSelf: 'center',
+            width: 0,
+            height: 0,
+            borderLeftWidth: w / 2,
+            borderRightWidth: w / 2,
+            borderBottomWidth: h * 0.36,
+            borderLeftColor: 'transparent',
+            borderRightColor: 'transparent',
+            borderBottomColor: notchColor,
+          }}
+        />
+      </View>
+    </View>
+  );
+}
+
+/** 경광등 (SOS 단축 버튼) */
+export function SirenIcon({ color, size = 20 }: IconProps) {
+  const ray = {
+    position: 'absolute' as const,
+    width: size * 0.2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: color,
+  };
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: size * 0.16 }}>
+      <View
+        style={{
+          width: size * 0.5,
+          height: size * 0.36,
+          borderWidth: 2,
+          borderBottomWidth: 0,
+          borderColor: color,
+          borderTopLeftRadius: size * 0.25,
+          borderTopRightRadius: size * 0.25,
+        }}
+      />
+      <View style={{ width: size * 0.74, height: 3, borderRadius: 1.5, backgroundColor: color }} />
+      <View style={[ray, { left: 0, top: size * 0.3, transform: [{ rotate: '-30deg' }] }]} />
+      <View style={[ray, { right: 0, top: size * 0.3, transform: [{ rotate: '30deg' }] }]} />
+    </View>
+  );
+}
+
 /** 반짝임 ✦ (AI/샛별이) */
 export function SparkIcon({ color, size = 18 }: IconProps) {
   return (
