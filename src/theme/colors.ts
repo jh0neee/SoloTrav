@@ -54,6 +54,11 @@ export const colors = {
   danger: '#d24b4b',
   dangerSoft: '#fbeaea',
 
+  // 카카오 로그인 (카카오 브랜드 가이드 고정 색 — 임의로 바꾸면 안 됩니다)
+  kakaoYellow: '#fee500',
+  kakaoYellowPressed: '#e9d200',
+  kakaoLabel: 'rgba(0,0,0,0.85)',
+
   // 슬라이더
   track: '#e5e2da',
   trackFill: '#1b2233',

@@ -23,5 +23,26 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
+
+      <!--
+        카카오 로그인 리다이렉트 수신 액티비티.
+        스킴의 ${KAKAO_NATIVE_APP_KEY} 는 app/build.gradle 의 manifestPlaceholders 로
+        gradle.properties 값이 주입됩니다.
+        Android 12(API 31)+ 는 exported 명시가 필수입니다.
+      -->
+      <activity
+        android:name="com.kakao.sdk.auth.AuthCodeHandlerActivity"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+
+            <!-- Redirect URI: kakao{NATIVE_APP_KEY}://oauth -->
+            <data
+              android:host="oauth"
+              android:scheme="kakao${KAKAO_NATIVE_APP_KEY}" />
+        </intent-filter>
+      </activity>
     </application>
 </manifest>

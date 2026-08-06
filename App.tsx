@@ -10,16 +10,22 @@ import {
   SafeAreaProvider,
   SafeAreaView,
 } from 'react-native-safe-area-context';
-import BottomTabNavigator from './src/navigation/BottomTabNavigator';
+import RootNavigator from './src/navigation/RootNavigator';
+import { AuthProvider } from './src/auth/AuthContext';
 import { colors } from './src/theme/colors';
 
 function App() {
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={styles.safeArea} edges={['top']}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-        <BottomTabNavigator />
-      </SafeAreaView>
+      <AuthProvider>
+        <SafeAreaView style={styles.safeArea} edges={['top']}>
+          <StatusBar
+            barStyle="dark-content"
+            backgroundColor={colors.background}
+          />
+          <RootNavigator />
+        </SafeAreaView>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

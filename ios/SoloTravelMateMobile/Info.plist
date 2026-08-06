@@ -24,6 +24,32 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- ── 카카오 로그인 ────────────────────────────────────────────
+	     아래 세 곳의 YOUR_KAKAO_NATIVE_APP_KEY 를 카카오 개발자센터의
+	     '네이티브 앱 키'로 바꿔주세요. (Android 쪽 값은 android/gradle.properties)
+	       · CFBundleURLSchemes  : kakao{네이티브앱키}  ← 로그인 후 앱으로 복귀할 스킴
+	       · KAKAO_APP_KEY       : SDK 초기화에 쓰이는 키
+	       · LSApplicationQueriesSchemes : 카카오톡 앱 설치 여부 확인용
+	-->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kakaoYOUR_KAKAO_NATIVE_APP_KEY</string>
+			</array>
+		</dict>
+	</array>
+	<key>KAKAO_APP_KEY</key>
+	<string>YOUR_KAKAO_NATIVE_APP_KEY</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>kakaokompassauth</string>
+		<string>storykompassauth</string>
+		<string>kakaolink</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>

@@ -5,6 +5,7 @@
  */
 import React, { useState } from 'react';
 import {
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { colors } from '../theme/colors';
+import { useAuth } from '../auth/AuthContext';
 import { getCityById } from '../data/cities';
 import {
   BADGES,
@@ -57,6 +59,7 @@ const SAFETY_ICONS: Record<SafetyIcon, IconComponent> = {
 const earnedBadgeCount = BADGES.filter(badge => badge.earned).length;
 
 function MyScreen() {
+  const { user, logout } = useAuth();
   // 찜 해제해도 목록에는 남기고 하트만 꺼지도록 id 집합으로 관리합니다.
   const [savedIds, setSavedIds] = useState<string[]>(
     SAVED_COURSES.map(course => course.id),
@@ -76,20 +79,38 @@ function MyScreen() {
   const toggleSafety = (key: string) =>
     setSafety(prev => ({ ...prev, [key]: !prev[key] }));
 
+  const confirmLogout = () =>
+    Alert.alert('로그아웃', '로그아웃 하시겠어요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '로그아웃',
+        style: 'destructive',
+        // logout() 은 내부에서 실패를 흡수하므로 결과를 기다리지 않습니다.
+        onPress: () => {
+          logout();
+        },
+      },
+    ]);
+
+  // 로그인한 계정 정보가 있으면 우선 사용하고, 없으면 목업 프로필로 표시합니다.
+  const displayName = user?.nickname ?? PROFILE.name;
+  const displayInitial = displayName.trim().charAt(0) || PROFILE.initial;
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}>
+      showsVerticalScrollIndicator={false}
+    >
       {/* ── 다크 히어로: 프로필 + 활동 통계 ── */}
       <View style={styles.hero}>
         <View style={styles.heroTop}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{PROFILE.initial}</Text>
+            <Text style={styles.avatarText}>{displayInitial}</Text>
           </View>
           <View style={styles.heroTexts}>
             <Text style={styles.heroName} numberOfLines={1}>
-              {PROFILE.name}
+              {displayName}
               <Text style={styles.heroTitle}> · {PROFILE.title}</Text>
             </Text>
             <Text style={styles.heroMeta}>
@@ -100,7 +121,8 @@ function MyScreen() {
           <Pressable
             style={styles.bellBtn}
             accessibilityRole="button"
-            accessibilityLabel="알림">
+            accessibilityLabel="알림"
+          >
             <BellIcon color="#ffffff" size={20} />
           </Pressable>
         </View>
@@ -138,9 +160,10 @@ function MyScreen() {
 
       {/* ── 찜한 코스 ── */}
       <Section
-        title="찜한 코스"
+        title="찜한 코스@"
         hint={`${savedIds.length}개`}
-        actionLabel="전체">
+        actionLabel="전체"
+      >
         <View style={styles.courseList}>
           {SAVED_COURSES.map(course => (
             <CourseCard
@@ -157,7 +180,8 @@ function MyScreen() {
       <Section
         title="나의 배지"
         hint={`${earnedBadgeCount}/${BADGES.length}`}
-        actionLabel="전체">
+        actionLabel="전체"
+      >
         <View style={styles.badgeGrid}>
           {BADGES.map(badge => (
             <BadgeCell key={badge.id} badge={badge} />
@@ -180,7 +204,8 @@ function MyScreen() {
                     style={[
                       styles.safetyIcon,
                       isSos ? styles.safetyIconSos : null,
-                    ]}>
+                    ]}
+                  >
                     <Icon
                       color={isSos ? colors.danger : colors.goldDeep}
                       size={18}
@@ -207,7 +232,8 @@ function MyScreen() {
                   <Pressable
                     style={styles.contactRow}
                     accessibilityRole="button"
-                    accessibilityLabel="긴급 연락처 변경">
+                    accessibilityLabel="긴급 연락처 변경"
+                  >
                     <Text style={styles.contactLabel}>긴급 연락처</Text>
                     <Text style={styles.contactValue}>
                       {EMERGENCY_CONTACT.name} · {EMERGENCY_CONTACT.phone}
@@ -223,6 +249,18 @@ function MyScreen() {
             );
           })}
         </View>
+      </Section>
+
+      {/* ── 계정 ── */}
+      <Section title="계정" hint={user?.email ?? undefined}>
+        <Pressable
+          style={styles.logoutBtn}
+          onPress={confirmLogout}
+          accessibilityRole="button"
+          accessibilityLabel="로그아웃"
+        >
+          <Text style={styles.logoutText}>로그아웃</Text>
+        </Pressable>
       </Section>
     </ScrollView>
   );
@@ -253,7 +291,8 @@ function Section({
           <Pressable
             style={styles.moreBtn}
             onPress={onAction}
-            accessibilityRole="button">
+            accessibilityRole="button"
+          >
             <Text style={styles.moreText}>{actionLabel}</Text>
             <Chevron direction="right" color={colors.textSecondary} size={16} />
           </Pressable>
@@ -311,7 +350,8 @@ function CourseCard({
         hitSlop={8}
         accessibilityRole="button"
         accessibilityState={{ selected: saved }}
-        accessibilityLabel={saved ? '찜 해제' : '찜하기'}>
+        accessibilityLabel={saved ? '찜 해제' : '찜하기'}
+      >
         <HeartIcon color={saved ? colors.goldDeep : colors.border} size={20} />
       </Pressable>
     </Pressable>
@@ -327,7 +367,8 @@ function BadgeCell({ badge }: { badge: Badge }) {
         style={[
           styles.badgeCircle,
           badge.earned ? styles.badgeCircleOn : styles.badgeCircleOff,
-        ]}>
+        ]}
+      >
         {badge.earned ? (
           <Icon color={colors.goldDeep} size={22} />
         ) : (
@@ -336,7 +377,8 @@ function BadgeCell({ badge }: { badge: Badge }) {
       </View>
       <Text
         style={[styles.badgeName, badge.earned ? null : styles.badgeNameOff]}
-        numberOfLines={1}>
+        numberOfLines={1}
+      >
         {badge.name}
       </Text>
       <Text style={styles.badgeDesc} numberOfLines={2}>
@@ -691,6 +733,22 @@ const styles = StyleSheet.create({
   contactValue: {
     fontSize: 13,
     color: colors.textSecondary,
+  },
+
+  // 계정
+  logoutBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: '#ffffff',
+  },
+  logoutText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.danger,
   },
 });
 

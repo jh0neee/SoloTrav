@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "lastUpdated": "2026-08-04T09:40:35.204Z",
+  "lastUpdated": "2026-08-06T09:42:18.423Z",
   "activeFeatures": [
     "theme",
     "SoloTrav",
@@ -9,7 +9,12 @@
     "icons",
     "config",
     "data",
-    "home"
+    "home",
+    "api",
+    "storage",
+    "auth",
+    "SoloTravelMateMobile",
+    "scratchpad"
   ],
   "primaryFeature": "theme",
   "features": {
@@ -22,7 +27,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-07-13T11:23:28.936Z",
-        "lastUpdated": "2026-08-04T09:34:57.058Z"
+        "lastUpdated": "2026-08-04T10:25:39.723Z"
       },
       "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\theme\\colors.ts"
     },
@@ -35,9 +40,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-07-13T11:23:35.299Z",
-        "lastUpdated": "2026-08-04T09:34:43.266Z"
+        "lastUpdated": "2026-08-04T10:26:17.896Z"
       },
-      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\components\\OptionCard.tsx"
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\App.tsx"
     },
     "screens": {
       "phase": "do",
@@ -48,9 +53,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-07-13T11:23:45.743Z",
-        "lastUpdated": "2026-08-04T04:11:02.661Z"
+        "lastUpdated": "2026-08-04T10:29:34.690Z"
       },
-      "lastFile": "c:\\Users\\jihyeon\\workspace\\SoloTrav\\src\\screens\\RecordScreen.tsx"
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\screens\\MyScreen.tsx"
     },
     "navigation": {
       "phase": "do",
@@ -61,9 +66,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-07-13T11:24:22.886Z",
-        "lastUpdated": "2026-08-04T09:36:30.302Z"
+        "lastUpdated": "2026-08-04T10:26:09.141Z"
       },
-      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\navigation\\HomeStack.tsx"
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\navigation\\RootNavigator.tsx"
     },
     "icons": {
       "phase": "do",
@@ -87,9 +92,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-07-21T00:15:24.181Z",
-        "lastUpdated": "2026-07-21T00:15:24.181Z"
+        "lastUpdated": "2026-08-06T09:32:23.075Z"
       },
-      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\config\\user.ts"
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\config\\userAgent.ts"
     },
     "data": {
       "phase": "do",
@@ -116,6 +121,71 @@
         "lastUpdated": "2026-08-04T09:37:28.535Z"
       },
       "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\screens\\home\\PreferencePromptScreen.tsx"
+    },
+    "api": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-04T10:21:43.529Z",
+        "lastUpdated": "2026-08-06T09:42:11.595Z"
+      },
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\api\\mappers.ts"
+    },
+    "storage": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-04T10:22:02.538Z",
+        "lastUpdated": "2026-08-04T10:24:49.956Z"
+      },
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\storage\\userStorage.ts"
+    },
+    "auth": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-04T10:24:31.576Z",
+        "lastUpdated": "2026-08-06T09:42:18.420Z"
+      },
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\auth\\AuthContext.tsx"
+    },
+    "SoloTravelMateMobile": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-04T10:28:42.304Z",
+        "lastUpdated": "2026-08-04T10:28:50.444Z"
+      },
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\ios\\SoloTravelMateMobile\\AppDelegate.swift"
+    },
+    "scratchpad": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-04T10:51:18.763Z",
+        "lastUpdated": "2026-08-04T10:51:40.211Z"
+      },
+      "lastFile": "C:\\Users\\TCS-W05\\AppData\\Local\\Temp\\claude\\c--Users-TCS-W05-Desktop-AppProject-SoloTrav\\6312db7f-ce36-4105-aa68-a03bd00cfca2\\scratchpad\\probe-babel.js"
     }
   },
   "pipeline": {
@@ -126,7 +196,7 @@
   "session": {
     "startedAt": "2026-07-13T11:22:23.378Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-08-04T09:40:35.204Z"
+    "lastActivity": "2026-08-06T09:42:18.423Z"
   },
   "history": [
     {
@@ -468,6 +538,336 @@
     {
       "timestamp": "2026-08-04T09:40:35.204Z",
       "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:21:22.103Z",
+      "feature": "SoloTrav",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:21:24.231Z",
+      "feature": "SoloTrav",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:21:36.055Z",
+      "feature": "config",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:21:43.531Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:22:02.540Z",
+      "feature": "storage",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:22:07.708Z",
+      "feature": "SoloTrav",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:22:24.501Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:22:33.080Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:22:48.672Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:22:53.636Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:23:12.554Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:23:30.606Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:23:44.099Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:24:31.578Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:24:49.959Z",
+      "feature": "storage",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:25:06.312Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:25:23.318Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:25:39.725Z",
+      "feature": "theme",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:25:50.453Z",
+      "feature": "SoloTrav",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:26:04.906Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:26:09.143Z",
+      "feature": "navigation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:26:17.899Z",
+      "feature": "SoloTrav",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:26:25.514Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:26:31.002Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:26:39.051Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:26:45.197Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:26:51.559Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:26:59.547Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:28:42.307Z",
+      "feature": "SoloTravelMateMobile",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:28:50.447Z",
+      "feature": "SoloTravelMateMobile",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:29:34.696Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:33:02.958Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:33:16.004Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:33:20.211Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:33:25.799Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:33:30.051Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:51:18.768Z",
+      "feature": "scratchpad",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T10:51:40.216Z",
+      "feature": "scratchpad",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-04T11:03:56.558Z",
+      "feature": "config",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:32:23.077Z",
+      "feature": "config",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:33:08.058Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:33:19.980Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:33:30.615Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:33:38.801Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:33:45.977Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:33:50.705Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:38:22.560Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:38:34.033Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:41:34.381Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:41:40.378Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:41:50.120Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:41:58.391Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:42:05.798Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:42:11.597Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:42:18.423Z",
+      "feature": "auth",
       "phase": "do",
       "action": "updated"
     }
