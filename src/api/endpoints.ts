@@ -44,4 +44,12 @@ export const ENDPOINTS = {
   refresh: () => `/auth/refresh`,
   /** 서비스 refresh token 폐기 */
   logout: () => `/auth/logout`,
+
+  // 마이페이지
+  /** 내 정보 조회 */
+  me: () => `/users/me`,
+  /** 내 여행 취향 프롬프트 조회(GET) / 등록·편집(POST) */
+  travelPreferences: () => `/users/me/travel-preferences`,
+  /** 내 여행 배지 조회 */
+  travelBadges: () => `/users/me/travel-badges`,
 } as const;

@@ -3,9 +3,12 @@
  * 나의 여행 취향 / 찜한 코스 / 나의 배지 / 안전 설정을 구성합니다.
  * 안전 설정은 SOS 단축 버튼을 포함한 토글(Switch) 목록입니다.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
+  BackHandler,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,17 +18,24 @@ import {
 } from 'react-native';
 import { colors } from '../theme/colors';
 import { useAuth } from '../auth/AuthContext';
-import { getCityById } from '../data/cities';
+import { useMyProfile } from '../user/userStore';
 import {
-  BADGES,
+  preferenceStore,
+  usePreferences,
+  type PreferenceState,
+} from '../preferences/preferenceStore';
+import { badgeStore, countEarned, useBadges } from '../badges/badgeStore';
+import PreferencePromptScreen from './home/PreferencePromptScreen';
+import { highlightPreferences } from '../data/preferences';
+import { getCityById } from '../data/cities';
+import type { Badge, BadgeIcon } from '../types/badge';
+import type { BadgeState } from '../badges/badgeStore';
+import {
   EMERGENCY_CONTACT,
   PROFILE,
   PROFILE_STATS,
   SAFETY_SETTINGS,
   SAVED_COURSES,
-  TRAVEL_PREFERENCE,
-  type Badge,
-  type BadgeIcon,
   type SafetyIcon,
   type SavedCourse,
 } from '../data/profile';
@@ -56,10 +66,15 @@ const SAFETY_ICONS: Record<SafetyIcon, IconComponent> = {
   shield: ShieldIcon,
 };
 
-const earnedBadgeCount = BADGES.filter(badge => badge.earned).length;
-
 function MyScreen() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
+  const profile = useMyProfile();
+  const preferences = usePreferences();
+  const badges = useBadges();
+  const earnedBadgeCount = countEarned(badges.badges);
+  // 취향 편집은 이 화면 위에 전체 화면으로 띄웁니다.
+  // (탭 안이라 홈 스택처럼 push 할 곳이 없습니다)
+  const [editingPreference, setEditingPreference] = useState(false);
   // 찜 해제해도 목록에는 남기고 하트만 꺼지도록 id 집합으로 관리합니다.
   const [savedIds, setSavedIds] = useState<string[]>(
     SAVED_COURSES.map(course => course.id),
@@ -79,6 +94,18 @@ function MyScreen() {
   const toggleSafety = (key: string) =>
     setSafety(prev => ({ ...prev, [key]: !prev[key] }));
 
+  // 편집 중 안드로이드 뒤로가기는 앱을 닫지 않고 편집만 닫습니다.
+  useEffect(() => {
+    if (!editingPreference) {
+      return;
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setEditingPreference(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [editingPreference]);
+
   const confirmLogout = () =>
     Alert.alert('로그아웃', '로그아웃 하시겠어요?', [
       { text: '취소', style: 'cancel' },
@@ -92,9 +119,24 @@ function MyScreen() {
       },
     ]);
 
-  // 로그인한 계정 정보가 있으면 우선 사용하고, 없으면 목업 프로필로 표시합니다.
-  const displayName = user?.nickname ?? PROFILE.name;
-  const displayInitial = displayName.trim().charAt(0) || PROFILE.initial;
+  if (editingPreference) {
+    return (
+      <PreferencePromptScreen
+        initialAnswers={preferences.answers}
+        isSaving={preferences.isSaving}
+        saveError={preferences.error}
+        onBack={() => setEditingPreference(false)}
+        onComplete={async answers => {
+          try {
+            await preferenceStore.save(answers);
+            setEditingPreference(false);
+          } catch {
+            // 실패 메시지는 위저드 하단에 뜹니다. 답변이 날아가지 않게 열어둡니다.
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <ScrollView
@@ -106,11 +148,20 @@ function MyScreen() {
       <View style={styles.hero}>
         <View style={styles.heroTop}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{displayInitial}</Text>
+            {/* 카카오 프로필 사진이 있으면 쓰고, 없으면 이름 첫 글자 */}
+            {profile.profileImageUrl ? (
+              <Image
+                source={{ uri: profile.profileImageUrl }}
+                style={styles.avatarImage}
+                accessibilityIgnoresInvertColors
+              />
+            ) : (
+              <Text style={styles.avatarText}>{profile.initial}</Text>
+            )}
           </View>
           <View style={styles.heroTexts}>
             <Text style={styles.heroName} numberOfLines={1}>
-              {displayName}
+              {profile.displayName}
               <Text style={styles.heroTitle}> · {PROFILE.title}</Text>
             </Text>
             <Text style={styles.heroMeta}>
@@ -138,24 +189,16 @@ function MyScreen() {
       </View>
 
       {/* ── 나의 여행 취향 ── */}
-      <Section title="나의 여행 취향" actionLabel="수정">
-        <View style={styles.card}>
-          <PreferenceRow label="여행 기간" value={TRAVEL_PREFERENCE.period} />
-          <PreferenceRow label="여행 페이스" value={TRAVEL_PREFERENCE.pace} />
-          <PreferenceRow
-            label="하루 예산"
-            value={`${TRAVEL_PREFERENCE.budget}만원`}
-          />
-          <View style={styles.divider} />
-          <Text style={styles.prefLabel}>좋아하는 무드</Text>
-          <View style={styles.moodWrap}>
-            {TRAVEL_PREFERENCE.moods.map(mood => (
-              <View key={mood} style={styles.moodPill}>
-                <Text style={styles.moodText}>{mood}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
+      <Section
+        title="나의 여행 취향"
+        actionLabel={preferences.answers ? '수정' : undefined}
+        onAction={() => setEditingPreference(true)}
+      >
+        <TravelPreferenceCard
+          state={preferences}
+          onStart={() => setEditingPreference(true)}
+          onRetry={() => preferenceStore.reload()}
+        />
       </Section>
 
       {/* ── 찜한 코스 ── */}
@@ -179,14 +222,17 @@ function MyScreen() {
       {/* ── 나의 배지 ── */}
       <Section
         title="나의 배지"
-        hint={`${earnedBadgeCount}/${BADGES.length}`}
-        actionLabel="전체"
+        hint={
+          badges.status === 'ready' && badges.badges.length > 0
+            ? `${earnedBadgeCount}/${badges.badges.length}`
+            : undefined
+        }
+        actionLabel={badges.badges.length > 0 ? '전체' : undefined}
       >
-        <View style={styles.badgeGrid}>
-          {BADGES.map(badge => (
-            <BadgeCell key={badge.id} badge={badge} />
-          ))}
-        </View>
+        <BadgeSection
+          state={badges}
+          onRetry={() => badgeStore.reload()}
+        />
       </Section>
 
       {/* ── 안전 설정 (토글) ── */}
@@ -252,7 +298,8 @@ function MyScreen() {
       </Section>
 
       {/* ── 계정 ── */}
-      <Section title="계정" hint={user?.email ?? undefined}>
+      {/* 서버가 이메일을 안 주는 계정이 있어(카카오 동의 항목 미수집) 없으면 연결 상태만 알립니다. */}
+      <Section title="계정" hint={profile.email ?? '카카오 계정 연결됨'}>
         <Pressable
           style={styles.logoutBtn}
           onPress={confirmLogout}
@@ -299,6 +346,93 @@ function Section({
         ) : null}
       </View>
       {children}
+    </View>
+  );
+}
+
+/**
+ * 나의 여행 취향 카드.
+ * 조회 중 / 실패 / 미등록 / 등록됨 네 가지 상태를 모두 다룹니다.
+ */
+function TravelPreferenceCard({
+  state,
+  onStart,
+  onRetry,
+}: {
+  state: PreferenceState;
+  onStart: () => void;
+  onRetry: () => void;
+}) {
+  if (state.status === 'loading' || state.status === 'idle') {
+    return (
+      <View style={[styles.card, styles.prefPlaceholder]}>
+        <ActivityIndicator color={colors.goldDeep} />
+      </View>
+    );
+  }
+
+  if (state.status === 'error') {
+    return (
+      <View style={[styles.card, styles.prefPlaceholder]}>
+        <Text style={styles.prefEmptyText}>
+          {state.error ?? '취향을 불러오지 못했습니다.'}
+        </Text>
+        <Pressable
+          style={styles.prefCta}
+          onPress={onRetry}
+          accessibilityRole="button"
+        >
+          <Text style={styles.prefCtaText}>다시 시도</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  // 조회는 됐지만 아직 등록한 적이 없는 경우
+  if (!state.answers) {
+    return (
+      <View style={[styles.card, styles.prefPlaceholder]}>
+        <Text style={styles.prefEmptyText}>
+          아직 여행 취향을 등록하지 않았어요.{'\n'}
+          등록하면 취향에 맞는 코스를 추천해드려요.
+        </Text>
+        <Pressable
+          style={styles.prefCta}
+          onPress={onStart}
+          accessibilityRole="button"
+        >
+          <Text style={styles.prefCtaText}>취향 등록하기</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const highlights = highlightPreferences(state.answers);
+  return (
+    <View style={styles.card}>
+      <PreferenceRow label="여행 기간" value={highlights.duration ?? '미설정'} />
+      <PreferenceRow label="여행 페이스" value={highlights.pace ?? '미설정'} />
+      <PreferenceRow
+        label="하루 예산"
+        value={
+          highlights.dailyBudget !== null
+            ? `${highlights.dailyBudget}만원`
+            : '미설정'
+        }
+      />
+      {highlights.moods.length > 0 ? (
+        <>
+          <View style={styles.divider} />
+          <Text style={styles.prefLabel}>좋아하는 무드</Text>
+          <View style={styles.moodWrap}>
+            {highlights.moods.map(mood => (
+              <View key={mood} style={styles.moodPill}>
+                <Text style={styles.moodText}>{mood}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      ) : null}
     </View>
   );
 }
@@ -355,6 +489,62 @@ function CourseCard({
         <HeartIcon color={saved ? colors.goldDeep : colors.border} size={20} />
       </Pressable>
     </Pressable>
+  );
+}
+
+/**
+ * 나의 배지 목록.
+ * 조회 중 / 실패 / 아직 배지 없음 / 목록 네 가지 상태를 다룹니다.
+ */
+function BadgeSection({
+  state,
+  onRetry,
+}: {
+  state: BadgeState;
+  onRetry: () => void;
+}) {
+  if (state.status === 'loading' || state.status === 'idle') {
+    return (
+      <View style={[styles.card, styles.prefPlaceholder]}>
+        <ActivityIndicator color={colors.goldDeep} />
+      </View>
+    );
+  }
+
+  if (state.status === 'error') {
+    return (
+      <View style={[styles.card, styles.prefPlaceholder]}>
+        <Text style={styles.prefEmptyText}>
+          {state.error ?? '배지를 불러오지 못했습니다.'}
+        </Text>
+        <Pressable
+          style={styles.prefCta}
+          onPress={onRetry}
+          accessibilityRole="button"
+        >
+          <Text style={styles.prefCtaText}>다시 시도</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (state.badges.length === 0) {
+    return (
+      <View style={[styles.card, styles.prefPlaceholder]}>
+        <Text style={styles.prefEmptyText}>
+          아직 받은 배지가 없어요.{'\n'}
+          여행을 기록하면 배지가 하나씩 열려요.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.badgeGrid}>
+      {state.badges.map(badge => (
+        <BadgeCell key={badge.id} badge={badge} />
+      ))}
+    </View>
   );
 }
 
@@ -418,6 +608,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.mascot,
     alignItems: 'center',
     justifyContent: 'center',
+    // 프로필 사진이 원 밖으로 삐져나오지 않도록
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   avatarText: {
     fontSize: 24,
@@ -527,6 +723,28 @@ const styles = StyleSheet.create({
   },
 
   // 여행 취향
+  prefPlaceholder: {
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 24,
+  },
+  prefEmptyText: {
+    fontSize: 13,
+    lineHeight: 20,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  prefCta: {
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 12,
+    backgroundColor: colors.ink,
+  },
+  prefCtaText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
   prefRow: {
     flexDirection: 'row',
     alignItems: 'center',

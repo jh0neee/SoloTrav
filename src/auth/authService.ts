@@ -9,7 +9,7 @@ import { authApi } from '../api/authApi';
 import { setSessionExpiredHandler } from '../api/sessionRefresh';
 import { toApiError } from '../api/errors';
 import { tokenStorage } from '../storage/tokenStorage';
-import { userStorage } from '../storage/userStorage';
+import { userStore } from '../user/userStore';
 import { signInWithKakao, signOutFromKakao } from './kakaoSdk';
 import type { AuthSession, AuthTokens } from '../types/auth';
 
@@ -40,7 +40,7 @@ export const authService = {
     if (!tokens) {
       return null;
     }
-    const user = await userStorage.get();
+    const user = await userStore.load();
     return { tokens, user };
   },
 
@@ -63,7 +63,7 @@ export const authService = {
     }
 
     await tokenStorage.save(session.tokens);
-    await userStorage.save(session.user);
+    await userStore.save(session.user);
     return session;
   },
 
@@ -80,7 +80,7 @@ export const authService = {
     const tokens = tokenStorage.get();
 
     await tokenStorage.clear();
-    await userStorage.clear();
+    await userStore.clear();
 
     // 결과를 기다리지 않습니다. 실패는 revokeRemoteSession 안에서 흡수됩니다.
     revokeRemoteSession(tokens);

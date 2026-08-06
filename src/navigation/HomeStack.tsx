@@ -12,10 +12,11 @@ import HomeScreen from '../screens/home/HomeScreen';
 import CitySelectScreen from '../screens/home/CitySelectScreen';
 import PreferencePromptScreen from '../screens/home/PreferencePromptScreen';
 import type { City } from '../data/cities';
+import { summarizePreferences } from '../data/preferences';
 import {
-  summarizePreferences,
-  type PreferenceAnswers,
-} from '../data/preferences';
+  preferenceStore,
+  usePreferences,
+} from '../preferences/preferenceStore';
 
 type Route =
   | { name: 'home' }
@@ -24,7 +25,9 @@ type Route =
 
 function HomeStack() {
   const [stack, setStack] = useState<Route[]>([{ name: 'home' }]);
-  const [preferences, setPreferences] = useState<PreferenceAnswers | null>(null);
+  // 취향은 서버가 원본이라 화면 로컬 state 로 들고 있지 않습니다.
+  // (탭을 옮기거나 앱을 껐다 켜도 유지되어야 합니다)
+  const preferences = usePreferences();
   const current = stack[stack.length - 1];
 
   const push = useCallback(
@@ -60,11 +63,19 @@ function HomeStack() {
       return (
         <PreferencePromptScreen
           city={current.city}
+          initialAnswers={preferences.answers}
+          isSaving={preferences.isSaving}
+          saveError={preferences.error}
           onBack={pop}
-          onComplete={answers => {
-            setPreferences(answers);
-            pop();
-            // TODO: AI 코스 생성 결과 화면 연결
+          onComplete={async answers => {
+            try {
+              await preferenceStore.save(answers);
+              pop();
+              // TODO: AI 코스 생성 결과 화면 연결
+            } catch {
+              // 저장 실패 메시지는 스토어에 담겨 화면 하단에 뜹니다.
+              // 여기서 pop() 하면 입력한 답변이 통째로 날아가므로 남겨둡니다.
+            }
           }}
         />
       );
@@ -73,7 +84,9 @@ function HomeStack() {
       return (
         <HomeScreen
           preferenceSummary={
-            preferences ? summarizePreferences(preferences) : null
+            preferences.answers
+              ? summarizePreferences(preferences.answers)
+              : null
           }
           onOpenPreference={() => push({ name: 'preference' })}
           onOpenSearch={() => push({ name: 'citySelect' })}

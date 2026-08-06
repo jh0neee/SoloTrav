@@ -90,3 +90,84 @@ export type KakaoNativeLoginRequest = {
 export type RefreshTokenRequest = {
   refreshToken: string;
 };
+
+/**
+ * GET /users/me 응답(봉투를 벗긴 뒤).
+ * 로그인 응답의 user 와 같은 모양으로 보고 AuthUserDto 를 재사용합니다.
+ * 사용자 정보를 한 겹 더 감싸 내려주는 경우도 있어 user/profile 도 함께 봅니다.
+ */
+export type UserMeDto = AuthUserDto & {
+  user?: AuthUserDto;
+  profile?: AuthUserDto;
+};
+
+/**
+ * 여행 취향 프롬프트 (GET/POST 공통).
+ *
+ * 카테고리 8개는 스펙상 자유 형식 객체(`{}`)라 안쪽 필드를 서버가 정해두지
+ * 않았습니다. 그래서 앱이 "필드 id → 답변" 맵을 그대로 넣고, 나중에 모양이
+ * 바뀌면 알아볼 수 있도록 schemaVersion 을 함께 올립니다.
+ */
+export type PreferenceCategoryDto = Record<
+  string,
+  string | string[] | number | null
+>;
+
+export type TravelPreferenceDto = {
+  schemaVersion?: string;
+  trip?: PreferenceCategoryDto;
+  mobility?: PreferenceCategoryDto;
+  tempo?: PreferenceCategoryDto;
+  avoid?: PreferenceCategoryDto;
+  activity?: PreferenceCategoryDto;
+  food?: PreferenceCategoryDto;
+  stay?: PreferenceCategoryDto;
+  budget?: PreferenceCategoryDto;
+  freeText?: string | null;
+  meta?: Record<string, unknown> | null;
+};
+
+/**
+ * GET /users/me/travel-badges 응답의 배지 한 개.
+ *
+ * 응답을 아직 실측하지 못해 이름·획득 여부에 흔히 쓰이는 필드명을 함께 받아둡니다.
+ * 배열이 `{ badges: [...] }` / `{ items: [...] }` 로 감싸 오는 경우도 있어
+ * mapper 에서 함께 처리합니다.
+ */
+export type TravelBadgeDto = {
+  id?: string | number;
+  code?: string;
+  badgeId?: string | number;
+
+  name?: string;
+  title?: string;
+  badgeName?: string;
+
+  description?: string;
+  desc?: string;
+
+  /** 서버가 아이콘 키를 준다면 사용하고, 없으면 앱이 정합니다. */
+  icon?: string;
+
+  earned?: boolean;
+  isEarned?: boolean;
+  acquired?: boolean;
+  /** 획득 일시. 값이 있으면 획득한 것으로 봅니다. */
+  earnedAt?: string | null;
+  acquiredAt?: string | null;
+};
+
+/** 배지 목록을 한 겹 더 감싸 내려주는 경우 대응 */
+export type TravelBadgeListDto = {
+  badges?: TravelBadgeDto[];
+  items?: TravelBadgeDto[];
+  list?: TravelBadgeDto[];
+};
+
+/** POST /users/me/travel-preferences 요청 바디 (모든 키를 채워 보냅니다) */
+export type TravelPreferenceRequest = Required<
+  Omit<TravelPreferenceDto, 'freeText' | 'meta'>
+> & {
+  freeText: string;
+  meta: Record<string, unknown>;
+};

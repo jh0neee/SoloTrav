@@ -39,12 +39,35 @@ export type PreferenceField = FieldBase &
     | { type: 'text'; placeholder: string; maxLength: number }
   );
 
+/**
+ * POST /users/me/travel-preferences 바디에서 각 단계의 답변이 들어갈 키.
+ * 서버 스펙의 카테고리 8개와 위저드 8단계가 1:1로 대응합니다.
+ */
+export type PreferenceCategory =
+  | 'trip'
+  | 'mobility'
+  | 'tempo'
+  | 'avoid'
+  | 'activity'
+  | 'food'
+  | 'stay'
+  | 'budget';
+
 export type PreferenceStep = {
   id: string;
+  /** 이 단계의 답변이 서버 바디의 어느 카테고리로 들어가는지 */
+  category: PreferenceCategory;
   title: string;
   subtitle?: string;
   fields: PreferenceField[];
 };
+
+/**
+ * 자유 입력 필드 id.
+ * 화면에서는 마지막(예산) 단계 안에 있지만 서버 바디에서는 카테고리가 아니라
+ * 최상위 `freeText` 로 올라갑니다. 변환할 때 이 id 만 따로 빼냅니다.
+ */
+export const FREE_TEXT_FIELD_ID = 'freeText';
 
 /** 지역 칩: 아직 미정 + 도시 목록 */
 const REGION_OPTIONS = ['아직 미정', ...CITIES.map(c => c.name)];
@@ -52,6 +75,7 @@ const REGION_OPTIONS = ['아직 미정', ...CITIES.map(c => c.name)];
 export const PREFERENCE_STEPS: PreferenceStep[] = [
   {
     id: 'basic',
+    category: 'trip',
     title: '어떤 여행을 준비 중이세요?',
     subtitle: '기본 정보부터 알려주세요. 나중에 언제든 바꿀 수 있어요.',
     fields: [
@@ -73,6 +97,7 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   },
   {
     id: 'move',
+    category: 'mobility',
     title: '이동은 어떻게 하실 건가요?',
     subtitle: '동선을 짜는 데 가장 큰 기준이 돼요.',
     fields: [
@@ -106,6 +131,7 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   },
   {
     id: 'tempo',
+    category: 'tempo',
     title: '여행의 온도를 알려주세요',
     subtitle: '하루를 얼마나 촘촘하게 채울지 정해볼게요.',
     fields: [
@@ -137,6 +163,7 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   },
   {
     id: 'avoid',
+    category: 'avoid',
     title: '이것만은 정말 피하고 싶은 게 있나요?',
     subtitle: '고른 조건은 코스에서 빼드릴게요.',
     fields: [
@@ -175,6 +202,7 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   },
   {
     id: 'activity',
+    category: 'activity',
     title: '어떤 활동이 끌리세요?',
     subtitle: '끌리는 걸 모두 골라주세요. 많이 고를수록 정확해져요.',
     fields: [
@@ -212,6 +240,7 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   },
   {
     id: 'food',
+    category: 'food',
     title: '맛집은 어떤 스타일이세요?',
     subtitle: '혼자서도 편하게 먹을 수 있는 곳으로 골라드려요.',
     fields: [
@@ -265,6 +294,7 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   },
   {
     id: 'stay',
+    category: 'stay',
     title: '숙소는 무엇이 중요하세요?',
     subtitle: '안전등급과 함께 조건에 맞는 곳을 찾아드려요.',
     fields: [
@@ -314,6 +344,7 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   },
   {
     id: 'budget',
+    category: 'budget',
     title: '하루 예산은 얼마쯤?',
     subtitle: '숙소를 뺀 하루 경비 기준으로 알려주세요.',
     fields: [
@@ -354,8 +385,11 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   },
 ];
 
-/** 슬라이더처럼 초기값이 필요한 항목만 채운 빈 답변 */
-export function createInitialAnswers(regionName?: string): PreferenceAnswers {
+/**
+ * 슬라이더처럼 초기값이 필요한 항목만 채운 빈 답변.
+ * 저장된 답변·진입 도시는 호출하는 쪽에서 이 위에 덮어씁니다.
+ */
+export function createInitialAnswers(): PreferenceAnswers {
   const answers: PreferenceAnswers = {};
   PREFERENCE_STEPS.forEach(step =>
     step.fields.forEach(field => {
@@ -364,9 +398,6 @@ export function createInitialAnswers(regionName?: string): PreferenceAnswers {
       }
     }),
   );
-  if (regionName) {
-    answers.region = regionName;
-  }
   return answers;
 }
 
@@ -385,6 +416,31 @@ export function isStepComplete(
   return step.fields.every(
     field => !field.required || hasValue(answers[field.id]),
   );
+}
+
+/** 마이페이지 '나의 여행 취향' 카드에 보여줄 값 */
+export type PreferenceHighlights = {
+  duration: string | null;
+  pace: string | null;
+  /** 만원 단위 */
+  dailyBudget: number | null;
+  moods: string[];
+};
+
+const asText = (value: PreferenceValue | undefined) =>
+  typeof value === 'string' && value.length > 0 ? value : null;
+
+export function highlightPreferences(
+  answers: PreferenceAnswers,
+): PreferenceHighlights {
+  const budget = answers.dailyBudget;
+  const activities = answers.activities;
+  return {
+    duration: asText(answers.duration),
+    pace: asText(answers.pace),
+    dailyBudget: typeof budget === 'number' ? budget : null,
+    moods: Array.isArray(activities) ? activities : [],
+  };
 }
 
 /** 홈 배너에 보여줄 한 줄 요약 */

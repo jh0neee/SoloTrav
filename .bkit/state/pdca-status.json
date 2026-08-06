@@ -1,6 +1,6 @@
 {
   "version": "3.0",
-  "lastUpdated": "2026-08-06T09:42:18.423Z",
+  "lastUpdated": "2026-08-06T10:19:37.612Z",
   "activeFeatures": [
     "theme",
     "SoloTrav",
@@ -14,7 +14,10 @@
     "storage",
     "auth",
     "SoloTravelMateMobile",
-    "scratchpad"
+    "scratchpad",
+    "user",
+    "preferences",
+    "badges"
   ],
   "primaryFeature": "theme",
   "features": {
@@ -40,9 +43,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-07-13T11:23:35.299Z",
-        "lastUpdated": "2026-08-04T10:26:17.896Z"
+        "lastUpdated": "2026-08-06T10:18:34.654Z"
       },
-      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\App.tsx"
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\types\\badge.ts"
     },
     "screens": {
       "phase": "do",
@@ -53,7 +56,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-07-13T11:23:45.743Z",
-        "lastUpdated": "2026-08-04T10:29:34.690Z"
+        "lastUpdated": "2026-08-06T10:19:12.855Z"
       },
       "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\screens\\MyScreen.tsx"
     },
@@ -66,9 +69,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-07-13T11:24:22.886Z",
-        "lastUpdated": "2026-08-04T10:26:09.141Z"
+        "lastUpdated": "2026-08-06T10:09:44.842Z"
       },
-      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\navigation\\RootNavigator.tsx"
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\navigation\\HomeStack.tsx"
     },
     "icons": {
       "phase": "do",
@@ -105,9 +108,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-07-21T00:15:43.990Z",
-        "lastUpdated": "2026-08-04T09:40:35.201Z"
+        "lastUpdated": "2026-08-06T10:18:11.324Z"
       },
-      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\data\\preferences.ts"
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\data\\profile.ts"
     },
     "home": {
       "phase": "do",
@@ -118,7 +121,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-07-21T00:18:24.868Z",
-        "lastUpdated": "2026-08-04T09:37:28.535Z"
+        "lastUpdated": "2026-08-06T10:09:26.351Z"
       },
       "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\screens\\home\\PreferencePromptScreen.tsx"
     },
@@ -131,9 +134,9 @@
       "documents": {},
       "timestamps": {
         "started": "2026-08-04T10:21:43.529Z",
-        "lastUpdated": "2026-08-06T09:42:11.595Z"
+        "lastUpdated": "2026-08-06T10:17:18.883Z"
       },
-      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\api\\mappers.ts"
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\api\\userApi.ts"
     },
     "storage": {
       "phase": "do",
@@ -144,7 +147,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-08-04T10:22:02.538Z",
-        "lastUpdated": "2026-08-04T10:24:49.956Z"
+        "lastUpdated": "2026-08-06T09:58:29.160Z"
       },
       "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\storage\\userStorage.ts"
     },
@@ -157,7 +160,7 @@
       "documents": {},
       "timestamps": {
         "started": "2026-08-04T10:24:31.576Z",
-        "lastUpdated": "2026-08-06T09:42:18.420Z"
+        "lastUpdated": "2026-08-06T10:19:37.610Z"
       },
       "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\auth\\AuthContext.tsx"
     },
@@ -186,6 +189,45 @@
         "lastUpdated": "2026-08-04T10:51:40.211Z"
       },
       "lastFile": "C:\\Users\\TCS-W05\\AppData\\Local\\Temp\\claude\\c--Users-TCS-W05-Desktop-AppProject-SoloTrav\\6312db7f-ce36-4105-aa68-a03bd00cfca2\\scratchpad\\probe-babel.js"
+    },
+    "user": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-06T09:58:03.487Z",
+        "lastUpdated": "2026-08-06T10:08:05.614Z"
+      },
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\user\\userStore.ts"
+    },
+    "preferences": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-06T10:08:29.391Z",
+        "lastUpdated": "2026-08-06T10:08:29.391Z"
+      },
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\preferences\\preferenceStore.ts"
+    },
+    "badges": {
+      "phase": "do",
+      "phaseNumber": 3,
+      "matchRate": null,
+      "iterationCount": 0,
+      "requirements": [],
+      "documents": {},
+      "timestamps": {
+        "started": "2026-08-06T10:17:35.546Z",
+        "lastUpdated": "2026-08-06T10:17:35.546Z"
+      },
+      "lastFile": "c:\\Users\\TCS-W05\\Desktop\\AppProject\\SoloTrav\\src\\badges\\badgeStore.ts"
     }
   },
   "pipeline": {
@@ -196,7 +238,7 @@
   "session": {
     "startedAt": "2026-07-13T11:22:23.378Z",
     "onboardingCompleted": false,
-    "lastActivity": "2026-08-06T09:42:18.423Z"
+    "lastActivity": "2026-08-06T10:19:37.612Z"
   },
   "history": [
     {
@@ -867,6 +909,486 @@
     },
     {
       "timestamp": "2026-08-06T09:42:18.423Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:58:03.488Z",
+      "feature": "user",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:58:12.934Z",
+      "feature": "SoloTrav",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:58:19.866Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:58:29.161Z",
+      "feature": "storage",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:58:35.239Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:58:40.737Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:58:45.282Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:58:50.044Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:59:03.503Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:59:10.249Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:59:17.629Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:59:23.438Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:59:30.027Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:59:36.178Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:59:41.290Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:59:47.407Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T09:59:55.391Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:00:00.106Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:00:06.526Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:00:14.878Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:00:21.493Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:00:31.229Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:00:36.717Z",
+      "feature": "home",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:00:43.082Z",
+      "feature": "home",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:00:49.491Z",
+      "feature": "home",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:01:16.616Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:05:28.125Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:05:35.300Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:05:42.219Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:05:47.689Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:05:56.698Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:06:01.444Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:06:06.241Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:06:11.373Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:06:15.806Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:06:23.010Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:06:37.944Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:06:59.460Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:07:09.901Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:07:15.056Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:07:37.227Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:07:48.110Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:07:56.527Z",
+      "feature": "user",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:08:05.615Z",
+      "feature": "user",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:08:29.392Z",
+      "feature": "preferences",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:08:38.006Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:08:50.461Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:08:57.130Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:09:08.598Z",
+      "feature": "home",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:09:18.145Z",
+      "feature": "home",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:09:26.352Z",
+      "feature": "home",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:09:35.891Z",
+      "feature": "navigation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:09:44.843Z",
+      "feature": "navigation",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:10:13.114Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:10:22.444Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:10:29.933Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:10:36.812Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:10:47.665Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:11:02.549Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:11:17.165Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:11:22.739Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:11:29.248Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:11:58.059Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:12:54.971Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:16:27.624Z",
+      "feature": "SoloTrav",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:16:34.318Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:16:46.926Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:17:04.262Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:17:12.827Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:17:18.884Z",
+      "feature": "api",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:17:35.547Z",
+      "feature": "badges",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:18:11.326Z",
+      "feature": "data",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:18:20.646Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:18:34.655Z",
+      "feature": "SoloTrav",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:18:45.748Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:18:55.840Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:19:12.857Z",
+      "feature": "screens",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:19:23.898Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:19:31.664Z",
+      "feature": "auth",
+      "phase": "do",
+      "action": "updated"
+    },
+    {
+      "timestamp": "2026-08-06T10:19:37.612Z",
       "feature": "auth",
       "phase": "do",
       "action": "updated"

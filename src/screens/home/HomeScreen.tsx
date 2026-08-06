@@ -10,7 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { currentUser } from '../../config/user';
+import { useMyProfile } from '../../user/userStore';
 import { CITIES, SPOTLIGHT_CITY_IDS, type City } from '../../data/cities';
 import { colors } from '../../theme/colors';
 import {
@@ -40,6 +40,7 @@ function HomeScreen({
   onOpenPreference,
   preferenceSummary,
 }: Props) {
+  const profile = useMyProfile();
   const hasPreference = !!preferenceSummary;
 
   return (
@@ -61,7 +62,7 @@ function HomeScreen({
 
         <Text style={styles.heroKicker}>오늘 밤도 안전한 길로</Text>
         <Text style={styles.heroTitle}>
-          {currentUser.name}님, 어디로{'\n'}혼자 떠나볼까요?
+          {profile.displayName}님, 어디로{'\n'}혼자 떠나볼까요?
         </Text>
 
         {/* 검색 input (누르면 도시 선택으로 이동) */}

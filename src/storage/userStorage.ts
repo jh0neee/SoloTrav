@@ -12,12 +12,17 @@ import type { AuthUser } from '../types/auth';
 
 const STORAGE_KEY = '@solotrav/auth-user';
 
+/**
+ * id 만 있으면 유효한 사용자로 봅니다.
+ * nickname 은 서버가 null 로 내려주는 값이라 여기서 요구하면(예전 구현)
+ * 닉네임 없는 계정이 앱 재시작 때마다 통째로 버려집니다.
+ */
 function isValidUser(value: unknown): value is AuthUser {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
   const candidate = value as Partial<AuthUser>;
-  return typeof candidate.id === 'string' && typeof candidate.nickname === 'string';
+  return typeof candidate.id === 'string' && candidate.id.length > 0;
 }
 
 export const userStorage = {

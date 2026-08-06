@@ -9,6 +9,7 @@ import type {
   Envelope,
   KakaoAuthUrlDto,
   KakaoNativeConfigDto,
+  UserMeDto,
 } from './dto';
 import type {
   AuthSession,
@@ -18,7 +19,9 @@ import type {
 } from '../types/auth';
 
 /** 공통 응답 봉투(`{ payload: {...} }`)를 한 겹 벗깁니다. */
-function unwrap<T extends object>(payload: Envelope<T> | undefined | null): T {
+export function unwrap<T extends object>(
+  payload: Envelope<T> | undefined | null,
+): T {
   if (!payload) {
     return {} as T;
   }
@@ -48,7 +51,9 @@ function toAuthUser(dto: AuthUserDto | undefined): AuthUser | null {
   }
   return {
     id: String(id),
-    nickname: firstString(dto.nickname, dto.nickName, dto.name) ?? '여행자',
+    // 표시용 기본값을 여기서 만들지 않습니다. "서버가 안 준 것"과 "서버가 준 값"을
+    // 섞어버리면 화면에서 구분할 수 없어져서, 비었으면 null 그대로 넘깁니다.
+    nickname: firstString(dto.nickname, dto.nickName, dto.name),
     email: firstString(dto.email),
     profileImageUrl: firstString(
       dto.profileImageUrl,
@@ -96,6 +101,19 @@ export function toAuthSession(payload: unknown): AuthSession {
   };
 
   return { tokens, user: toAuthUser(dto.user ?? dto.profile) };
+}
+
+/**
+ * GET /users/me 응답 → 사용자.
+ * 사용자 객체를 user/profile 로 한 겹 더 감싸 주는 경우까지 받아둡니다.
+ */
+export function toMeUser(payload: unknown): AuthUser {
+  const dto = unwrap(payload as Envelope<UserMeDto>);
+  const user = toAuthUser(dto.user ?? dto.profile ?? dto);
+  if (!user) {
+    throw new ApiError('내 정보 응답을 해석할 수 없습니다.', { payload });
+  }
+  return user;
 }
 
 export function toKakaoNativeConfig(payload: unknown): KakaoNativeConfig {

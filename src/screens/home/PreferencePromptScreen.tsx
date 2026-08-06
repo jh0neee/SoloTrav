@@ -36,17 +36,33 @@ import {
 type Props = {
   /** 도시 카드에서 진입한 경우 여행 지역을 미리 채웁니다. */
   city?: City;
+  /** 이미 등록한 취향(편집 진입). 없으면 새로 작성합니다. */
+  initialAnswers?: PreferenceAnswers | null;
+  /** 저장 중이면 완료 버튼을 잠급니다. */
+  isSaving?: boolean;
+  /** 저장 실패 메시지. 있으면 하단에 띄우고 화면은 그대로 둡니다. */
+  saveError?: string | null;
   onBack: () => void;
   onComplete: (answers: PreferenceAnswers) => void;
 };
 
 const TOTAL = PREFERENCE_STEPS.length;
 
-function PreferencePromptScreen({ city, onBack, onComplete }: Props) {
+function PreferencePromptScreen({
+  city,
+  initialAnswers,
+  isSaving = false,
+  saveError,
+  onBack,
+  onComplete,
+}: Props) {
   const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<PreferenceAnswers>(() =>
-    createInitialAnswers(city?.name),
-  );
+  const [answers, setAnswers] = useState<PreferenceAnswers>(() => ({
+    // 저장된 답변 위에 진입 도시를 덮어씁니다(도시 카드로 들어온 의도가 우선).
+    ...createInitialAnswers(),
+    ...(initialAnswers ?? {}),
+    ...(city?.name ? { region: city.name } : {}),
+  }));
 
   const step = PREFERENCE_STEPS[index];
   const isLast = index === TOTAL - 1;
@@ -146,18 +162,24 @@ function PreferencePromptScreen({ city, onBack, onComplete }: Props) {
 
       {/* 하단 액션 */}
       <View style={styles.footer}>
+        {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
         <Pressable
           onPress={goNext}
-          disabled={!canNext}
+          disabled={!canNext || isSaving}
           accessibilityRole="button"
-          accessibilityState={{ disabled: !canNext }}
-          style={[styles.cta, !canNext && styles.ctaOff]}>
-          <Text style={[styles.ctaText, !canNext && styles.ctaTextOff]}>
-            {isLast ? '완료' : '다음'}
+          accessibilityState={{ disabled: !canNext || isSaving }}
+          style={[styles.cta, (!canNext || isSaving) && styles.ctaOff]}>
+          <Text
+            style={[
+              styles.ctaText,
+              (!canNext || isSaving) && styles.ctaTextOff,
+            ]}>
+            {isSaving ? '저장 중...' : isLast ? '완료' : '다음'}
           </Text>
         </Pressable>
         <Pressable
           onPress={() => (isLast ? onComplete(answers) : setIndex(i => i + 1))}
+          disabled={isSaving}
           accessibilityRole="button"
           style={styles.skipBtn}>
           <Text style={styles.skipText}>건너뛰기</Text>
@@ -474,6 +496,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 12,
+  },
+  error: {
+    marginBottom: 10,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+    color: colors.danger,
+    textAlign: 'center',
   },
   cta: {
     alignItems: 'center',

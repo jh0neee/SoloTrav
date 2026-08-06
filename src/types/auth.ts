@@ -10,10 +10,15 @@ export type AuthTokens = {
   refreshToken: string | null;
 };
 
-/** 로그인한 사용자 */
+/**
+ * 로그인한 사용자.
+ * 서버가 nickname/email/profileImage 를 null 로 내려주는 경우가 있어
+ * id 를 뺀 나머지는 전부 nullable 입니다.
+ * 표시용 기본값('여행자' 등)은 여기가 아니라 user/userStore 에서 채웁니다.
+ */
 export type AuthUser = {
   id: string;
-  nickname: string;
+  nickname: string | null;
   email: string | null;
   profileImageUrl: string | null;
 };
