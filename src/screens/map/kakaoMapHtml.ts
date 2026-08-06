@@ -7,14 +7,22 @@
  *
  * 통신 규약
  *  - Web → RN : window.ReactNativeWebView.postMessage(JSON)
- *      { type: 'ready' }                  지도 로드 완료
- *      { type: 'markerPress', id }        마커 탭
- *      { type: 'mapPress' }               빈 지도 탭 (시트 닫기용)
- *      { type: 'error', message }         SDK 로드 실패 등
+ *      { type: 'ready' }                       지도 로드 완료
+ *      { type: 'markerPress', id }             마커 탭
+ *      { type: 'searchMarkerPress', id }       검색 결과 마커 탭
+ *      { type: 'mapPress' }                    빈 지도 탭 (시트 닫기용)
+ *      { type: 'searchResult', reqId, items }  키워드 검색 응답
+ *      { type: 'error', message }              SDK 로드 실패 등
  *  - RN → Web : injectJavaScript 로 아래 전역 함수 호출
- *      window.__setCategory(category)     카테고리 필터 변경
- *      window.__selectPlace(id | null)    선택 마커 강조
- *      window.__moveToMyLocation()        현위치로 이동
+ *      window.__setCategory(category)          카테고리 필터 변경
+ *      window.__selectPlace(id | null)         선택 마커 강조
+ *      window.__moveToMyLocation()             현위치로 이동
+ *      window.__zoomIn() / window.__zoomOut()  확대 / 축소
+ *      window.__search(query, reqId)           카카오 장소 키워드 검색
+ *      window.__showSearchMarkers(items, fit)  검색 결과 마커 표시
+ *      window.__clearSearchMarkers()           검색 결과 마커 제거
+ *      window.__selectSearchMarker(id | null)  검색 결과 마커 강조 + 이동
+ *      window.__moveTo(lat, lng, level)        임의 좌표로 이동
  */
 import { KAKAO_JS_KEY } from '../../config/kakao';
 import type { Place, PlaceCategory } from '../../data/places';
@@ -59,7 +67,9 @@ export function buildKakaoMapHtml({
 <style>
   html, body { margin:0; padding:0; width:100%; height:100%; overflow:hidden;
     background:#f3efe7; -webkit-tap-highlight-color: transparent; }
-  #map { width:100%; height:100%; }
+  /* touch-action:none — 두 손가락 제스처를 브라우저가 가로채지 않고 지도 SDK 로 그대로
+     넘겨줍니다. 이게 없으면 웹뷰 안에서 핀치 확대/축소가 먹지 않는 경우가 있습니다. */
+  #map { width:100%; height:100%; touch-action:none; }
 
   /* ── 커스텀 마커 (방패 핀) ── */
   .pin { position:relative; width:34px; height:34px; cursor:pointer;
@@ -74,6 +84,23 @@ export function buildKakaoMapHtml({
   .pin-shadow { position:absolute; z-index:0; left:50%; top:40px; width:20px; height:6px;
     transform:translateX(-50%); border-radius:50%; background:rgba(40,40,40,.26); }
   .pin svg { width:15px; height:15px; display:block; }
+
+  /* ── 검색 결과 마커 (번호 핀) ── */
+  .spin { position:relative; width:30px; height:30px; cursor:pointer;
+    transition: transform .18s ease; transform-origin: 50% 120%; }
+  .spin.on { transform: scale(1.22); }
+  .spin-body { position:relative; z-index:2; width:30px; height:30px; box-sizing:border-box;
+    border-radius:50%; border:2.5px solid #fff; background:#d8a84e; color:#fff;
+    font:700 13px/1 -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 3px 8px rgba(0,0,0,.3); }
+  .spin.on .spin-body { background:#1b2233; }
+  .spin-tail { position:absolute; z-index:1; left:50%; top:22px; width:10px; height:10px;
+    transform:translateX(-50%) rotate(45deg); border-radius:0 0 3px 0; background:#d8a84e;
+    border-right:2.5px solid #fff; border-bottom:2.5px solid #fff; }
+  .spin.on .spin-tail { background:#1b2233; }
+  .spin-shadow { position:absolute; z-index:0; left:50%; top:36px; width:18px; height:6px;
+    transform:translateX(-50%); border-radius:50%; background:rgba(40,40,40,.26); }
 
   /* ── 현위치 파란 점 ── */
   .me { position:relative; width:20px; height:20px; }
@@ -101,6 +128,8 @@ export function buildKakaoMapHtml({
   var CENTER = ${JSON.stringify(center)};
   var ME = ${JSON.stringify(myLocation)};
   var LEVEL = ${level};
+  var MIN_LEVEL = 1;   // 최대 확대
+  var MAX_LEVEL = 14;  // 최대 축소
   var INITIAL_CATEGORY = ${JSON.stringify(initialCategory)};
 
   function send(payload) {
@@ -117,8 +146,11 @@ export function buildKakaoMapHtml({
     '<path d="m8.7 12.1 2.3 2.3 4.3-4.6" stroke="currentColor" stroke-width="2" ' +
     'stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-  var overlays = {};   // id -> { overlay, el, category }
+  var overlays = {};         // id -> { overlay, el, category }
+  var searchOverlays = {};   // 검색 결과 id -> { overlay, el }
   var selectedId = null;
+  var selectedSearchId = null;
+  var placesService = null;  // kakao.maps.services.Places
   var map = null;
 
   function makePin(place) {
@@ -143,6 +175,9 @@ export function buildKakaoMapHtml({
       center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
       level: LEVEL,
     });
+
+    // 키워드 검색용 서비스 (SDK URL 의 libraries=services 로 로드됩니다)
+    placesService = new kakao.maps.services.Places();
 
     PLACES.forEach(function (place) {
       var el = makePin(place);
@@ -201,10 +236,150 @@ export function buildKakaoMapHtml({
     if (map) { map.panTo(new kakao.maps.LatLng(ME.lat, ME.lng)); }
   };
 
+  /**
+   * 카카오 확대 레벨은 숫자가 작을수록 확대입니다 (1=최대 확대, 14=최대 축소).
+   * 범위를 벗어난 값을 넣으면 아무 반응이 없어서 여기서 직접 잘라 줍니다.
+   */
+  function setLevelClamped(next) {
+    if (!map) return;
+    var level = Math.max(MIN_LEVEL, Math.min(MAX_LEVEL, next));
+    if (level === map.getLevel()) return;
+    map.setLevel(level, { animate: true });
+  }
+
+  window.__zoomIn = function () { setLevelClamped(map ? map.getLevel() - 1 : LEVEL); };
+  window.__zoomOut = function () { setLevelClamped(map ? map.getLevel() + 1 : LEVEL); };
+
+  window.__moveTo = function (lat, lng, level) {
+    if (!map) return;
+    if (typeof level === 'number') { map.setLevel(level); }
+    map.panTo(new kakao.maps.LatLng(lat, lng));
+  };
+
+  /* ── 카카오 장소 키워드 검색 ── */
+
+  // SDK 응답에서 필요한 필드만 골라 RN 으로 넘깁니다.
+  function toItem(d) {
+    return {
+      id: d.id,
+      name: d.place_name,
+      address: d.address_name || '',
+      roadAddress: d.road_address_name || '',
+      category: d.category_group_name || (d.category_name || '').split('>').pop().trim(),
+      phone: d.phone || '',
+      url: d.place_url || '',
+      distance: d.distance ? Number(d.distance) : null,
+      lat: Number(d.y),
+      lng: Number(d.x),
+    };
+  }
+
+  /**
+   * 1차는 현재 지도 중심 20km 안에서 가까운 순으로 찾고,
+   * 결과가 없으면 지역 제한을 풀고 전국에서 한 번 더 찾습니다.
+   * (예: 단양에서 지도를 보다가 '부산 해운대' 를 검색하는 경우)
+   */
+  window.__search = function (query, reqId) {
+    if (!placesService) {
+      send({ type: 'searchResult', reqId: reqId, items: [], status: 'ERROR' });
+      return;
+    }
+    var c = map ? map.getCenter() : new kakao.maps.LatLng(CENTER.lat, CENTER.lng);
+
+    function reply(items, status) {
+      send({ type: 'searchResult', reqId: reqId, items: items, status: status });
+    }
+
+    placesService.keywordSearch(query, function (data, status) {
+      if (status === kakao.maps.services.Status.OK && data.length) {
+        reply(data.map(toItem), 'OK');
+        return;
+      }
+      // 주변에 없으면 전국 검색으로 재시도
+      placesService.keywordSearch(query, function (data2, status2) {
+        if (status2 === kakao.maps.services.Status.OK) {
+          reply(data2.map(toItem), 'OK');
+        } else if (status2 === kakao.maps.services.Status.ZERO_RESULT) {
+          reply([], 'ZERO_RESULT');
+        } else {
+          reply([], 'ERROR');
+        }
+      }, { size: 15 });
+    }, {
+      location: c,
+      radius: 20000,
+      size: 15,
+      sort: kakao.maps.services.SortBy.DISTANCE,
+    });
+  };
+
+  function makeSearchPin(item, index) {
+    var el = document.createElement('div');
+    el.className = 'spin';
+    el.innerHTML =
+      '<div class="spin-shadow"></div>' +
+      '<div class="spin-tail"></div>' +
+      '<div class="spin-body">' + (index + 1) + '</div>';
+    el.addEventListener('click', function (e) {
+      e.stopPropagation();
+      send({ type: 'searchMarkerPress', id: item.id });
+    });
+    return el;
+  }
+
+  window.__clearSearchMarkers = function () {
+    Object.keys(searchOverlays).forEach(function (id) {
+      searchOverlays[id].overlay.setMap(null);
+    });
+    searchOverlays = {};
+    selectedSearchId = null;
+  };
+
+  window.__showSearchMarkers = function (items, fit) {
+    if (!map) return;
+    window.__clearSearchMarkers();
+
+    var bounds = new kakao.maps.LatLngBounds();
+    items.forEach(function (item, index) {
+      var pos = new kakao.maps.LatLng(item.lat, item.lng);
+      var el = makeSearchPin(item, index);
+      var overlay = new kakao.maps.CustomOverlay({
+        map: map,
+        position: pos,
+        content: el,
+        yAnchor: 1,
+        zIndex: 5,       // 카테고리 마커 위에 그립니다
+        clickable: true,
+      });
+      searchOverlays[item.id] = { overlay: overlay, el: el };
+      bounds.extend(pos);
+    });
+
+    if (fit && items.length) {
+      if (items.length === 1) {
+        map.setLevel(3);
+        map.setCenter(new kakao.maps.LatLng(items[0].lat, items[0].lng));
+      } else {
+        map.setBounds(bounds, 90, 40, 260, 40); // 상단 검색바·하단 카드 자리를 비워 둡니다
+      }
+    }
+  };
+
+  window.__selectSearchMarker = function (id) {
+    if (selectedSearchId && searchOverlays[selectedSearchId]) {
+      searchOverlays[selectedSearchId].el.classList.remove('on');
+    }
+    selectedSearchId = id;
+    if (id && searchOverlays[id]) {
+      searchOverlays[id].el.classList.add('on');
+      map.panTo(searchOverlays[id].overlay.getPosition());
+    }
+  };
+
   /* ── SDK 로드 ── */
   var script = document.createElement('script');
   script.src =
-    'https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JS_KEY}&autoload=false';
+    'https://dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_JS_KEY}&autoload=false&libraries=services';
   script.onload = function () {
     kakao.maps.load(initMap);
   };
