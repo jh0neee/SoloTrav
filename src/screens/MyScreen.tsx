@@ -10,6 +10,7 @@ import {
   BackHandler,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Switch,
@@ -18,7 +19,7 @@ import {
 } from 'react-native';
 import { colors } from '../theme/colors';
 import { useAuth } from '../auth/AuthContext';
-import { useMyProfile } from '../user/userStore';
+import { useMyProfile, userStore } from '../user/userStore';
 import {
   preferenceStore,
   usePreferences,
@@ -72,6 +73,24 @@ function MyScreen() {
   const preferences = usePreferences();
   const badges = useBadges();
   const earnedBadgeCount = countEarned(badges.badges);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // 마이 탭에 들어올 때마다 내 정보를 서버 기준으로 다시 불러옵니다.
+  // (로그인 직후 한 번만 받으면 다른 기기에서 바꾼 닉네임 등이 반영되지 않습니다)
+  useEffect(() => {
+    userStore.refresh();
+  }, []);
+
+  /** 당겨서 새로고침 — 마이페이지가 보여주는 세 가지를 한 번에 다시 받습니다. */
+  const refreshAll = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      userStore.refresh(),
+      preferenceStore.reload(),
+      badgeStore.reload(),
+    ]);
+    setRefreshing(false);
+  };
   // 취향 편집은 이 화면 위에 전체 화면으로 띄웁니다.
   // (탭 안이라 홈 스택처럼 push 할 곳이 없습니다)
   const [editingPreference, setEditingPreference] = useState(false);
@@ -143,6 +162,13 @@ function MyScreen() {
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refreshAll}
+          tintColor={colors.goldDeep}
+        />
+      }
     >
       {/* ── 다크 히어로: 프로필 + 활동 통계 ── */}
       <View style={styles.hero}>

@@ -157,6 +157,121 @@ export type TravelBadgeDto = {
   acquiredAt?: string | null;
 };
 
+/**
+ * 여행 기록 한 건 (GET /travel-records, GET /travel-records/me).
+ *
+ * 등록 바디는 스펙에서 확인된 `{ safetyGrade, tag, description, date }` 지만,
+ * 조회 응답은 아직 못 봐서 흔히 쓰이는 이름들을 함께 받아둡니다.
+ * 특히 태그는 요청이 `tag`(단수)라 응답도 `tag` 일 가능성이 높습니다.
+ */
+export type TravelRecordDto = {
+  id?: string | number;
+  recordId?: string | number;
+
+  safetyGrade?: string;
+  grade?: string;
+
+  tag?: string[];
+  tags?: string[];
+
+  description?: string;
+  content?: string;
+
+  date?: string;
+  createdAt?: string;
+
+  /** 전체 피드용 작성자. 형태를 몰라 객체/문자열 양쪽을 봅니다. */
+  user?: AuthUserDto;
+  author?: AuthUserDto;
+  nickname?: string;
+  userNickname?: string;
+  userId?: string | number;
+  authorId?: string | number;
+
+  /** 좋아요·댓글 집계. 이름을 몰라 흔한 후보를 모두 받아둡니다. */
+  likeCount?: number;
+  likesCount?: number;
+  likes?: number;
+  liked?: boolean;
+  likedByMe?: boolean;
+  isLiked?: boolean;
+
+  commentCount?: number;
+  commentsCount?: number;
+  comments?: number;
+
+  /**
+   * 업로드된 이미지. 문자열 배열로도, 객체 배열로도 올 수 있어 둘 다 받습니다.
+   * 객체일 때 URL 이 어떤 키에 담기는지 실측 전이라 흔한 후보를 함께 봅니다.
+   */
+  images?: (
+    | string
+    | {
+        url?: string;
+        imageUrl?: string;
+        fileUrl?: string;
+        filePath?: string;
+        path?: string;
+        src?: string;
+      }
+  )[];
+  imageUrls?: string[];
+};
+
+/** 댓글 한 건 */
+export type RecordCommentDto = {
+  id?: string | number;
+  commentId?: string | number;
+
+  content?: string;
+  text?: string;
+
+  user?: AuthUserDto;
+  author?: AuthUserDto;
+  nickname?: string;
+  userId?: string | number;
+  authorId?: string | number;
+
+  createdAt?: string;
+  date?: string;
+
+  likeCount?: number;
+  likesCount?: number;
+  likes?: number;
+  liked?: boolean;
+  likedByMe?: boolean;
+  isLiked?: boolean;
+};
+
+/** 댓글 목록을 한 겹 더 감싸 내려주는 경우 대응 */
+export type RecordCommentListDto = {
+  comments?: RecordCommentDto[];
+  items?: RecordCommentDto[];
+  list?: RecordCommentDto[];
+  content?: RecordCommentDto[];
+};
+
+/** POST /travel-records/{recordId}/comments, PATCH .../comments/{commentId} 바디 */
+export type CommentRequest = {
+  content: string;
+};
+
+/** 기록 목록을 한 겹 더 감싸 내려주는 경우 대응 (페이지네이션 포함) */
+export type TravelRecordListDto = {
+  records?: TravelRecordDto[];
+  items?: TravelRecordDto[];
+  list?: TravelRecordDto[];
+  content?: TravelRecordDto[];
+};
+
+/** POST /travel-records 요청 바디 — 스펙 그대로(태그 키는 `tag`) */
+export type TravelRecordRequest = {
+  safetyGrade: string;
+  tag: string[];
+  description: string;
+  date: string;
+};
+
 /** 배지 목록을 한 겹 더 감싸 내려주는 경우 대응 */
 export type TravelBadgeListDto = {
   badges?: TravelBadgeDto[];

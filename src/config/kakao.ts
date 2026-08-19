@@ -18,7 +18,9 @@
  * 있습니다. (Android: android/gradle.properties 의 KAKAO_NATIVE_APP_KEY,
  * iOS: ios/SoloTravelMateMobile/Info.plist) JS 에서는 접근하지 않습니다.
  */
-export const KAKAO_JS_KEY = '505ea2b2fe3bb9d79b69e242beb92f4b';
+import { KAKAO_LOGIN_REST_API_KEY} from '@env';
+
+export const KAKAO_JS_KEY =KAKAO_LOGIN_REST_API_KEY;
 
 /** WebView 에 HTML 을 주입할 때 쓰는 baseUrl. 카카오 Web 플랫폼에 등록한 값과 같아야 합니다. */
 export const KAKAO_WEBVIEW_ORIGIN = 'http://localhost';

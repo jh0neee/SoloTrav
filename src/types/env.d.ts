@@ -7,4 +7,5 @@ declare module '@env' {
   export const API_BASE_URL: string;
   export const API_VERSION: string;
   export const API_TIMEOUT_MS: string;
+  export const KAKAO_LOGIN_REST_API_KEY: string;
 }

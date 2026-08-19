@@ -26,11 +26,22 @@ function toPositiveInt(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
 }
 
+/**
+ * 스킴+호스트+포트만 남깁니다. (http://hj.tcs.local:3000/api → http://hj.tcs.local:3000)
+ * 서버가 '/uploads/a.jpg' 같은 상대 경로를 내려줄 때 앞에 붙일 주소입니다.
+ */
+function originOf(url: string): string {
+  const match = /^[a-z][a-z0-9+.-]*:\/\/[^/]+/i.exec(url);
+  return match ? match[0] : stripTrailingSlash(url);
+}
+
 const baseUrl = stripTrailingSlash(required('API_BASE_URL', API_BASE_URL));
 const version = required('API_VERSION', API_VERSION);
 
 export const env = {
   /** 예: http://hj.tcs.local:3000/api/v1 */
   apiBaseUrl: `${baseUrl}/${version}`,
+  /** 예: http://hj.tcs.local:3000 — 상대 경로를 절대 URL 로 만들 때 씁니다. */
+  apiOrigin: originOf(baseUrl),
   apiTimeoutMs: toPositiveInt(API_TIMEOUT_MS, 15000),
 } as const;

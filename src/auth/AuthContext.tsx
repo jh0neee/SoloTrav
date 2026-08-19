@@ -24,6 +24,8 @@ import { toApiError } from '../api/errors';
 import { userStore } from '../user/userStore';
 import { preferenceStore } from '../preferences/preferenceStore';
 import { badgeStore } from '../badges/badgeStore';
+import { recordStore } from '../records/recordStore';
+import { commentStore } from '../records/commentStore';
 import type { AuthStatus } from '../types/auth';
 
 type AuthContextValue = {
@@ -87,6 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userStore.clear();
       preferenceStore.reset();
       badgeStore.reset();
+      recordStore.reset();
+      commentStore.reset();
       setStatus('unauthenticated');
       setError('로그인이 만료되었습니다. 다시 로그인해주세요.');
     });
@@ -122,6 +126,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await authService.logout();
     preferenceStore.reset();
     badgeStore.reset();
+    recordStore.reset();
+    commentStore.reset();
     if (!mounted.current) {
       return;
     }

@@ -52,4 +52,32 @@ export const ENDPOINTS = {
   travelPreferences: () => `/users/me/travel-preferences`,
   /** 내 여행 배지 조회 */
   travelBadges: () => `/users/me/travel-badges`,
+
+  // 여행 기록
+  /** 여행 기록 조회(GET) / 등록(POST) */
+  travelRecords: () => `/travel-records`,
+  /** 내 여행 기록 조회 */
+  myTravelRecords: () => `/travel-records/me`,
+  /** 기록 수정(PATCH) / 삭제(DELETE) */
+  travelRecord: (recordId: string) =>
+    `/travel-records/${encodeURIComponent(recordId)}`,
+  /** 기록 이미지 업로드 (multipart/form-data) */
+  travelRecordImages: (recordId: string) =>
+    `/travel-records/${encodeURIComponent(recordId)}/images`,
+
+  // 피드 좋아요
+  /** 기록 좋아요(POST) / 취소(DELETE) */
+  recordLikes: (recordId: string) =>
+    `/travel-records/${encodeURIComponent(recordId)}/likes`,
+
+  // 댓글
+  /** 기록의 댓글 조회(GET) / 등록(POST) */
+  recordComments: (recordId: string) =>
+    `/travel-records/${encodeURIComponent(recordId)}/comments`,
+  /** 댓글 수정(PATCH) / 삭제(DELETE) — 기록 id 가 아니라 댓글 id 기준입니다 */
+  comment: (commentId: string) =>
+    `/travel-records/comments/${encodeURIComponent(commentId)}`,
+  /** 댓글 좋아요(POST) / 취소(DELETE) */
+  commentLikes: (commentId: string) =>
+    `/travel-records/comments/${encodeURIComponent(commentId)}/likes`,
 } as const;
