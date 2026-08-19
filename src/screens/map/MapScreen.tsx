@@ -19,8 +19,8 @@ import {
   PinIcon,
   SearchIcon,
   ShieldIcon,
-  SirenIcon,
 } from '../../components/icons/UiIcons';
+import { SirenIcon } from 'phosphor-react-native';
 import { colors } from '../../theme/colors';
 import {
   CATEGORY_LABEL,
@@ -32,6 +32,7 @@ import KakaoMap, { type KakaoMapHandle } from './KakaoMap';
 import MapSearchOverlay from './MapSearchOverlay';
 import PlaceBottomSheet from './PlaceBottomSheet';
 import PoiCard from './PoiCard';
+import SosScreen from '../sos/SosScreen';
 import type { SearchPoi } from './searchTypes';
 import type { Place } from '../../data/places';
 
@@ -51,6 +52,9 @@ function MapScreen() {
 
   const [category, setCategory] = useState<PlaceCategory>('safe');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // 비상벨 화면 — 하단 탭바까지 덮는 전체 화면으로 열립니다.
+  const [sosOpen, setSosOpen] = useState(false);
 
   // 검색 상태 — 오버레이 표시 / 지도에 찍힌 결과 / 그중 선택된 항목
   const [searchOpen, setSearchOpen] = useState(false);
@@ -275,9 +279,10 @@ function MapScreen() {
       {!selectedPlace && !selectedPoi && (
         <Pressable
           style={[styles.sos, { bottom: insets.bottom + 96 }]}
+          onPress={() => setSosOpen(true)}
           accessibilityRole="button"
           accessibilityLabel="긴급 SOS">
-          <SirenIcon color={colors.textOnPrimary} size={20} />
+          <SirenIcon color={colors.textOnPrimary} size={22} weight="fill" />
           <Text style={styles.sosText}>SOS</Text>
         </Pressable>
       )}
@@ -307,6 +312,8 @@ function MapScreen() {
       )}
 
       <PlaceBottomSheet place={selectedPlace} onClose={closeSheet} />
+
+      <SosScreen visible={sosOpen} onClose={() => setSosOpen(false)} />
 
       <MapSearchOverlay
         visible={searchOpen}
