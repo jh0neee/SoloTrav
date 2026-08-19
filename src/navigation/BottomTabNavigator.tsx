@@ -1,6 +1,6 @@
 /**
  * 외부 의존성 없는 자체 하단 탭 네비게이터.
- * - 떠 있는 둥근 알약형 탭바.
+ * - 화면 하단에 붙는 납작한 탭바 (라운드·그림자 없음, 상단 얇은 구분선).
  * - 가운데(샛별이) 탭은 볼록 튀어나온 금색 마스코트 버튼.
  * - 탭 목록은 ./tabs.ts 에서 관리합니다.
  */
@@ -20,13 +20,14 @@ function BottomTabNavigator() {
 
   return (
     <View style={styles.container}>
-      {/* 현재 선택된 화면 */}
+      {/* 현재 선택된 화면 — 모든 화면이 상태바 아래까지 그려집니다.
+          상단 여백은 각 화면이 useSafeAreaInsets 로 직접 처리합니다. */}
       <View style={styles.screen}>
         <ActiveScreen />
       </View>
 
-      {/* 떠 있는 하단 탭바 */}
-      <View style={[styles.tabBarWrap, { paddingBottom: (insets.bottom || 10) }]}>
+      {/* 하단 탭바 */}
+      <View style={[styles.tabBarWrap, { paddingBottom: insets.bottom }]}>
         <View style={styles.tabBar}>
           {TABS.map(tab =>
             tab.variant === 'center' ? (
@@ -57,7 +58,7 @@ type TabProps = {
   onPress: () => void;
 };
 
-/** 일반 탭 — 아이콘 + 라벨 */
+/** 일반 탭 — 아이콘 + 라벨. 선택 시 Phosphor weight 를 fill 로 바꿔 강조합니다. */
 function DefaultTab({ tab, focused, onPress }: TabProps) {
   const color = focused ? colors.tabActive : colors.tabInactive;
   const Icon = tab.Icon;
@@ -68,7 +69,9 @@ function DefaultTab({ tab, focused, onPress }: TabProps) {
       accessibilityRole="button"
       accessibilityState={{ selected: focused }}
       accessibilityLabel={tab.label}>
-      {Icon ? <Icon color={color} size={24} /> : null}
+      {Icon ? (
+        <Icon color={color} size={24} weight={focused ? 'fill' : 'regular'} />
+      ) : null}
       <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
         {tab.label}
       </Text>
@@ -104,24 +107,17 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
+  // 카카오맵처럼 화면 하단에 붙는 납작한 바 (라운드·그림자 없음)
   tabBarWrap: {
-    paddingHorizontal: 16,
-    backgroundColor: 'transparent',
+    backgroundColor: colors.tabBarBackground,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
   },
   tabBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 66,
+    height: 58,
     backgroundColor: colors.tabBarBackground,
-    borderRadius: 33,
-    paddingHorizontal: 8,
-    // 부드러운 그림자 (iOS)
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    // Android
-    elevation: 12,
   },
   tabItem: {
     flex: 1,

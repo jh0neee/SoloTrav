@@ -6,10 +6,12 @@ import React from 'react';
 import {
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { currentUser } from '../../config/user';
 import { CITIES, SPOTLIGHT_CITY_IDS, type City } from '../../data/cities';
 import { colors } from '../../theme/colors';
@@ -32,13 +34,17 @@ const spotlightCities = SPOTLIGHT_CITY_IDS.map(
 );
 
 function HomeScreen({ onOpenSearch, onSelectCity }: Props) {
+  const insets = useSafeAreaInsets();
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}>
+      {/* 히어로가 상태바 뒤까지 올라가므로 아이콘을 밝게 */}
+      <StatusBar barStyle="light-content" />
+
       {/* ── 다크 히어로 ── */}
-      <View style={styles.hero}>
+      <View style={[styles.hero, { paddingTop: insets.top + 12 }]}>
         <View style={styles.heroTop}>
           <View style={styles.brandRow}>
             <Lighthouse />
@@ -177,7 +183,7 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.heroBg,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
     paddingBottom: 24,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,

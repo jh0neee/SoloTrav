@@ -10,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CITIES,
   CITY_TYPE_LABEL,
@@ -28,6 +29,7 @@ const REGION_TABS = ['충북 시군', '전국'] as const;
 const CHIP = 54;
 
 function CitySelectScreen({ onBack, onCreateCourse }: Props) {
+  const insets = useSafeAreaInsets();
   const [regionTab, setRegionTab] = useState(0);
   const [selectedId, setSelectedId] = useState('danyang');
 
@@ -35,8 +37,8 @@ function CitySelectScreen({ onBack, onCreateCourse }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* 헤더 */}
-      <View style={styles.header}>
+      {/* 헤더 — 상태바 아래까지 화면이 올라오므로 인셋만큼 내려줍니다 */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable
           onPress={onBack}
           style={styles.backBtn}

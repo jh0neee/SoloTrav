@@ -11,6 +11,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '../components/Chip';
 import { CITY_TYPE_LABEL, getCityById } from '../data/cities';
 import { FEED_CATEGORIES, FEED_POSTS, type FeedPost } from '../data/feed';
@@ -27,6 +28,7 @@ const ALL = '전체';
 const FILTERS = [ALL, ...FEED_CATEGORIES];
 
 function RecordScreen() {
+  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<string>(ALL);
   const [likedIds, setLikedIds] = useState<string[]>(
     FEED_POSTS.filter(post => post.likedByMe).map(post => post.id),
@@ -56,7 +58,7 @@ function RecordScreen() {
       showsVerticalScrollIndicator={false}
       ListHeaderComponent={
         <View>
-          <View style={styles.header}>
+          <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
             <View style={styles.headerTexts}>
               <Text style={styles.kicker}>혼행 피드</Text>
               <Text style={styles.title}>다들 어디 다녀왔을까</Text>
@@ -243,7 +245,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 16,
+    // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
   },
   headerTexts: {
     flex: 1,

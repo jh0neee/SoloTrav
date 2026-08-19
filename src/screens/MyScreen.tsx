@@ -7,11 +7,13 @@ import React, { useState } from 'react';
 import {
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Switch,
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { getCityById } from '../data/cities';
 import {
@@ -57,6 +59,7 @@ const SAFETY_ICONS: Record<SafetyIcon, IconComponent> = {
 const earnedBadgeCount = BADGES.filter(badge => badge.earned).length;
 
 function MyScreen() {
+  const insets = useSafeAreaInsets();
   // 찜 해제해도 목록에는 남기고 하트만 꺼지도록 id 집합으로 관리합니다.
   const [savedIds, setSavedIds] = useState<string[]>(
     SAVED_COURSES.map(course => course.id),
@@ -81,8 +84,11 @@ function MyScreen() {
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}>
+      {/* 히어로가 상태바 뒤까지 올라가므로 아이콘을 밝게 */}
+      <StatusBar barStyle="light-content" />
+
       {/* ── 다크 히어로: 프로필 + 활동 통계 ── */}
-      <View style={styles.hero}>
+      <View style={[styles.hero, { paddingTop: insets.top + 18 }]}>
         <View style={styles.heroTop}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{PROFILE.initial}</Text>
@@ -359,7 +365,7 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.heroBg,
     paddingHorizontal: 20,
-    paddingTop: 18,
+    // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
     paddingBottom: 22,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,

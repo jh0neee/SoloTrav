@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { City } from '../../data/cities';
 import { colors } from '../../theme/colors';
 import Chip from '../../components/Chip';
@@ -51,6 +52,7 @@ const MOODS = [
 const MAX_TEXT = 300;
 
 function PreferencePromptScreen({ city, onBack, onGenerate }: Props) {
+  const insets = useSafeAreaInsets();
   const [period, setPeriod] = useState('1박 2일');
   const [pace, setPace] = useState('느긋하게');
   const [moods, setMoods] = useState<string[]>(['#감성사진', '#조용한_카페']);
@@ -67,8 +69,8 @@ function PreferencePromptScreen({ city, onBack, onGenerate }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* 헤더 */}
-      <View style={styles.header}>
+      {/* 헤더 — 상태바 아래까지 화면이 올라오므로 인셋만큼 내려줍니다 */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable
           onPress={onBack}
           style={styles.backBtn}
