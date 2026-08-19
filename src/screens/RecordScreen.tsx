@@ -1,11 +1,21 @@
 /**
- * 기록 화면 — 혼행러들이 어디에 다녀왔는지 보여주는 인스타그램형 피드.
- * 카테고리 칩으로 거르고, 사진 위에는 장소별 안전 등급을 작게 표시합니다.
+ * 기록 화면 — 혼행러들이 어디에 다녀왔는지 보여주는 피드.
+ *
+ *   전체(GET /travel-records) / 내 기록(GET /travel-records/me) 을 탭으로 나누고,
+ *   '+ 기록' 으로 작성 화면(POST /travel-records)을 띄웁니다.
+ *
+ * 서버가 주는 기록은 안전등급·태그·내용·날짜뿐이라 목업에 있던 좋아요/댓글은
+ * 화면에서 뺐습니다. 사진도 API 에 없어서 예전처럼 색 플레이스홀더를 씁니다.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  BackHandler,
   FlatList,
+  Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,220 +23,419 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '../components/Chip';
-import { CITY_TYPE_LABEL, getCityById } from '../data/cities';
-import { FEED_CATEGORIES, FEED_POSTS, type FeedPost } from '../data/feed';
+import RecordFormScreen from './record/RecordFormScreen';
+import RecordDetailScreen from './record/RecordDetailScreen';
+import {
+  recordStore,
+  useRecords,
+  type RecordListState,
+  type RecordScope,
+} from '../records/recordStore';
 import { colors, photoTones } from '../theme/colors';
 import {
-  BookmarkIcon,
   CommentIcon,
   HeartIcon,
-  SendIcon,
   ShieldIcon,
 } from '../components/icons/UiIcons';
+import type { TravelRecord } from '../types/travelRecord';
 
-const ALL = '전체';
-const FILTERS = [ALL, ...FEED_CATEGORIES];
+const ALL_TAGS = '전체';
+
+const SCOPES: { key: RecordScope; label: string }[] = [
+  { key: 'all', label: '전체' },
+  { key: 'mine', label: '내 기록' },
+];
+
+/**
+ * 탭 안이라 홈 스택처럼 push 할 곳이 없어서, 화면 전환을 이 안에서 관리합니다.
+ *   feed → detail → form(수정) / feed → form(작성)
+ */
+type Route =
+  | { name: 'feed' }
+  | { name: 'detail'; recordId: string }
+  | { name: 'form'; record: TravelRecord | null };
 
 function RecordScreen() {
+  const [scope, setScope] = useState<RecordScope>('all');
   const insets = useSafeAreaInsets();
-  const [filter, setFilter] = useState<string>(ALL);
-  const [likedIds, setLikedIds] = useState<string[]>(
-    FEED_POSTS.filter(post => post.likedByMe).map(post => post.id),
-  );
-  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string>(ALL_TAGS);
+  const [route, setRoute] = useState<Route>({ name: 'feed' });
 
-  const posts = useMemo(
+  const state = useRecords(scope);
+  const list = state[scope];
+
+  // 안드로이드 뒤로가기: 피드가 아니면 앱을 닫지 않고 한 단계 되돌립니다.
+  useEffect(() => {
+    if (route.name === 'feed') {
+      return;
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      // 수정 화면에서 돌아갈 곳은 그 기록의 상세입니다.
+      setRoute(current =>
+        current.name === 'form' && current.record
+          ? { name: 'detail', recordId: current.record.id }
+          : { name: 'feed' },
+      );
+      return true;
+    });
+    return () => sub.remove();
+  }, [route.name]);
+
+  // 필터 칩은 실제로 올라온 태그에서 만듭니다(서버에 카테고리 개념이 없습니다).
+  const tagOptions = useMemo(() => {
+    const tags = new Set<string>();
+    list.records.forEach(record => record.tags.forEach(tag => tags.add(tag)));
+    return [ALL_TAGS, ...Array.from(tags)];
+  }, [list.records]);
+
+  const visible = useMemo(
     () =>
-      filter === ALL
-        ? FEED_POSTS
-        : FEED_POSTS.filter(post => post.category === filter),
-    [filter],
+      tagFilter === ALL_TAGS
+        ? list.records
+        : list.records.filter(record => record.tags.includes(tagFilter)),
+    [list.records, tagFilter],
   );
 
-  const toggle = (id: string, setIds: React.Dispatch<React.SetStateAction<string[]>>) =>
-    setIds(prev =>
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id],
+  const switchScope = (next: RecordScope) => {
+    setScope(next);
+    // 목록이 바뀌면 이전 목록의 태그로 걸러진 채 남지 않도록 초기화합니다.
+    setTagFilter(ALL_TAGS);
+  };
+
+  const openForm = (record: TravelRecord | null) => {
+    recordStore.clearSubmitError();
+    setRoute({ name: 'form', record });
+  };
+
+  if (route.name === 'detail') {
+    return (
+      <RecordDetailScreen
+        recordId={route.recordId}
+        onBack={() => setRoute({ name: 'feed' })}
+        onEdit={record => openForm(record)}
+      />
     );
+  }
+
+  if (route.name === 'form') {
+    const editing = route.record;
+    return (
+      <RecordFormScreen
+        initial={
+          editing
+            ? {
+                safetyGrade: editing.safetyGrade,
+                tags: editing.tags,
+                description: editing.description,
+                date: editing.date,
+              }
+            : null
+        }
+        existingImageUrls={editing?.imageUrls ?? []}
+        isSubmitting={state.isSubmitting}
+        submitError={state.submitError}
+        onBack={() =>
+          setRoute(
+            editing
+              ? { name: 'detail', recordId: editing.id }
+              : { name: 'feed' },
+          )
+        }
+        onSubmit={async (input, images) => {
+          try {
+            // 사진만 실패한 경우는 던지지 않고 결과로 옵니다.
+            // 기록은 이미 저장됐으니 화면은 닫고, 사진 얘기만 따로 알립니다.
+            const result = editing
+              ? await recordStore.update(editing.id, input, images)
+              : await recordStore.create(input, images);
+
+            if (editing) {
+              setRoute({ name: 'detail', recordId: editing.id });
+            } else {
+              setRoute({ name: 'feed' });
+              // 방금 올린 기록이 바로 보이도록 내 기록으로 옮겨줍니다.
+              switchScope('mine');
+            }
+
+            if (result.imageError) {
+              Alert.alert('사진 업로드 실패', result.imageError);
+            }
+          } catch {
+            // 실패 메시지는 작성 화면 하단에 뜹니다. 입력이 날아가지 않게 열어둡니다.
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <FlatList
       style={styles.container}
       contentContainerStyle={styles.content}
-      data={posts}
-      keyExtractor={post => post.id}
-      extraData={[likedIds, savedIds]}
+      data={visible}
+      keyExtractor={record => record.id}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={list.status === 'loading' && list.records.length > 0}
+          onRefresh={() => recordStore.reload(scope)}
+          tintColor={colors.goldDeep}
+        />
+      }
       ListHeaderComponent={
         <View>
           <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
             <View style={styles.headerTexts}>
               <Text style={styles.kicker}>혼행 피드</Text>
-              <Text style={styles.title}>다들 어디 다녀왔을까</Text>
+              <Text style={styles.title}>
+                {scope === 'mine' ? '내가 다녀온 곳' : '다들 어디 다녀왔을까'}
+              </Text>
             </View>
             <Pressable
               style={styles.writeBtn}
+              onPress={() => openForm(null)}
               accessibilityRole="button"
-              accessibilityLabel="기록 쓰기">
-              {/* TODO: 기록 작성 화면 연결 */}
+              accessibilityLabel="기록 쓰기"
+            >
               <Text style={styles.writeText}>+ 기록</Text>
             </Pressable>
           </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterRow}>
-            {FILTERS.map(item => (
-              <Chip
-                key={item}
-                label={item}
-                selected={filter === item}
-                onPress={() => setFilter(item)}
-              />
-            ))}
-          </ScrollView>
+          {/* 전체 / 내 기록 */}
+          <View style={styles.segment}>
+            {SCOPES.map(item => {
+              const active = item.key === scope;
+              return (
+                <Pressable
+                  key={item.key}
+                  style={[styles.segmentItem, active && styles.segmentItemOn]}
+                  onPress={() => switchScope(item.key)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      active && styles.segmentTextOn,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {tagOptions.length > 1 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterRow}
+            >
+              {tagOptions.map(tag => (
+                <Chip
+                  key={tag}
+                  label={tag === ALL_TAGS ? tag : `#${tag}`}
+                  selected={tagFilter === tag}
+                  onPress={() => setTagFilter(tag)}
+                />
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={styles.filterSpacer} />
+          )}
         </View>
       }
       ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>아직 이 주제의 기록이 없어요.</Text>
-        </View>
+        <ListPlaceholder
+          state={list}
+          scope={scope}
+          filtered={tagFilter !== ALL_TAGS}
+          onRetry={() => recordStore.reload(scope)}
+          onWrite={() => openForm(null)}
+        />
       }
       renderItem={({ item }) => (
-        <PostCard
-          post={item}
-          liked={likedIds.includes(item.id)}
-          saved={savedIds.includes(item.id)}
-          onToggleLike={() => toggle(item.id, setLikedIds)}
-          onToggleSave={() => toggle(item.id, setSavedIds)}
+        <RecordCard
+          record={item}
+          onPress={() => setRoute({ name: 'detail', recordId: item.id })}
         />
       )}
     />
   );
 }
 
-/** 피드 카드 한 장 */
-function PostCard({
-  post,
-  liked,
-  saved,
-  onToggleLike,
-  onToggleSave,
+/** 목록이 비어 있을 때: 조회 중 / 실패 / 기록 없음 */
+function ListPlaceholder({
+  state,
+  scope,
+  filtered,
+  onRetry,
+  onWrite,
 }: {
-  post: FeedPost;
-  liked: boolean;
-  saved: boolean;
-  onToggleLike: () => void;
-  onToggleSave: () => void;
+  state: RecordListState;
+  scope: RecordScope;
+  filtered: boolean;
+  onRetry: () => void;
+  onWrite: () => void;
 }) {
-  const city = getCityById(post.cityId);
-  const tone = photoTones[post.tone];
-  // 데이터의 likes 에는 내 좋아요가 이미 반영돼 있으므로 차이만 더합니다.
-  const likeCount = post.likes + (liked ? 1 : 0) - (post.likedByMe ? 1 : 0);
+  if (state.status === 'loading' || state.status === 'idle') {
+    return (
+      <View style={styles.empty}>
+        <ActivityIndicator color={colors.goldDeep} />
+      </View>
+    );
+  }
+
+  if (state.status === 'error') {
+    return (
+      <View style={styles.empty}>
+        <Text style={styles.emptyText}>
+          {state.error ?? '기록을 불러오지 못했습니다.'}
+        </Text>
+        <Pressable
+          style={styles.emptyCta}
+          onPress={onRetry}
+          accessibilityRole="button"
+        >
+          <Text style={styles.emptyCtaText}>다시 시도</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (filtered) {
+    return (
+      <View style={styles.empty}>
+        <Text style={styles.emptyText}>이 태그의 기록이 없어요.</Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.card}>
+    <View style={styles.empty}>
+      <Text style={styles.emptyText}>
+        {scope === 'mine'
+          ? '아직 남긴 기록이 없어요.\n다녀온 곳을 기록해보세요.'
+          : '아직 올라온 기록이 없어요.\n첫 기록을 남겨보세요.'}
+      </Text>
+      <Pressable
+        style={styles.emptyCta}
+        onPress={onWrite}
+        accessibilityRole="button"
+      >
+        <Text style={styles.emptyCtaText}>기록 남기기</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/** 기록 카드 한 장 — 누르면 상세로 들어갑니다. */
+function RecordCard({
+  record,
+  onPress,
+}: {
+  record: TravelRecord;
+  onPress: () => void;
+}) {
+  const tone = photoTones[record.tone];
+  const author = record.authorName ?? '혼행러';
+  const isTopGrade = record.safetyGrade === 'A';
+  const cover = record.imageUrls[0];
+
+  return (
+    <Pressable
+      style={styles.card}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${author}의 기록 자세히 보기`}
+    >
       {/* 작성자 */}
       <View style={styles.postHead}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{post.author.initial}</Text>
+          <Text style={styles.avatarText}>{author.charAt(0)}</Text>
         </View>
         <View style={styles.postHeadTexts}>
-          <View style={styles.authorRow}>
-            <Text style={styles.author}>{post.author.name}</Text>
-            <View style={styles.authorTitle}>
-              <Text style={styles.authorTitleText}>{post.author.title}</Text>
-            </View>
-          </View>
+          <Text style={styles.author}>{author}</Text>
           <Text style={styles.postMeta} numberOfLines={1}>
-            {city.name} · {post.spot} · {post.timeAgo}
+            {record.date || '날짜 미상'}
           </Text>
         </View>
       </View>
 
-      {/* 사진 (플레이스홀더) + 안전 등급 */}
+      {/* 이미지가 있으면 첫 장을, 없으면 색 플레이스홀더를 그립니다. */}
       <View style={[styles.photo, { backgroundColor: tone.bg }]}>
-        <View style={[styles.moon, { backgroundColor: tone.accent }]} />
-        <View style={[styles.ridgeBack, { borderBottomColor: tone.ridge }]} />
-        <View style={[styles.ridgeFront, { borderBottomColor: tone.ridge }]} />
-
-        <View style={styles.typeBadge}>
-          <Text style={styles.typeBadgeText}>{CITY_TYPE_LABEL[city.type]}</Text>
-        </View>
+        {cover ? (
+          <Image
+            source={{ uri: cover }}
+            style={styles.photoImage}
+            accessibilityIgnoresInvertColors
+          />
+        ) : (
+          <>
+            <View style={[styles.moon, { backgroundColor: tone.accent }]} />
+            <View
+              style={[styles.ridgeBack, { borderBottomColor: tone.ridge }]}
+            />
+            <View
+              style={[styles.ridgeFront, { borderBottomColor: tone.ridge }]}
+            />
+          </>
+        )}
 
         <View style={styles.safetyPill}>
           <ShieldIcon
-            color={post.safetyGrade === 'A' ? colors.safeText : colors.bonusText}
+            color={isTopGrade ? colors.safeText : colors.bonusText}
             size={13}
           />
           <Text
             style={[
               styles.safetyGrade,
-              post.safetyGrade === 'A' ? styles.gradeA : styles.gradeB,
-            ]}>
-            안전 {post.safetyGrade}
-          </Text>
-          <Text style={styles.safetyNote} numberOfLines={1}>
-            {post.safetyNote}
+              isTopGrade ? styles.gradeA : styles.gradeB,
+            ]}
+          >
+            안전 {record.safetyGrade}
           </Text>
         </View>
       </View>
 
-      {/* 액션 */}
+      {/* 좋아요 · 댓글 */}
       <View style={styles.actions}>
         <Pressable
           style={styles.action}
-          onPress={onToggleLike}
+          onPress={() => {
+            // 실패하면 스토어가 알아서 되돌립니다.
+            recordStore.toggleLike(record.id).catch(() => {});
+          }}
           hitSlop={6}
           accessibilityRole="button"
-          accessibilityState={{ selected: liked }}
-          accessibilityLabel={liked ? '좋아요 취소' : '좋아요'}>
-          <HeartIcon color={liked ? colors.danger : colors.textSecondary} size={20} />
-          <Text style={styles.actionText}>{likeCount}</Text>
+          accessibilityState={{ selected: record.likedByMe }}
+          accessibilityLabel={record.likedByMe ? '좋아요 취소' : '좋아요'}
+        >
+          <HeartIcon
+            color={record.likedByMe ? colors.danger : colors.textSecondary}
+            size={20}
+          />
+          <Text style={styles.actionText}>{record.likeCount}</Text>
         </Pressable>
-
-        <Pressable
-          style={styles.action}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel="댓글">
-          <CommentIcon color={colors.textSecondary} size={20} />
-          <Text style={styles.actionText}>{post.comments}</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.action}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel="공유">
-          <SendIcon color={colors.textSecondary} size={18} />
-        </Pressable>
-
-        <Pressable
-          style={styles.saveBtn}
-          onPress={onToggleSave}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityState={{ selected: saved }}
-          accessibilityLabel={saved ? '저장 취소' : '저장'}>
-          <BookmarkIcon color={saved ? colors.ink : colors.textSecondary} size={20} />
-        </Pressable>
+        <View style={styles.action}>
+          <CommentIcon color={colors.textSecondary} size={19} />
+          <Text style={styles.actionText}>{record.commentCount}</Text>
+        </View>
       </View>
 
       {/* 본문 */}
-      <Text style={styles.caption}>
-        <Text style={styles.captionAuthor}>{post.author.name} </Text>
-        {post.caption}
-      </Text>
-      <Text style={styles.tags}>{post.tags.join(' ')}</Text>
-      {post.comments > 0 ? (
-        <Pressable accessibilityRole="button">
-          <Text style={styles.moreComments}>
-            댓글 {post.comments}개 모두 보기
-          </Text>
-        </Pressable>
+      {record.description ? (
+        <Text style={styles.caption} numberOfLines={3}>
+          {record.description}
+        </Text>
       ) : null}
-    </View>
+      {record.tags.length > 0 ? (
+        <Text style={styles.tags}>
+          {record.tags.map(tag => `#${tag}`).join(' ')}
+        </Text>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -273,10 +482,44 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
+
+  // 전체 / 내 기록
+  segment: {
+    flexDirection: 'row',
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 16,
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  segmentItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  segmentItemOn: {
+    backgroundColor: colors.ink,
+  },
+  segmentText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  segmentTextOn: {
+    color: colors.inkText,
+  },
+
   filterRow: {
     gap: 8,
     paddingHorizontal: 20,
     paddingVertical: 16,
+  },
+  filterSpacer: {
+    height: 16,
   },
 
   // 카드
@@ -311,26 +554,10 @@ const styles = StyleSheet.create({
   postHeadTexts: {
     flex: 1,
   },
-  authorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
   author: {
     fontSize: 15,
     fontWeight: '800',
     color: colors.textPrimary,
-  },
-  authorTitle: {
-    backgroundColor: colors.bonusBg,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  authorTitleText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.bonusText,
   },
   postMeta: {
     marginTop: 3,
@@ -338,11 +565,15 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // 사진
+  // 사진 자리
   photo: {
     height: 200,
     borderRadius: 14,
     overflow: 'hidden',
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
   },
   moon: {
     position: 'absolute',
@@ -377,22 +608,6 @@ const styles = StyleSheet.create({
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
   },
-  typeBadge: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    backgroundColor: 'rgba(10,14,24,0.45)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  typeBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#e7e9f0',
-  },
-
-  // 안전 등급 (사진 위 작은 칩)
   safetyPill: {
     position: 'absolute',
     left: 12,
@@ -416,42 +631,31 @@ const styles = StyleSheet.create({
   gradeB: {
     color: colors.bonusText,
   },
-  safetyNote: {
-    flexShrink: 1,
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
 
-  // 액션
+  // 좋아요 · 댓글
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 18,
     marginTop: 12,
-    marginBottom: 10,
   },
   action: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 6,
   },
   actionText: {
     fontSize: 13,
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  saveBtn: {
-    marginLeft: 'auto',
-  },
 
   // 본문
   caption: {
+    marginTop: 12,
     fontSize: 14,
     lineHeight: 21,
     color: colors.textPrimary,
-  },
-  captionAuthor: {
-    fontWeight: '800',
   },
   tags: {
     marginTop: 6,
@@ -459,20 +663,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.goldDeep,
   },
-  moreComments: {
-    marginTop: 8,
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
 
   // 빈 상태
   empty: {
     alignItems: 'center',
+    gap: 14,
     paddingVertical: 48,
+    paddingHorizontal: 32,
   },
   emptyText: {
     fontSize: 14,
+    lineHeight: 21,
     color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  emptyCta: {
+    paddingHorizontal: 18,
+    paddingVertical: 11,
+    borderRadius: 12,
+    backgroundColor: colors.ink,
+  },
+  emptyCtaText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.inkText,
   },
 });
 

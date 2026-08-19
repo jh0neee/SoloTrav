@@ -2,16 +2,15 @@
  * 마이 화면 프로필 데이터(임시).
  * 로그인·서버 연동 전까지 쓰는 목업이며, 연동 시 이 파일의 값만 교체하면 됩니다.
  */
-import { currentUser } from '../config/user';
-
-/** 배지·안전설정 아이콘 키 (화면에서 실제 아이콘 컴포넌트로 매핑) */
-export type BadgeIcon = 'pin' | 'spark' | 'shield' | 'heart';
+/** 안전설정 아이콘 키 (화면에서 실제 아이콘 컴포넌트로 매핑) */
 export type SafetyIcon = 'siren' | 'pin' | 'bell' | 'shield';
+// 배지 아이콘 키(BadgeIcon)는 types/badge.ts 에 있습니다.
 
-/** 히어로 프로필 요약 */
+/**
+ * 히어로 프로필 요약(활동 지표만).
+ * 이름·프로필 사진처럼 계정에 딸린 값은 여기가 아니라 user/userStore 에서 옵니다.
+ */
 export const PROFILE = {
-  name: currentUser.name,
-  initial: currentUser.name.slice(0, 1),
   title: '단양 마스터', // 활동 등급 호칭
   tripCount: 6,
   reviewCount: 18,
@@ -24,16 +23,8 @@ export const PROFILE_STATS = [
   { key: 'photos', label: '공유 사진', value: 34 },
 ];
 
-/**
- * 저장된 여행 취향.
- * 취향 프롬프트 화면(PreferencePromptScreen)에서 설정한 값과 같은 형식입니다.
- */
-export const TRAVEL_PREFERENCE = {
-  period: '1박 2일',
-  pace: '느긋하게',
-  budget: 15, // 만원 단위
-  moods: ['#감성사진', '#조용한_카페', '#야경_명소', '#로컬_맛집'],
-};
+// 여행 취향 목업(TRAVEL_PREFERENCE)은 제거했습니다.
+// 이제 GET /users/me/travel-preferences 값을 preferences/preferenceStore 에서 읽습니다.
 
 export type SavedCourse = {
   id: string;
@@ -76,59 +67,8 @@ export const SAVED_COURSES: SavedCourse[] = [
   },
 ];
 
-export type Badge = {
-  id: string;
-  name: string;
-  description: string;
-  icon: BadgeIcon;
-  earned: boolean;
-};
-
-/** 나의 배지 (earned=false 는 잠금 표시) */
-export const BADGES: Badge[] = [
-  {
-    id: 'first-solo',
-    name: '첫 혼행',
-    description: '첫 혼자 여행 완료',
-    icon: 'pin',
-    earned: true,
-  },
-  {
-    id: 'night-hunter',
-    name: '야경 헌터',
-    description: '야경 명소 3곳 방문',
-    icon: 'spark',
-    earned: true,
-  },
-  {
-    id: 'safety-reporter',
-    name: '안전 리포터',
-    description: '안전 후기 10개 작성',
-    icon: 'shield',
-    earned: true,
-  },
-  {
-    id: 'local-foodie',
-    name: '로컬 미식가',
-    description: '로컬 맛집 5곳 기록',
-    icon: 'heart',
-    earned: true,
-  },
-  {
-    id: 'hidden-town',
-    name: '숨은 동네',
-    description: '인구감소지역 5곳 방문',
-    icon: 'pin',
-    earned: false,
-  },
-  {
-    id: 'photo-master',
-    name: '사진 장인',
-    description: '여행 사진 50장 공유',
-    icon: 'spark',
-    earned: false,
-  },
-];
+// 배지 타입은 types/badge.ts 로, 목록은 GET /users/me/travel-badges 로 옮겼습니다.
+// 화면은 badges/badgeStore 에서 읽습니다.
 
 export type SafetySetting = {
   key: string;

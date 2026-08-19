@@ -1,3 +1,8 @@
+/**
+ * 하단 탭 구성 정의.
+ * 탭을 추가·수정·재정렬하려면 이 배열만 바꾸면 됩니다.
+ * - variant 'center' 탭은 가운데 볼록 튀어나온 샛별이 버튼으로 렌더링됩니다.
+ */
 import {
   HouseIcon,
   MapTrifoldIcon,

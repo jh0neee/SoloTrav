@@ -1,6 +1,7 @@
 # OSX
 #
 .DS_Store
+/.bkit/
 
 # Xcode
 #
@@ -34,6 +35,11 @@ local.properties
 *.keystore
 !debug.keystore
 .kotlin/
+
+# 환경 변수 (.env.example 만 커밋)
+.env
+.env.local
+.env.*.local
 
 # node.js
 #

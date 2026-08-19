@@ -6,13 +6,12 @@ import React from 'react';
 import {
   Pressable,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { currentUser } from '../../config/user';
+import { useMyProfile } from '../../user/userStore';
 import { CITIES, SPOTLIGHT_CITY_IDS, type City } from '../../data/cities';
 import { colors } from '../../theme/colors';
 import {
@@ -27,22 +26,30 @@ import {
 type Props = {
   onOpenSearch: () => void;
   onSelectCity: (city: City) => void;
+  onOpenPreference: () => void;
+  /** 취향 프롬프트를 설정했다면 요약 문구, 아직이면 null */
+  preferenceSummary?: string | null;
 };
 
 const spotlightCities = SPOTLIGHT_CITY_IDS.map(
   id => CITIES.find(c => c.id === id)!,
 );
 
-function HomeScreen({ onOpenSearch, onSelectCity }: Props) {
+function HomeScreen({
+  onOpenSearch,
+  onSelectCity,
+  onOpenPreference,
+  preferenceSummary,
+}: Props) {
+  const profile = useMyProfile();
   const insets = useSafeAreaInsets();
+  const hasPreference = !!preferenceSummary;
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}>
-      {/* 히어로가 상태바 뒤까지 올라가므로 아이콘을 밝게 */}
-      <StatusBar barStyle="light-content" />
-
       {/* ── 다크 히어로 ── */}
       <View style={[styles.hero, { paddingTop: insets.top + 12 }]}>
         <View style={styles.heroTop}>
@@ -57,7 +64,7 @@ function HomeScreen({ onOpenSearch, onSelectCity }: Props) {
 
         <Text style={styles.heroKicker}>오늘 밤도 안전한 길로</Text>
         <Text style={styles.heroTitle}>
-          {currentUser.name}님, 어디로{'\n'}혼자 떠나볼까요?
+          {profile.displayName}님, 어디로{'\n'}혼자 떠나볼까요?
         </Text>
 
         {/* 검색 input (누르면 도시 선택으로 이동) */}
@@ -72,6 +79,38 @@ function HomeScreen({ onOpenSearch, onSelectCity }: Props) {
           <PinIcon color={colors.goldDeep} size={20} />
         </Pressable>
       </View>
+
+      {/* ── 취향 프롬프트 배너 ── */}
+      <Pressable
+        style={styles.promptCard}
+        onPress={onOpenPreference}
+        accessibilityRole="button"
+        accessibilityLabel="취향 프롬프트 설정하기">
+        <View style={styles.promptIcon}>
+          <SparkIcon color={colors.goldDeep} size={24} />
+        </View>
+        <View style={styles.promptTexts}>
+          <Text style={styles.promptKicker}>
+            {hasPreference ? '취향 프롬프트 설정 완료' : '2분이면 끝!'}
+          </Text>
+          <Text style={styles.promptTitle}>
+            {hasPreference
+              ? '취향에 맞춰 코스를 찾는 중이에요'
+              : '취향을 알려주시면\n딱 맞는 코스를 찾아드려요'}
+          </Text>
+          <Text style={styles.promptSub} numberOfLines={2}>
+            {hasPreference
+              ? preferenceSummary
+              : '아직 취향 프롬프트가 비어있어요'}
+          </Text>
+        </View>
+        <View style={styles.promptBtn}>
+          <Text style={styles.promptBtnText}>
+            {hasPreference ? '수정하기' : '설정하기'}
+          </Text>
+          <Chevron direction="right" color="#ffffff" size={16} />
+        </View>
+      </Pressable>
 
       {/* ── 스포트라이트 ── */}
       <View style={styles.section}>
@@ -262,6 +301,64 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 2,
+  },
+
+  // 취향 프롬프트 배너
+  promptCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginHorizontal: 20,
+    marginTop: 18,
+    padding: 16,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.promptBannerBorder,
+    backgroundColor: colors.promptBanner,
+  },
+  promptIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.55)',
+  },
+  promptTexts: {
+    flex: 1,
+  },
+  promptKicker: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.bonusText,
+    marginBottom: 4,
+  },
+  promptTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    lineHeight: 21,
+  },
+  promptSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 5,
+    lineHeight: 17,
+  },
+  promptBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingLeft: 14,
+    paddingRight: 10,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: colors.ink,
+  },
+  promptBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '800',
   },
 
   // 섹션 공통

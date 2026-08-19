@@ -17,6 +17,11 @@ end
 target 'SoloTravelMateMobile' do
   config = use_native_modules!
 
+  # AppDelegate 에서 카카오톡 로그인 리다이렉트 URL 을 처리하려면 앱 타깃에도
+  # KakaoSDKAuth 가 직접 링크돼 있어야 합니다.
+  # (@react-native-seoul/kakao-login 의 의존성이라 버전은 그쪽에 맞춰 자동 해석됩니다)
+  pod 'KakaoSDKAuth'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
