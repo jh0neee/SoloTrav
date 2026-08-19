@@ -24,14 +24,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SirenIcon, XIcon } from 'phosphor-react-native';
 import { colors } from '../../theme/colors';
-import { MY_LOCATION } from '../../data/places';
+import { useCurrentLocation } from '../../location/useCurrentLocation';
 import { sosApi, type SafetyFacility } from '../../api/sos';
 import SafetyFacilityCard from './SafetyFacilityCard';
 
 /** 사이렌이 울리는 동안 반복할 진동 패턴 (진동 0.6s / 쉼 0.4s) */
 const VIBRATION_PATTERN = [0, 600, 400];
 
-const BUTTON_SIZE = 190;
+const BUTTON_SIZE = 152;
 const FACILITY_LIMIT = 3;
 
 type Props = {
@@ -41,6 +41,8 @@ type Props = {
 
 function SosScreen({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  // 측위 실패·권한 거절이면 단양읍 기본 좌표로 떨어지므로 항상 값이 있습니다.
+  const { coords } = useCurrentLocation();
 
   const [sirenOn, setSirenOn] = useState(false);
   const [facilities, setFacilities] = useState<SafetyFacility[]>([]);
@@ -60,9 +62,8 @@ function SosScreen({ visible, onClose }: Props) {
     sosApi
       .safetyFacilities(
         {
-          // TODO: geolocation 연동 시 실제 현위치로 교체 (지금은 지도와 같은 임시 좌표)
-          latitude: MY_LOCATION.lat,
-          longitude: MY_LOCATION.lng,
+          latitude: coords.lat,
+          longitude: coords.lng,
           limit: FACILITY_LIMIT,
         },
         controller.signal,
@@ -87,7 +88,7 @@ function SosScreen({ visible, onClose }: Props) {
       });
 
     return () => controller.abort();
-  }, [visible, reloadKey]);
+  }, [visible, reloadKey, coords]);
 
   /* ── 사이렌 진동 ── */
   useEffect(() => {
@@ -146,20 +147,23 @@ function SosScreen({ visible, onClose }: Props) {
             { paddingBottom: insets.bottom + 28 },
           ]}
           showsVerticalScrollIndicator={false}>
-          <Text style={styles.headline}>
-            {sirenOn
-              ? '사이렌이 울리고 있어요'
-              : '버튼을 누르면 큰 소리로 사이렌이 울려요'}
-          </Text>
-          <Text style={styles.subhead}>
-            {sirenOn
-              ? '다시 누르면 꺼져요'
-              : '주변에 위험을 알리고 주의를 끌 수 있어요'}
-          </Text>
+          {/* 제목·부제는 한 덩어리 — space-between 이 둘 사이를 벌리지 않게 합니다 */}
+          <View>
+            <Text style={styles.headline}>
+              {sirenOn
+                ? '사이렌이 울리고 있어요'
+                : '버튼을 누르면 큰 소리로 사이렌이 울려요'}
+            </Text>
+            <Text style={styles.subhead}>
+              {sirenOn
+                ? '다시 누르면 꺼져요'
+                : '주변에 위험을 알리고 주의를 끌 수 있어요'}
+            </Text>
+          </View>
 
           <View style={styles.buttonArea}>
-            <PulseRing size={BUTTON_SIZE + 62} delay={0} />
-            <PulseRing size={BUTTON_SIZE + 62} delay={900} />
+            <PulseRing size={BUTTON_SIZE + 64} delay={0} />
+            <PulseRing size={BUTTON_SIZE + 64} delay={900} />
             <Pressable
               onPress={() => setSirenOn(prev => !prev)}
               style={({ pressed }) => [
@@ -182,13 +186,15 @@ function SosScreen({ visible, onClose }: Props) {
             </Pressable>
           </View>
 
-          <SafetyFacilityCard
-            facilities={facilities}
-            loading={loading}
-            error={error}
-            active={sirenOn}
-            onRetry={() => setReloadKey(prev => prev + 1)}
-          />
+          <View style={styles.cardSlot}>
+            <SafetyFacilityCard
+              facilities={facilities}
+              loading={loading}
+              error={error}
+              active={sirenOn}
+              onRetry={() => setReloadKey(prev => prev + 1)}
+            />
+          </View>
         </ScrollView>
       </View>
     </Modal>
@@ -276,27 +282,36 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   content: {
+    // 제목은 위, 버튼은 그 바로 아래, 카드는 바닥(cardSlot 의 marginTop:'auto').
+    // 남는 세로 공간은 전부 버튼과 카드 사이로 갑니다.
+    flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: 18,
   },
   headline: {
-    fontSize: 22,
-    lineHeight: 31,
+    fontSize: 21,
+    lineHeight: 29,
     fontWeight: '800',
     color: colors.inkText,
     textAlign: 'center',
   },
   subhead: {
-    marginTop: 10,
+    marginTop: 8,
     fontSize: 13,
     fontWeight: '500',
     color: colors.sosTextMuted,
     textAlign: 'center',
   },
   buttonArea: {
-    height: BUTTON_SIZE + 100,
     alignItems: 'center',
     justifyContent: 'center',
+    // 링(BUTTON_SIZE + 64)이 커질 여유까지 감안한 높이
+    height: BUTTON_SIZE + 96,
+    marginTop: 26,
+  },
+  cardSlot: {
+    // 카드는 항상 화면 아래쪽에 붙습니다.
+    marginTop: 'auto',
   },
   ring: {
     position: 'absolute',
@@ -310,7 +325,7 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 7,
     borderWidth: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -330,7 +345,7 @@ const styles = StyleSheet.create({
     opacity: 0.88,
   },
   sirenLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: colors.inkText,
   },

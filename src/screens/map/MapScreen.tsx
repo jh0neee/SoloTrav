@@ -33,6 +33,7 @@ import MapSearchOverlay from './MapSearchOverlay';
 import PlaceBottomSheet from './PlaceBottomSheet';
 import PoiCard from './PoiCard';
 import SosScreen from '../sos/SosScreen';
+import { useCurrentLocation } from '../../location/useCurrentLocation';
 import type { SearchPoi } from './searchTypes';
 import type { Place } from '../../data/places';
 
@@ -49,6 +50,9 @@ const CATEGORIES: PlaceCategory[] = ['safe', 'solo', 'review'];
 function MapScreen() {
   const insets = useSafeAreaInsets();
   const mapRef = useRef<KakaoMapHandle>(null);
+
+  // 현위치 — 지도 파란 점과 비상벨의 안전시설 조회가 같은 좌표를 씁니다.
+  const { coords: myLocation } = useCurrentLocation();
 
   const [category, setCategory] = useState<PlaceCategory>('safe');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -175,6 +179,7 @@ function MapScreen() {
         ref={mapRef}
         category={category}
         selectedId={selectedId}
+        myLocation={myLocation}
         onMarkerPress={handleMarkerPress}
         onSearchMarkerPress={handleSearchMarkerPress}
         onMapPress={handleMapPress}

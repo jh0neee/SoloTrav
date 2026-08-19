@@ -139,8 +139,8 @@ function SafetyFacilityCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 18,
+    padding: 15,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.14)',
   },
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: colors.goldSoft,
-    marginBottom: 12,
+    marginBottom: 11,
   },
   row: {
     flexDirection: 'row',
@@ -156,12 +156,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowGap: {
-    marginTop: 14,
+    marginTop: 12,
   },
   iconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     backgroundColor: 'rgba(227,178,92,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -181,9 +181,9 @@ const styles = StyleSheet.create({
     color: colors.sosTextMuted,
   },
   callButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.14)',
@@ -196,7 +196,7 @@ const styles = StyleSheet.create({
   stateBox: {
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 18,
+    paddingVertical: 16,
   },
   stateText: {
     fontSize: 13,

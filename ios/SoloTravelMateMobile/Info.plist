@@ -60,8 +60,9 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- 주변 안전 시설을 찾고 지도에 현위치를 표시할 때 iOS 가 이 문구를 보여줍니다. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>주변 안전 시설을 찾고 지도에 현위치를 표시하는 데 사용합니다.</string>
 	<!-- 여행 기록에 붙일 사진을 고를 때 iOS 가 이 문구를 보여줍니다. -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>여행 기록에 사진을 올리기 위해 사진 접근이 필요합니다.</string>

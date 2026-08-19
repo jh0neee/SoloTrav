@@ -62,6 +62,8 @@ export type KakaoMapHandle = {
 type Props = {
   category: PlaceCategory;
   selectedId: string | null;
+  /** 측위된 현위치. 바뀌면 지도의 파란 점도 따라 옮겨집니다. */
+  myLocation: { lat: number; lng: number };
   onMarkerPress: (id: string) => void;
   onSearchMarkerPress: (id: string) => void;
   onMapPress: () => void;
@@ -71,7 +73,14 @@ type Props = {
 const SEARCH_TIMEOUT_MS = 8000;
 
 const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
-  { category, selectedId, onMarkerPress, onSearchMarkerPress, onMapPress },
+  {
+    category,
+    selectedId,
+    myLocation,
+    onMarkerPress,
+    onSearchMarkerPress,
+    onMapPress,
+  },
   ref,
 ) {
   const webRef = useRef<WebViewInstance>(null);
@@ -150,6 +159,12 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
     if (!ready) return;
     run(`window.__selectPlace(${JSON.stringify(selectedId)})`);
   }, [ready, selectedId, run]);
+
+  // 측위 결과가 늦게 도착해도 ready 이후 한 번 더 흘려보내 파란 점을 맞춥니다.
+  useEffect(() => {
+    if (!ready) return;
+    run(`window.__setMyLocation(${myLocation.lat}, ${myLocation.lng})`);
+  }, [ready, myLocation, run]);
 
   const handleMessage = useCallback(
     (event: WebViewMessageEvent) => {
