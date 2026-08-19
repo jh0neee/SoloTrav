@@ -317,6 +317,70 @@ export function SirenIcon({ color, size = 20 }: IconProps) {
   );
 }
 
+/** 필터 (가로 슬라이더 3줄 + 손잡이) */
+export function FilterIcon({ color, size = 18 }: IconProps) {
+  const row = {
+    width: size,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: color,
+  };
+  const knob = {
+    position: 'absolute' as const,
+    width: size * 0.28,
+    height: size * 0.28,
+    borderRadius: size * 0.14,
+    borderWidth: 2,
+    borderColor: color,
+    backgroundColor: '#ffffff',
+  };
+  return (
+    <View style={{ width: size, height: size, justifyContent: 'space-between', paddingVertical: size * 0.14 }}>
+      <View>
+        <View style={row} />
+        <View style={[knob, { left: size * 0.58, top: -size * 0.13 }]} />
+      </View>
+      <View>
+        <View style={row} />
+        <View style={[knob, { left: size * 0.14, top: -size * 0.13 }]} />
+      </View>
+      <View>
+        <View style={row} />
+        <View style={[knob, { left: size * 0.44, top: -size * 0.13 }]} />
+      </View>
+    </View>
+  );
+}
+
+/** 사람 (혼행 인프라) */
+export function PersonIcon({ color, size = 18 }: IconProps) {
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          width: size * 0.36,
+          height: size * 0.36,
+          borderRadius: size * 0.18,
+          borderWidth: 2,
+          borderColor: color,
+        }}
+      />
+      <View
+        style={{
+          marginTop: 2,
+          width: size * 0.66,
+          height: size * 0.34,
+          borderWidth: 2,
+          borderBottomWidth: 0,
+          borderColor: color,
+          borderTopLeftRadius: size * 0.33,
+          borderTopRightRadius: size * 0.33,
+        }}
+      />
+    </View>
+  );
+}
+
 /** 반짝임 ✦ (AI/샛별이) */
 export function SparkIcon({ color, size = 18 }: IconProps) {
   return (

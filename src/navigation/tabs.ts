@@ -5,7 +5,7 @@
  */
 import type { ComponentType } from 'react';
 import HomeStack from './HomeStack';
-import MapScreen from '../screens/MapScreen';
+import MapScreen from '../screens/map/MapScreen';
 import AssistantScreen from '../screens/AssistantScreen';
 import RecordScreen from '../screens/RecordScreen';
 import MyScreen from '../screens/MyScreen';
