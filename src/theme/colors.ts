@@ -53,6 +53,12 @@ export const colors = {
   // 긴급/SOS
   danger: '#d24b4b',
   dangerSoft: '#fbeaea',
+  sosIdleBg: '#0f1729', // 비상벨 화면 대기 상태 배경 (짙은 남색)
+  sosActiveBg: '#e0524d', // 사이렌 작동 중 배경 (레드)
+  sosIdleCard: 'rgba(255,255,255,0.06)', // 대기 상태 안전시설 카드
+  sosActiveCard: 'rgba(90,16,16,0.28)', // 작동 중 안전시설 카드
+  sosRing: 'rgba(255,255,255,0.16)', // 버튼 주변 파장 링
+  sosTextMuted: 'rgba(255,255,255,0.62)',
 
   // 카카오 로그인 (카카오 브랜드 가이드 고정 색 — 임의로 바꾸면 안 됩니다)
   kakaoYellow: '#fee500',

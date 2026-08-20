@@ -77,6 +77,14 @@ export const ENDPOINTS = {
   recordLikes: (recordId: string) =>
     `/travel-records/${encodeURIComponent(recordId)}/likes`,
 
+  // SOS
+  /** 현위치 기준 가장 가까운 안전 시설 조회 */
+  safetyFacilities: (params: {
+    latitude: string;
+    longitude: string;
+    limit?: number;
+  }) => withQuery(`/sos/safety-facilities`, params),
+
   // 댓글
   /** 기록의 댓글 조회(GET) / 등록(POST) */
   recordComments: (recordId: string) =>

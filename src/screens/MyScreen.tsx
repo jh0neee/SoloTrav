@@ -17,6 +17,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { useAuth } from '../auth/AuthContext';
 import { useMyProfile, userStore } from '../user/userStore';
@@ -69,6 +70,7 @@ const SAFETY_ICONS: Record<SafetyIcon, IconComponent> = {
 
 function MyScreen() {
   const { logout } = useAuth();
+  const insets = useSafeAreaInsets();
   const profile = useMyProfile();
   const preferences = usePreferences();
   const badges = useBadges();
@@ -171,7 +173,7 @@ function MyScreen() {
       }
     >
       {/* ── 다크 히어로: 프로필 + 활동 통계 ── */}
-      <View style={styles.hero}>
+      <View style={[styles.hero, { paddingTop: insets.top + 18 }]}>
         <View style={styles.heroTop}>
           <View style={styles.avatar}>
             {/* 카카오 프로필 사진이 있으면 쓰고, 없으면 이름 첫 글자 */}
@@ -617,7 +619,7 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.heroBg,
     paddingHorizontal: 20,
-    paddingTop: 18,
+    // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
     paddingBottom: 22,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,

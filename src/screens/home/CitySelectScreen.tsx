@@ -1,19 +1,16 @@
 /**
  * 도시 선택 화면.
  * 지도 위 지역 칩을 눌러 도시를 고르고, 하단 상세 카드에서 코스 만들기로 진입합니다.
- *
- * 안전등급·안전점수는 지역안전지수 API 값이고(응답 전에는 정적 기본값),
- * 대표 명소와 둘러보기 카드는 선택한 도시가 바뀔 때마다 다시 조회합니다.
  */
 import React, { useState } from 'react';
 import {
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CITIES,
   CITY_TYPE_LABEL,
@@ -22,37 +19,26 @@ import {
 } from '../../data/cities';
 import { cityTypeColors, colors } from '../../theme/colors';
 import { Chevron, ShieldIcon } from '../../components/icons/UiIcons';
-import { SectionState } from '../../components/travel/TravelCards';
-import {
-  safetyOf,
-  useCityIntro,
-  useRegionSafety,
-} from '../../travel/homeQueries';
-import type { TourSpot } from '../../types/travel';
 
 type Props = {
   onBack: () => void;
   onCreateCourse: (city: City) => void;
-  /** 둘러보기 카드 탭 → 장소 상세 */
-  onSelectSpot: (spot: TourSpot) => void;
 };
 
 const REGION_TABS = ['충북 시군', '전국'] as const;
 const CHIP = 54;
 
-function CitySelectScreen({ onBack, onCreateCourse, onSelectSpot }: Props) {
+function CitySelectScreen({ onBack, onCreateCourse }: Props) {
+  const insets = useSafeAreaInsets();
   const [regionTab, setRegionTab] = useState(0);
   const [selectedId, setSelectedId] = useState('danyang');
 
   const selected = CITIES.find(c => c.id === selectedId) ?? CITIES[0];
-  const safety = useRegionSafety();
-  const citySafety = safetyOf(selected, safety.data);
-  const intro = useCityIntro(selected);
 
   return (
     <View style={styles.container}>
-      {/* 헤더 */}
-      <View style={styles.header}>
+      {/* 헤더 — 상태바 아래까지 화면이 올라오므로 인셋만큼 내려줍니다 */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable
           onPress={onBack}
           style={styles.backBtn}
@@ -131,7 +117,7 @@ function CitySelectScreen({ onBack, onCreateCourse, onSelectSpot }: Props) {
             </View>
             <View style={styles.gradeRow}>
               <ShieldIcon color={colors.safeText} size={16} />
-              <Text style={styles.gradeText}>안전등급 {citySafety.grade}</Text>
+              <Text style={styles.gradeText}>안전등급 {selected.safetyGrade}</Text>
             </View>
           </View>
 
@@ -140,34 +126,10 @@ function CitySelectScreen({ onBack, onCreateCourse, onSelectSpot }: Props) {
           </Text>
 
           <View style={styles.statsRow}>
-            <Stat label="안전 점수" value={`${citySafety.score}`} unit="/100" />
+            <Stat label="안전 점수" value={`${selected.stats.safety}`} unit="/100" />
             <Stat label="트렌드" value={`${selected.stats.trend}`} unit="%" />
             <Stat label="추천 가산점" value={`+${selected.stats.bonus}`} unit="" />
           </View>
-
-          {/* 안전 점수 출처 — 임시값과 API 값을 구분해 보여줍니다 */}
-          <Text style={styles.safetySource}>
-            {citySafety.isLive
-              ? `행정안전부 지역안전지수 ${citySafety.baseYear}년 기준`
-              : '안전 점수를 불러오는 중이에요'}
-          </Text>
-
-          {/* 방문 상위 명소 (기초지자체 중심 관광지) */}
-          {intro.data && intro.data.attractions.length > 0 ? (
-            <View style={styles.hubBox}>
-              <Text style={styles.hubTitle}>많이 찾는 곳</Text>
-              <View style={styles.hubRow}>
-                {intro.data.attractions.map(attraction => (
-                  <View key={attraction.code} style={styles.hubChip}>
-                    <Text style={styles.hubRank}>{attraction.rank}</Text>
-                    <Text style={styles.hubName} numberOfLines={1}>
-                      {attraction.name}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : null}
 
           <Pressable
             style={styles.cta}
@@ -176,52 +138,6 @@ function CitySelectScreen({ onBack, onCreateCourse, onSelectSpot }: Props) {
             <Text style={styles.ctaText}>{selected.name} (으)로 코스 만들기</Text>
             <Chevron direction="right" color="#ffffff" size={18} />
           </Pressable>
-        </View>
-
-        {/* 이 동네 둘러보기 — 관광정보 카드 */}
-        <View style={styles.exploreSection}>
-          <Text style={styles.exploreTitle}>{selected.name} 둘러보기</Text>
-
-          <SectionState
-            status={intro.status}
-            error={intro.error}
-            isEmpty={intro.data?.spots.length === 0}
-            emptyText="등록된 관광정보가 아직 없어요"
-            onRetry={intro.reload}
-            height={150}
-          />
-
-          {intro.data && intro.data.spots.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.exploreRow}>
-              {intro.data.spots.map(spot => (
-                <Pressable
-                  key={spot.contentId}
-                  style={styles.exploreCard}
-                  onPress={() => onSelectSpot(spot)}>
-                  {spot.thumbnailUrl ? (
-                    <Image
-                      source={{ uri: spot.thumbnailUrl }}
-                      style={styles.exploreImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={[styles.exploreImage, styles.explorePlaceholder]}>
-                      <Text style={styles.explorePlaceholderText}>
-                        {spot.title.slice(0, 1)}
-                      </Text>
-                    </View>
-                  )}
-                  <Text style={styles.exploreName} numberOfLines={1}>
-                    {spot.title}
-                  </Text>
-                  <Text style={styles.exploreType}>{spot.typeLabel}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          ) : null}
         </View>
       </ScrollView>
     </View>
@@ -462,92 +378,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  safetySource: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginBottom: 16,
-  },
-
-  // 많이 찾는 곳 (기초지자체 중심 관광지 랭킹)
-  hubBox: {
     marginBottom: 18,
-    gap: 8,
-  },
-  hubTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-  hubRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  hubChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    maxWidth: '100%',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 11,
-    backgroundColor: colors.surface,
-  },
-  hubRank: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.goldDeep,
-  },
-  hubName: {
-    flexShrink: 1,
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-
-  // 둘러보기
-  exploreSection: {
-    marginTop: 24,
-    gap: 12,
-  },
-  exploreTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: colors.textPrimary,
-  },
-  exploreRow: {
-    gap: 12,
-    paddingRight: 8,
-  },
-  exploreCard: {
-    width: 128,
-    gap: 6,
-  },
-  exploreImage: {
-    width: 128,
-    height: 96,
-    borderRadius: 14,
-    backgroundColor: colors.darkCard,
-  },
-  explorePlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  explorePlaceholderText: {
-    color: colors.goldSoft,
-    fontSize: 26,
-    fontWeight: '800',
-  },
-  exploreName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  exploreType: {
-    fontSize: 11,
-    color: colors.textSecondary,
   },
   stat: {
     flex: 1,

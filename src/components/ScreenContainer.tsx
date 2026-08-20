@@ -4,6 +4,7 @@
  */
 import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 
 type Props = {
@@ -13,10 +14,11 @@ type Props = {
 };
 
 function ScreenContainer({ title, subtitle, children }: Props) {
+  const insets = useSafeAreaInsets();
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <Text style={styles.title}>{title}</Text>
@@ -34,7 +36,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 20,
-    paddingTop: 16,
+    // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
     paddingBottom: 32,
   },
   header: {

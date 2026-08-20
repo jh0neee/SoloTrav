@@ -17,6 +17,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMyProfile } from '../../user/userStore';
 import { type City } from '../../data/cities';
 import { colors } from '../../theme/colors';
@@ -66,6 +67,7 @@ function HomeScreen({
   preferenceSummary,
 }: Props) {
   const profile = useMyProfile();
+  const insets = useSafeAreaInsets();
   const hasPreference = !!preferenceSummary;
 
   const safety = useRegionSafety();
@@ -79,7 +81,7 @@ function HomeScreen({
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}>
       {/* ── 다크 히어로 ── */}
-      <View style={styles.hero}>
+      <View style={[styles.hero, { paddingTop: insets.top + 12 }]}>
         <View style={styles.heroTop}>
           <View style={styles.brandRow}>
             <Lighthouse />
@@ -362,7 +364,7 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.heroBg,
     paddingHorizontal: 20,
-    paddingTop: 12,
+    // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
     paddingBottom: 24,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,

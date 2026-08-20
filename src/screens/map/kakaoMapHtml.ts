@@ -17,6 +17,7 @@
  *      window.__setCategory(category)          카테고리 필터 변경
  *      window.__selectPlace(id | null)         선택 마커 강조
  *      window.__moveToMyLocation()             현위치로 이동
+ *      window.__setMyLocation(lat, lng)        현위치 점 좌표 갱신
  *      window.__zoomIn() / window.__zoomOut()  확대 / 축소
  *      window.__search(query, reqId)           카카오 장소 키워드 검색
  *      window.__showSearchMarkers(items, fit)  검색 결과 마커 표시
@@ -146,6 +147,7 @@ export function buildKakaoMapHtml({
     '<path d="m8.7 12.1 2.3 2.3 4.3-4.6" stroke="currentColor" stroke-width="2" ' +
     'stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
+  var meOverlay = null;      // 현위치 파란 점 (측위 결과가 오면 위치를 갱신)
   var overlays = {};         // id -> { overlay, el, category }
   var searchOverlays = {};   // 검색 결과 id -> { overlay, el }
   var selectedId = null;
@@ -196,7 +198,7 @@ export function buildKakaoMapHtml({
     var meEl = document.createElement('div');
     meEl.className = 'me';
     meEl.innerHTML = '<div class="me-halo"></div><div class="me-dot"></div>';
-    new kakao.maps.CustomOverlay({
+    meOverlay = new kakao.maps.CustomOverlay({
       map: map,
       position: new kakao.maps.LatLng(ME.lat, ME.lng),
       content: meEl,
@@ -234,6 +236,12 @@ export function buildKakaoMapHtml({
 
   window.__moveToMyLocation = function () {
     if (map) { map.panTo(new kakao.maps.LatLng(ME.lat, ME.lng)); }
+  };
+
+  /** 측위 결과를 받아 현위치 점을 옮깁니다. (RN 의 useCurrentLocation 훅이 호출) */
+  window.__setMyLocation = function (lat, lng) {
+    ME = { lat: lat, lng: lng };
+    if (meOverlay) { meOverlay.setPosition(new kakao.maps.LatLng(lat, lng)); }
   };
 
   /**

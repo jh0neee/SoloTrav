@@ -15,6 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { City } from '../../data/cities';
 import {
   PREFERENCE_STEPS,
@@ -57,6 +58,7 @@ function PreferencePromptScreen({
   onComplete,
 }: Props) {
   const [index, setIndex] = useState(0);
+  const insets = useSafeAreaInsets();
   const [answers, setAnswers] = useState<PreferenceAnswers>(() => ({
     // 저장된 답변 위에 진입 도시를 덮어씁니다(도시 카드로 들어온 의도가 우선).
     ...createInitialAnswers(),
@@ -103,7 +105,7 @@ function PreferencePromptScreen({
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {/* 진행바 */}
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <Pressable
           onPress={goPrev}
           style={styles.backBtn}
@@ -328,7 +330,8 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingLeft: 8,
     paddingRight: 20,
-    paddingVertical: 10,
+    // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
+    paddingBottom: 10,
   },
   backBtn: {
     width: 36,

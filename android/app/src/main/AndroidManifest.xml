@@ -1,6 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 현위치(주변 안전시설 조회 · 지도 파란 점) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- 비상벨 사이렌 진동 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Android 11+ 패키지 가시성: 안전시설 전화 버튼이 기본 통화 앱을 열 수 있게 합니다 -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+    </queries>
 
     <application
       android:name=".MainApplication"

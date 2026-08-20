@@ -21,6 +21,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '../components/Chip';
 import RecordFormScreen from './record/RecordFormScreen';
 import RecordDetailScreen from './record/RecordDetailScreen';
@@ -56,6 +57,7 @@ type Route =
 
 function RecordScreen() {
   const [scope, setScope] = useState<RecordScope>('all');
+  const insets = useSafeAreaInsets();
   const [tagFilter, setTagFilter] = useState<string>(ALL_TAGS);
   const [route, setRoute] = useState<Route>({ name: 'feed' });
 
@@ -182,7 +184,7 @@ function RecordScreen() {
       }
       ListHeaderComponent={
         <View>
-          <View style={styles.header}>
+          <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
             <View style={styles.headerTexts}>
               <Text style={styles.kicker}>혼행 피드</Text>
               <Text style={styles.title}>
@@ -452,7 +454,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 16,
+    // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
   },
   headerTexts: {
     flex: 1,
