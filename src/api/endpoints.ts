@@ -4,6 +4,14 @@
  * 경로는 baseURL(env.apiBaseUrl = .../api/v1) 기준의 상대 경로입니다.
  */
 
+import type {
+  GalleryQuery,
+  MunicipalityQuery,
+  RegionalSafetyQuery,
+  TourInfoQuery,
+  VisitorRegionQuery,
+} from './travelDto';
+
 type QueryValue = string | number | boolean | undefined | null;
 
 /** undefined/null 인 값은 빼고 쿼리스트링을 붙입니다. */
@@ -70,6 +78,18 @@ export const ENDPOINTS = {
   recordLikes: (recordId: string) =>
     `/travel-records/${encodeURIComponent(recordId)}/likes`,
 
+  // ── 샛별이 (AI 여행 코스) ──
+  // "접수 → SSE 구독" 인 비동기 구조라 한 번의 대화에 세 경로를 씁니다.
+
+  /** 코스 생성 요청 접수 (POST) — requestId 를 돌려줍니다 */
+  saetbyeolChat: () => `/ai/saetbyeol/chat`,
+  /** 요청 최종 상태 조회 — 앱 재시작·화면 복귀 시 결과를 되찾을 때 씁니다 */
+  saetbyeolChatResult: (requestId: string) =>
+    `/ai/saetbyeol/chat/${encodeURIComponent(requestId)}`,
+  /** 결과 SSE 스트림 (text/event-stream) */
+  saetbyeolChatStream: (requestId: string) =>
+    `/ai/saetbyeol/chat/${encodeURIComponent(requestId)}/stream`,
+
   // SOS
   /** 현위치 기준 가장 가까운 안전 시설 조회 */
   safetyFacilities: (params: {
@@ -129,4 +149,64 @@ export const ENDPOINTS = {
   /** 댓글 좋아요(POST) / 취소(DELETE) */
   commentLikes: (commentId: string) =>
     `/travel-records/comments/${encodeURIComponent(commentId)}/likes`,
+
+  // ── 여행 정보 (한국관광공사 TourAPI 프록시) ──
+  // 서버가 kebab-case 와 원본 camelCase(예: searchKeyword2) 두 벌을 열어두었는데
+  // 같은 핸들러입니다. 우리 서버 라우팅 관례를 따라 kebab-case 만 씁니다.
+
+  /** 키워드 검색 조회 */
+  tourSearchKeyword: (params?: TourInfoQuery) =>
+    withQuery(`/travel/information/search-keyword`, params),
+  /** 지역기반 관광정보 조회 */
+  tourAreaBasedList: (params?: TourInfoQuery) =>
+    withQuery(`/travel/information/area-based-list`, params),
+  /** 위치기반 관광정보 조회 (좌표 + 반경) */
+  tourLocationBasedList: (params?: TourInfoQuery) =>
+    withQuery(`/travel/information/location-based-list`, params),
+  /** 행사 정보 조회 */
+  tourSearchFestival: (params?: TourInfoQuery) =>
+    withQuery(`/travel/information/search-festival`, params),
+  /** 숙박 정보 조회 */
+  tourSearchStay: (params?: TourInfoQuery) =>
+    withQuery(`/travel/information/search-stay`, params),
+  /** 공통 정보 조회 (제목·주소·개요) */
+  tourDetailCommon: (params?: TourInfoQuery) =>
+    withQuery(`/travel/information/detail-common`, params),
+  /** 소개 정보 조회 (이용시간·휴무일 등, 콘텐츠 타입별로 필드가 다름) */
+  tourDetailIntro: (params?: TourInfoQuery) =>
+    withQuery(`/travel/information/detail-intro`, params),
+  /** 이미지 정보 조회 */
+  tourDetailImage: (params?: TourInfoQuery) =>
+    withQuery(`/travel/information/detail-image`, params),
+  /** 지역코드 조회 (areaCode 를 주면 그 지역의 시군구 목록) */
+  tourAreaCode: (params?: TourInfoQuery) =>
+    withQuery(`/travel/information/area-code`, params),
+  /** 법정동 코드 조회 */
+  tourLdongCode: (params?: TourInfoQuery) =>
+    withQuery(`/travel/information/ldong-code`, params),
+
+  /** 관광사진 갤러리 목록 조회 */
+  tourGalleryList: (params?: GalleryQuery) =>
+    withQuery(`/travel/photozone/gallery-list`, params),
+  /** 관광사진 갤러리 키워드 검색 */
+  tourGallerySearchList: (params?: GalleryQuery) =>
+    withQuery(`/travel/photozone/gallery-search-list`, params),
+
+  /** 지역안전지수 목록 조회 */
+  regionalSafety: (params?: RegionalSafetyQuery) =>
+    withQuery(`/travel/regional-safety`, params),
+  /** 시도명으로 지역안전지수 조회 — 해당 시도의 시군까지 한 번에 옵니다 */
+  regionalSafetyBySido: (params?: RegionalSafetyQuery) =>
+    withQuery(`/travel/regional-safety/sido`, params),
+
+  /** 기초지자체 중심 관광지 목록 (방문 상위 랭킹) */
+  municipalityAttractions: (params: MunicipalityQuery) =>
+    withQuery(`/travel/municipality/tourist-attractions/items`, params),
+
+  /** 기초 지자체(시군구) 지역방문자수 — 지역 필터가 없어 전국이 통째로 옵니다 */
+  visitorLocalGovernment: (params: VisitorRegionQuery) =>
+    withQuery(`/travel/visitor-region/local-government`, params),
+  /** 광역 지자체(시도) 지역방문자수 */
+  visitorMetropolitan: (params: VisitorRegionQuery) =>
+    withQuery(`/travel/visitor-region/metropolitan`, params),
 } as const;

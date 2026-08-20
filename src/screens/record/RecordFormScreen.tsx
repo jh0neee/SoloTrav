@@ -20,6 +20,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '../../components/Chip';
 import { Chevron } from '../../components/icons/UiIcons';
 import { colors } from '../../theme/colors';
@@ -76,6 +77,8 @@ function RecordFormScreen({
   onBack,
   onSubmit,
 }: Props) {
+  // 상태바가 투명(translucent)이라 상단 여백은 화면이 직접 만들어 줍니다.
+  const insets = useSafeAreaInsets();
   const isEditing = !!initial;
   const [date, setDate] = useState(() => initial?.date || today());
   const [safetyGrade, setSafetyGrade] = useState<string>(
@@ -123,7 +126,7 @@ function RecordFormScreen({
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <Pressable
           onPress={onBack}
           style={styles.backBtn}
@@ -342,7 +345,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingLeft: 8,
     paddingRight: 8,
-    paddingVertical: 10,
+    // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
+    paddingBottom: 10,
   },
   backBtn: {
     width: 36,

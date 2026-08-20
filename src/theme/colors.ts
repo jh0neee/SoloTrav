@@ -65,6 +65,33 @@ export const colors = {
   kakaoYellowPressed: '#e9d200',
   kakaoLabel: 'rgba(0,0,0,0.85)',
 
+  // 샛별이 채팅 (밤하늘)
+  chatBg: '#101a2e', // 화면 배경 — 위쪽 밤하늘
+  chatBgDeep: '#0a1120', // 아래로 갈수록 짙어지는 톤
+  chatStar: '#ffffff', // 별 (투명도는 컴포넌트에서 조절)
+  chatBotBubble: '#f8f9fc', // 샛별이 말풍선
+  chatBotText: '#1b2233',
+  chatUserBubble: '#e3b25c', // 내 말풍선 (골드)
+  chatUserText: '#2a2110',
+  chatBubbleMuted: '#6b7280', // 말풍선 안 보조 문구
+  chatStarterBorder: 'rgba(227,178,92,0.55)', // 첫 인사 아래 골드 칩
+  chatStarterBg: 'rgba(227,178,92,0.14)',
+  chatStarterText: '#f0d9a6',
+  chatQuickBg: 'rgba(255,255,255,0.06)', // 입력창 위 빠른 질문 칩
+  chatQuickBorder: 'rgba(255,255,255,0.18)',
+  chatQuickText: '#dfe5f0',
+  chatInputBg: '#f8f9fc',
+  chatInputPlaceholder: '#9aa3b2',
+  chatIconButton: 'rgba(255,255,255,0.08)', // 헤더 원형 버튼
+  chatHeaderSub: '#9aa6bd',
+  chatCardBg: 'rgba(255,255,255,0.05)', // 코스 카드 (유리 느낌)
+  chatCardBorder: 'rgba(255,255,255,0.12)',
+  chatCardText: '#e8ecf5',
+  chatCardMuted: '#a7b1c6',
+  chatSafetyBg: 'rgba(227,178,92,0.10)', // 안전 안내 박스
+  chatNoticeBg: 'rgba(255,255,255,0.05)', // 확인해주세요 박스
+  chatOnline: '#5cd6a0', // 헤더 '응답 중' 점
+
   // 슬라이더
   track: '#e5e2da',
   trackFill: '#1b2233',

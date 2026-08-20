@@ -21,6 +21,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, photoTones } from '../../theme/colors';
 import {
   Chevron,
@@ -298,8 +299,10 @@ function TopBar({
   onBack: () => void;
   right?: React.ReactNode;
 }) {
+  // 상태바가 투명(translucent)이라 상단 여백은 화면이 직접 만들어 줍니다.
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.topBar}>
+    <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
       <Pressable
         onPress={onBack}
         style={styles.backBtn}
@@ -480,7 +483,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingLeft: 8,
     paddingRight: 16,
-    paddingVertical: 10,
+    // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
+    paddingBottom: 10,
   },
   backBtn: {
     width: 36,
