@@ -1,9 +1,16 @@
 /**
- * 홈 화면 — 상단 다크 히어로(브랜드 + 인사 + 검색) + 스포트라이트 + 빠른 시작.
- * 검색 input 을 누르면 도시 선택 화면으로 이동합니다.
+ * 홈 화면 — 상단 다크 히어로(브랜드 + 인사 + 검색) + 실데이터 섹션 3개 + 빠른 시작.
+ *
+ * 섹션은 모두 서버 API 로 채웁니다.
+ *  - 숨은 동네   : 지역안전지수(안전등급) + 관광정보(대표 사진)
+ *  - 지금 축제   : 행사정보조회
+ *  - 계절 사진   : 관광사진갤러리
+ *
+ * 섹션마다 독립적으로 로딩·실패하므로 하나가 실패해도 나머지는 그대로 뜹니다.
  */
 import React from 'react';
 import {
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,37 +18,60 @@ import {
   View,
 } from 'react-native';
 import { useMyProfile } from '../../user/userStore';
-import { CITIES, SPOTLIGHT_CITY_IDS, type City } from '../../data/cities';
+import { type City } from '../../data/cities';
 import { colors } from '../../theme/colors';
 import {
   BellIcon,
   Chevron,
   PinIcon,
   SearchIcon,
-  ShieldIcon,
   SparkIcon,
 } from '../../components/icons/UiIcons';
+import {
+  FestivalCard,
+  PhotoCard,
+  SafetyPill,
+  SectionState,
+} from '../../components/travel/TravelCards';
+import {
+  safetyOf,
+  useGalleryPhotos,
+  useRegionSafety,
+  useSpotlightCities,
+  useUpcomingFestivals,
+  type SpotlightCity,
+} from '../../travel/homeQueries';
+import type { SafetyMap } from '../../travel/homeQueries';
+import type { TourSpot } from '../../types/travel';
 
 type Props = {
+  /** 검색 화면 열기 */
   onOpenSearch: () => void;
+  /** 도시 선택 화면 열기 */
+  onOpenCitySelect: () => void;
   onSelectCity: (city: City) => void;
   onOpenPreference: () => void;
+  /** 축제·장소 카드 탭 → 상세 화면 */
+  onSelectSpot: (spot: TourSpot) => void;
   /** 취향 프롬프트를 설정했다면 요약 문구, 아직이면 null */
   preferenceSummary?: string | null;
 };
 
-const spotlightCities = SPOTLIGHT_CITY_IDS.map(
-  id => CITIES.find(c => c.id === id)!,
-);
-
 function HomeScreen({
   onOpenSearch,
+  onOpenCitySelect,
   onSelectCity,
   onOpenPreference,
+  onSelectSpot,
   preferenceSummary,
 }: Props) {
   const profile = useMyProfile();
   const hasPreference = !!preferenceSummary;
+
+  const safety = useRegionSafety();
+  const spotlight = useSpotlightCities();
+  const festivals = useUpcomingFestivals();
+  const photos = useGalleryPhotos();
 
   return (
     <ScrollView
@@ -65,7 +95,7 @@ function HomeScreen({
           {profile.displayName}님, 어디로{'\n'}혼자 떠나볼까요?
         </Text>
 
-        {/* 검색 input (누르면 도시 선택으로 이동) */}
+        {/* 검색 input (누르면 검색 화면으로 이동) */}
         <Pressable
           style={styles.searchBox}
           onPress={onOpenSearch}
@@ -110,31 +140,98 @@ function HomeScreen({
         </View>
       </Pressable>
 
-      {/* ── 스포트라이트 ── */}
+      {/* ── 숨은 동네 ── */}
       <View style={styles.section}>
-        <View style={styles.sectionHead}>
-          <View>
-            <Text style={styles.sectionKicker}>SPOTLIGHT · 충북</Text>
-            <Text style={styles.sectionTitle}>등대가 비추는 숨은 동네</Text>
-          </View>
-          <Pressable style={styles.moreBtn}>
-            <Text style={styles.moreText}>전체</Text>
-            <Chevron direction="right" color={colors.textSecondary} size={16} />
-          </Pressable>
-        </View>
+        <SectionHead
+          kicker="SPOTLIGHT · 충북"
+          title="등대가 비추는 숨은 동네"
+          onMore={onOpenCitySelect}
+        />
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.spotlightRow}>
-          {spotlightCities.map(city => (
-            <SpotlightCard
-              key={city.id}
-              city={city}
-              onPress={() => onSelectCity(city)}
-            />
-          ))}
-        </ScrollView>
+        <SectionState
+          status={spotlight.status}
+          error={spotlight.error}
+          isEmpty={spotlight.data?.length === 0}
+          emptyText="추천할 동네를 불러오지 못했어요"
+          onRetry={spotlight.reload}
+          height={230}
+        />
+
+        {spotlight.data && spotlight.data.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.spotlightRow}>
+            {spotlight.data.map(item => (
+              <SpotlightCard
+                key={item.city.id}
+                item={item}
+                safety={safety.data}
+                onPress={() => onSelectCity(item.city)}
+              />
+            ))}
+          </ScrollView>
+        ) : null}
+      </View>
+
+      {/* ── 지금 열리는 축제 ── */}
+      <View style={styles.section}>
+        <SectionHead
+          kicker="FESTIVAL"
+          title="지금 충북에서 열리는 축제"
+        />
+
+        <SectionState
+          status={festivals.status}
+          error={festivals.error}
+          isEmpty={festivals.data?.length === 0}
+          emptyText="예정된 축제가 아직 없어요"
+          onRetry={festivals.reload}
+          height={200}
+        />
+
+        {festivals.data && festivals.data.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.spotlightRow}>
+            {festivals.data.map(festival => (
+              <FestivalCard
+                key={festival.contentId}
+                festival={festival}
+                onPress={() => onSelectSpot(festival)}
+              />
+            ))}
+          </ScrollView>
+        ) : null}
+      </View>
+
+      {/* ── 관광사진 갤러리 ── */}
+      <View style={styles.section}>
+        <SectionHead
+          kicker="PHOTO"
+          title="사진으로 먼저 만나는 충북"
+        />
+
+        <SectionState
+          status={photos.status}
+          error={photos.error}
+          isEmpty={photos.data?.length === 0}
+          emptyText="사진을 불러오지 못했어요"
+          onRetry={photos.reload}
+          height={180}
+        />
+
+        {photos.data && photos.data.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.photoRow}>
+            {photos.data.map(photo => (
+              <PhotoCard key={photo.id} photo={photo} />
+            ))}
+          </ScrollView>
+        ) : null}
       </View>
 
       {/* ── 빠른 시작 ── */}
@@ -143,7 +240,7 @@ function HomeScreen({
         <View style={styles.quickRow}>
           <Pressable
             style={[styles.tile, styles.tileLight]}
-            onPress={onOpenSearch}>
+            onPress={onOpenCitySelect}>
             <View style={styles.tileTop}>
               <SparkIcon color={colors.goldDeep} size={18} />
               <Chevron direction="right" color={colors.textSecondary} size={16} />
@@ -168,6 +265,32 @@ function HomeScreen({
   );
 }
 
+/** 섹션 제목 줄 — 오른쪽 '전체' 버튼은 onMore 를 준 섹션에만 붙습니다 */
+function SectionHead({
+  kicker,
+  title,
+  onMore,
+}: {
+  kicker: string;
+  title: string;
+  onMore?: () => void;
+}) {
+  return (
+    <View style={styles.sectionHead}>
+      <View>
+        <Text style={styles.sectionKicker}>{kicker}</Text>
+        <Text style={styles.sectionTitle}>{title}</Text>
+      </View>
+      {onMore ? (
+        <Pressable style={styles.moreBtn} onPress={onMore}>
+          <Text style={styles.moreText}>전체</Text>
+          <Chevron direction="right" color={colors.textSecondary} size={16} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 /** 작은 등대 로고 */
 function Lighthouse() {
   return (
@@ -178,15 +301,37 @@ function Lighthouse() {
   );
 }
 
-/** 숨은 동네 카드 */
-function SpotlightCard({ city, onPress }: { city: City; onPress: () => void }) {
+/** 숨은 동네 카드 — 사진은 그 지역 관광정보에서, 안전등급은 지역안전지수에서 */
+function SpotlightCard({
+  item,
+  safety,
+  onPress,
+}: {
+  item: SpotlightCity;
+  safety: SafetyMap | null;
+  onPress: () => void;
+}) {
+  const { city, imageUrl, imageCaption } = item;
+  const citySafety = safetyOf(city, safety);
+
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.cardImage}>
+        {imageUrl ? (
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.cardImagePhoto}
+            resizeMode="cover"
+          />
+        ) : null}
         <View style={styles.cardBadge}>
-          <Text style={styles.cardBadgeText}>인구감소지역</Text>
+          <Text style={styles.cardBadgeText}>{city.tag}</Text>
         </View>
-        <View style={styles.cardMoon} />
+        {imageCaption ? (
+          <Text style={styles.cardCaption} numberOfLines={1}>
+            {imageCaption}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.cardBody}>
         <Text style={styles.cardCity}>{city.name}</Text>
@@ -194,10 +339,7 @@ function SpotlightCard({ city, onPress }: { city: City; onPress: () => void }) {
           {city.description}
         </Text>
         <View style={styles.cardPills}>
-          <View style={[styles.pill, styles.pillSafe]}>
-            <ShieldIcon color={colors.safeText} size={14} />
-            <Text style={styles.pillSafeText}>안전 {city.safetyGrade}</Text>
-          </View>
+          <SafetyPill grade={citySafety.grade} />
           <View style={[styles.pill, styles.pillBonus]}>
             <Text style={styles.pillBonusText}>+{city.stats.bonus} 추천가산점</Text>
           </View>
@@ -398,6 +540,10 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingRight: 8,
   },
+  photoRow: {
+    gap: 10,
+    paddingRight: 8,
+  },
   card: {
     width: 220,
     backgroundColor: '#ffffff',
@@ -414,6 +560,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.darkCard,
     padding: 12,
   },
+  cardImagePhoto: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   cardBadge: {
     alignSelf: 'flex-start',
     backgroundColor: colors.badgeBg,
@@ -426,14 +579,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  cardMoon: {
+  cardCaption: {
     position: 'absolute',
-    top: 14,
-    right: 16,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: colors.goldSoft,
+    left: 12,
+    right: 12,
+    bottom: 8,
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '700',
+    // 사진 위 글씨라 그림자로 가독성을 확보합니다.
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   cardBody: {
     padding: 14,
@@ -462,14 +619,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
-  },
-  pillSafe: {
-    backgroundColor: colors.safeBg,
-  },
-  pillSafeText: {
-    color: colors.safeText,
-    fontSize: 12,
-    fontWeight: '700',
   },
   pillBonus: {
     backgroundColor: colors.bonusBg,

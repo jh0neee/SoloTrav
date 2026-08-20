@@ -3,15 +3,20 @@
  * 외부 라이브러리 없이 상태 배열로 화면 전환(push/pop)을 관리하고,
  * 안드로이드 하드웨어 back 으로도 pop 되게 처리합니다.
  *
+ *   홈 → 검색 → 장소 상세
  *   홈 → 도시 선택 → 취향 프롬프트
  *   홈 → 취향 프롬프트 (홈 배너에서 바로 진입)
+ *   홈 → 축제 카드 → 장소 상세
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { BackHandler } from 'react-native';
 import HomeScreen from '../screens/home/HomeScreen';
+import SearchScreen from '../screens/home/SearchScreen';
+import SpotDetailScreen from '../screens/home/SpotDetailScreen';
 import CitySelectScreen from '../screens/home/CitySelectScreen';
 import PreferencePromptScreen from '../screens/home/PreferencePromptScreen';
 import type { City } from '../data/cities';
+import type { TourSpot } from '../types/travel';
 import { summarizePreferences } from '../data/preferences';
 import {
   preferenceStore,
@@ -20,6 +25,8 @@ import {
 
 type Route =
   | { name: 'home' }
+  | { name: 'search' }
+  | { name: 'spot'; spot: TourSpot }
   | { name: 'citySelect' }
   | { name: 'preference'; city?: City };
 
@@ -52,11 +59,21 @@ function HomeStack() {
   }, [stack.length, pop]);
 
   switch (current.name) {
+    case 'search':
+      return (
+        <SearchScreen
+          onBack={pop}
+          onSelectSpot={spot => push({ name: 'spot', spot })}
+        />
+      );
+    case 'spot':
+      return <SpotDetailScreen spot={current.spot} onBack={pop} />;
     case 'citySelect':
       return (
         <CitySelectScreen
           onBack={pop}
           onCreateCourse={city => push({ name: 'preference', city })}
+          onSelectSpot={spot => push({ name: 'spot', spot })}
         />
       );
     case 'preference':
@@ -89,8 +106,10 @@ function HomeStack() {
               : null
           }
           onOpenPreference={() => push({ name: 'preference' })}
-          onOpenSearch={() => push({ name: 'citySelect' })}
+          onOpenSearch={() => push({ name: 'search' })}
+          onOpenCitySelect={() => push({ name: 'citySelect' })}
           onSelectCity={city => push({ name: 'preference', city })}
+          onSelectSpot={spot => push({ name: 'spot', spot })}
         />
       );
   }
