@@ -2,8 +2,11 @@
  * 지도 검색 오버레이 — 상단 검색바를 누르면 지도 위를 덮으며 열립니다.
  *
  * 결과는 두 갈래를 합쳐 보여 줍니다.
- *  1) 앱이 아는 장소(PLACES) — 안전 등급·후기가 있는 우리 데이터
- *  2) 카카오 장소 검색 결과 — 그 외 모든 POI
+ *  1) 관광정보(TourAPI) 검색 결과 — 상세 정보가 붙는 관광 콘텐츠
+ *  2) 카카오 장소 검색 결과 — 편의점·약국 등 그 외 모든 POI
+ *
+ * 두 검색은 같은 디바운스 타이밍에 나란히 나갑니다. 한쪽이 실패해도 다른 쪽
+ * 결과는 그대로 보여 줍니다.
  *
  * 입력은 350ms 디바운스하고, 응답이 늦게 도착해 이전 결과가 덮어쓰는 일이 없도록
  * 마지막 질의어를 ref 로 붙들어 비교합니다.
@@ -15,7 +18,7 @@
  * 코드에서 입력칸을 채워야 할 때(최근 검색어 탭)는 key 를 바꿔 리마운트하고,
  * 비울 때는 명령형 API 인 clear() 를 씁니다.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -34,7 +37,11 @@ import {
   ShieldIcon,
 } from '../../components/icons/UiIcons';
 import { colors } from '../../theme/colors';
-import { PLACES, type Place } from '../../data/places';
+import { tourApi } from '../../api/tourApi';
+import {
+  TOUR_CATEGORY_LABEL,
+  type TourPlace,
+} from '../../types/tourPlace';
 import type { SearchPoi, SearchStatus } from './searchTypes';
 import { formatDistance } from './searchTypes';
 
@@ -56,23 +63,15 @@ function pushRecent(keyword: string) {
   ].slice(0, MAX_RECENT);
 }
 
-/** 앱 등록 장소를 이름·지역·배지로 훑어 봅니다. */
-function matchLocalPlaces(query: string): Place[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return [];
-  return PLACES.filter(place =>
-    [place.name, place.area, place.badge].some(field =>
-      field.toLowerCase().includes(q),
-    ),
-  );
-}
+/** 관광정보 검색은 목록에 너무 길게 늘어지지 않게 위에서 몇 건만 보여 줍니다. */
+const TOUR_HIT_LIMIT = 8;
 
 type Props = {
   visible: boolean;
   /** 카카오 장소 검색 실행 — KakaoMap 핸들의 search 를 그대로 받습니다. */
   onSearch: (query: string) => Promise<{ items: SearchPoi[]; status: SearchStatus }>;
-  /** 앱 등록 장소 선택 */
-  onSelectPlace: (place: Place) => void;
+  /** 관광 콘텐츠 선택 */
+  onSelectPlace: (place: TourPlace) => void;
   /** 카카오 POI 선택 — 현재 결과 목록 전체를 함께 넘겨 지도에 마커를 찍습니다. */
   onSelectPoi: (poi: SearchPoi, all: SearchPoi[], query: string) => void;
   /** 키보드 검색 버튼(제출) — 결과 전체를 지도에 표시 */
@@ -107,7 +106,9 @@ function MapSearchOverlay({
   const [inputSeed, setInputSeed] = useState(0);
   const seedTextRef = useRef('');
 
-  const localHits = useMemo(() => matchLocalPlaces(query), [query]);
+  /** 관광정보(TourAPI) 검색 결과 */
+  const [tourHits, setTourHits] = useState<TourPlace[]>([]);
+
   const trimmed = query.trim();
 
   // 열릴 때마다 입력 상태를 비웁니다. (오버레이가 통째로 언마운트되므로 입력칸은 자동으로 빕니다)
@@ -118,6 +119,7 @@ function MapSearchOverlay({
     latestQuery.current = '';
     setQuery('');
     setPois([]);
+    setTourHits([]);
     setStatus('OK');
     setLoading(false);
     const timer = setTimeout(() => inputRef.current?.focus(), 80);
@@ -149,6 +151,7 @@ function MapSearchOverlay({
 
     if (trimmed.length < 2) {
       setPois([]);
+      setTourHits([]);
       setStatus('OK');
       setLoading(false);
       return;
@@ -168,6 +171,24 @@ function MapSearchOverlay({
       alive = false;
     };
   }, [visible, trimmed, onSearch]);
+
+  // 관광정보 검색 — 카카오 검색과 나란히 나가고, 실패하면 조용히 비웁니다.
+  useEffect(() => {
+    if (!visible || trimmed.length < 2) return;
+
+    const controller = new AbortController();
+    tourApi
+      .searchKeyword(trimmed, { rows: TOUR_HIT_LIMIT }, controller.signal)
+      .then(page => {
+        if (controller.signal.aborted || latestQuery.current !== trimmed) return;
+        setTourHits(page.items);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setTourHits([]);
+      });
+
+    return () => controller.abort();
+  }, [visible, trimmed]);
 
   /** 최근 검색어를 눌렀을 때 — 입력칸을 리마운트해 값을 채웁니다. */
   const fillInput = useCallback((text: string) => {
@@ -202,8 +223,8 @@ function MapSearchOverlay({
   }, [trimmed, pois, onSubmit]);
 
   const handlePlace = useCallback(
-    (place: Place) => {
-      pushRecent(place.name);
+    (place: TourPlace) => {
+      pushRecent(place.title);
       onSelectPlace(place);
     },
     [onSelectPlace],
@@ -222,7 +243,7 @@ function MapSearchOverlay({
   const showEmpty =
     trimmed.length >= 2 &&
     !loading &&
-    localHits.length === 0 &&
+    tourHits.length === 0 &&
     pois.length === 0;
 
   return (
@@ -292,24 +313,19 @@ function MapSearchOverlay({
               </>
             )}
 
-            <Text style={styles.sectionTitle}>등록된 안심 장소</Text>
-            {PLACES.map(place => (
-              <PlaceRow
-                key={place.id}
-                place={place}
-                onPress={() => handlePlace(place)}
-              />
-            ))}
+            <Text style={styles.hint}>
+              가고 싶은 곳이나 지역 이름을 입력해 보세요.
+            </Text>
           </>
         )}
 
-        {/* 입력 중 — 우리 데이터 우선, 그 아래 카카오 결과 */}
+        {/* 입력 중 — 관광정보 우선, 그 아래 카카오 결과 */}
         {trimmed.length > 0 && (
           <>
-            {localHits.length > 0 && (
+            {tourHits.length > 0 && (
               <>
-                <Text style={styles.sectionTitle}>등록된 안심 장소</Text>
-                {localHits.map(place => (
+                <Text style={styles.sectionTitle}>관광정보</Text>
+                {tourHits.map(place => (
                   <PlaceRow
                     key={place.id}
                     place={place}
@@ -319,7 +335,7 @@ function MapSearchOverlay({
               </>
             )}
 
-            {trimmed.length < 2 && localHits.length === 0 && (
+            {trimmed.length < 2 && tourHits.length === 0 && (
               <Text style={styles.hint}>두 글자 이상 입력해 주세요.</Text>
             )}
 
@@ -364,8 +380,8 @@ function MapSearchOverlay({
   );
 }
 
-/** 앱 등록 장소 한 줄 — 방패 아이콘 + 안전 배지 */
-function PlaceRow({ place, onPress }: { place: Place; onPress: () => void }) {
+/** 관광 콘텐츠 한 줄 — 방패 아이콘 + 카테고리 배지 */
+function PlaceRow({ place, onPress }: { place: TourPlace; onPress: () => void }) {
   return (
     <Pressable style={styles.row} onPress={onPress} accessibilityRole="button">
       <View style={[styles.rowIcon, styles.rowIconSafe]}>
@@ -373,14 +389,16 @@ function PlaceRow({ place, onPress }: { place: Place; onPress: () => void }) {
       </View>
       <View style={styles.rowBody}>
         <Text style={styles.rowTitle} numberOfLines={1}>
-          {place.name}
+          {place.title}
         </Text>
         <Text style={styles.rowSub} numberOfLines={1}>
-          {place.area}
+          {place.address}
         </Text>
       </View>
       <View style={styles.rowBadge}>
-        <Text style={styles.rowBadgeText}>{place.badge}</Text>
+        <Text style={styles.rowBadgeText}>
+          {TOUR_CATEGORY_LABEL[place.category]}
+        </Text>
       </View>
     </Pressable>
   );

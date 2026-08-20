@@ -2,8 +2,6 @@
  * 지도 검색 관련 타입.
  * WebView(카카오 SDK) ↔ RN 사이에서 오가는 값이라 별도 파일로 분리했습니다.
  */
-import type { Place } from '../../data/places';
-
 /** 카카오 장소 검색(keywordSearch) 결과 1건 */
 export type SearchPoi = {
   id: string;
@@ -18,11 +16,6 @@ export type SearchPoi = {
   lat: number;
   lng: number;
 };
-
-/** 검색 목록의 한 줄 — 앱이 아는 장소(local) 와 카카오 POI(poi) 를 함께 보여 줍니다. */
-export type SearchHit =
-  | { kind: 'local'; place: Place }
-  | { kind: 'poi'; poi: SearchPoi };
 
 export type SearchStatus = 'OK' | 'ZERO_RESULT' | 'ERROR';
 

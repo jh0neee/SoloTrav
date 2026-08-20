@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PermissionsAndroid, Platform } from 'react-native';
 import Geolocation from '@react-native-community/geolocation';
-import { MY_LOCATION } from '../data/places';
+import { MY_LOCATION } from '../data/mapDefaults';
 
 export type Coords = { lat: number; lng: number };
 

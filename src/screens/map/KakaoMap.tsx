@@ -20,14 +20,10 @@ import RNWebView, {
   type WebViewProps,
 } from 'react-native-webview';
 import { KAKAO_WEBVIEW_ORIGIN, isKakaoKeyConfigured } from '../../config/kakao';
-import {
-  MAP_CENTER,
-  MY_LOCATION,
-  PLACES,
-  type PlaceCategory,
-} from '../../data/places';
+import { MAP_CENTER, MY_LOCATION } from '../../data/mapDefaults';
 import { colors } from '../../theme/colors';
-import { buildKakaoMapHtml } from './kakaoMapHtml';
+import { buildKakaoMapHtml, toMapMarkers } from './kakaoMapHtml';
+import type { TourCategory, TourPlace } from '../../types/tourPlace';
 import type { SearchPoi, SearchStatus } from './searchTypes';
 
 /**
@@ -60,13 +56,17 @@ export type KakaoMapHandle = {
 };
 
 type Props = {
-  category: PlaceCategory;
+  /** 관광정보 API 로 받아 온 마커 목록 */
+  places: TourPlace[];
+  category: TourCategory;
   selectedId: string | null;
   /** 측위된 현위치. 바뀌면 지도의 파란 점도 따라 옮겨집니다. */
   myLocation: { lat: number; lng: number };
   onMarkerPress: (id: string) => void;
   onSearchMarkerPress: (id: string) => void;
   onMapPress: () => void;
+  /** 지도 이동이 멎었을 때의 새 중심 — "이 지역에서 재검색" 판단에 씁니다. */
+  onCenterChanged?: (center: { lat: number; lng: number }) => void;
 };
 
 /** 검색 요청은 비동기라 reqId 로 응답을 짝지어 줍니다. */
@@ -74,12 +74,14 @@ const SEARCH_TIMEOUT_MS = 8000;
 
 const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
   {
+    places,
     category,
     selectedId,
     myLocation,
     onMarkerPress,
     onSearchMarkerPress,
     onMapPress,
+    onCenterChanged,
   },
   ref,
 ) {
@@ -96,7 +98,6 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
   const html = useMemo(
     () =>
       buildKakaoMapHtml({
-        places: PLACES,
         center: MAP_CENTER,
         myLocation: MY_LOCATION,
         initialCategory: initialCategoryRef.current,
@@ -155,6 +156,12 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
     run(`window.__setCategory(${JSON.stringify(category)})`);
   }, [ready, category, run]);
 
+  // 관광정보 API 결과가 바뀌면 마커를 통째로 교체합니다.
+  useEffect(() => {
+    if (!ready) return;
+    run(`window.__setPlaces(${JSON.stringify(toMapMarkers(places))})`);
+  }, [ready, places, run]);
+
   useEffect(() => {
     if (!ready) return;
     run(`window.__selectPlace(${JSON.stringify(selectedId)})`);
@@ -175,6 +182,8 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
         reqId?: number;
         items?: SearchPoi[];
         status?: SearchStatus;
+        lat?: number;
+        lng?: number;
       };
       try {
         payload = JSON.parse(event.nativeEvent.data);
@@ -196,6 +205,14 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
         case 'mapPress':
           onMapPress();
           break;
+        case 'centerChanged':
+          if (
+            typeof payload.lat === 'number' &&
+            typeof payload.lng === 'number'
+          ) {
+            onCenterChanged?.({ lat: payload.lat, lng: payload.lng });
+          }
+          break;
         case 'searchResult': {
           const resolve =
             payload.reqId != null
@@ -213,7 +230,7 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
           break;
       }
     },
-    [onMarkerPress, onSearchMarkerPress, onMapPress],
+    [onMarkerPress, onSearchMarkerPress, onMapPress, onCenterChanged],
   );
 
   // 키를 아직 안 넣었으면 빈 회색 지도 대신 무엇을 해야 하는지 알려줍니다.

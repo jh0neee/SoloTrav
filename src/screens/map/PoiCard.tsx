@@ -1,7 +1,7 @@
 /**
  * 검색 결과(카카오 POI) 선택 시 하단에 뜨는 간단 카드.
  *
- * 앱 등록 장소는 안전 등급·후기가 있어 PlaceBottomSheet 를 쓰지만,
+ * 관광 콘텐츠는 개요·이용시간·사진이 있어 TourPlaceSheet 를 쓰지만,
  * 카카오 POI 는 이름·주소·전화번호 정도만 있으므로 가벼운 카드로 보여 줍니다.
  */
 import React from 'react';

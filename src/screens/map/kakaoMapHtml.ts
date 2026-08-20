@@ -11,9 +11,11 @@
  *      { type: 'markerPress', id }             마커 탭
  *      { type: 'searchMarkerPress', id }       검색 결과 마커 탭
  *      { type: 'mapPress' }                    빈 지도 탭 (시트 닫기용)
+ *      { type: 'centerChanged', lat, lng }     지도 이동이 멎었을 때의 새 중심
  *      { type: 'searchResult', reqId, items }  키워드 검색 응답
  *      { type: 'error', message }              SDK 로드 실패 등
  *  - RN → Web : injectJavaScript 로 아래 전역 함수 호출
+ *      window.__setPlaces(list)                마커 전체 교체 (관광정보 API 결과)
  *      window.__setCategory(category)          카테고리 필터 변경
  *      window.__selectPlace(id | null)         선택 마커 강조
  *      window.__moveToMyLocation()             현위치로 이동
@@ -26,40 +28,47 @@
  *      window.__moveTo(lat, lng, level)        임의 좌표로 이동
  */
 import { KAKAO_JS_KEY } from '../../config/kakao';
-import type { Place, PlaceCategory } from '../../data/places';
+import { TOUR_CATEGORY_COLOR, type TourCategory } from '../../types/tourPlace';
 
-/** 카테고리별 마커 색상 */
-const CATEGORY_COLOR: Record<PlaceCategory, string> = {
-  safe: '#3d8a5a',
-  solo: '#3b4557',
-  review: '#d8a84e',
+/** 웹뷰로 넘기는 마커 한 건 — 좌표·색만 있으면 그릴 수 있습니다. */
+export type MapMarker = {
+  id: string;
+  lat: number;
+  lng: number;
+  category: TourCategory;
+  color: string;
 };
 
+/** TourPlace 배열을 웹뷰가 쓰는 마커 데이터로 줄입니다. */
+export function toMapMarkers(
+  places: { id: string; lat: number; lng: number; category: TourCategory }[],
+): MapMarker[] {
+  return places.map(p => ({
+    id: p.id,
+    lat: p.lat,
+    lng: p.lng,
+    category: p.category,
+    color: TOUR_CATEGORY_COLOR[p.category],
+  }));
+}
+
 type Options = {
-  places: Place[];
   center: { lat: number; lng: number };
   myLocation: { lat: number; lng: number };
-  /** 처음 보여 줄 카테고리. 전체가 잠깐 떴다 사라지는 깜빡임을 막습니다. */
-  initialCategory: PlaceCategory;
+  /**
+   * 처음 보여 줄 카테고리.
+   * 마커는 API 응답이 온 뒤 __setPlaces 로 들어오므로 여기서는 필터값만 정합니다.
+   */
+  initialCategory: TourCategory;
   level?: number; // 카카오 확대 레벨 (숫자가 작을수록 확대)
 };
 
 export function buildKakaoMapHtml({
-  places,
   center,
   myLocation,
   initialCategory,
   level = 4,
 }: Options) {
-  // 좌표·이름만 넘기면 되므로 리뷰 등 무거운 필드는 제외합니다.
-  const markerData = places.map(p => ({
-    id: p.id,
-    lat: p.lat,
-    lng: p.lng,
-    category: p.category,
-    color: CATEGORY_COLOR[p.category],
-  }));
-
   return `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -125,7 +134,8 @@ export function buildKakaoMapHtml({
 <div id="fallback">지도를 불러오지 못했습니다.<br />JavaScript 키와 플랫폼 도메인 등록을 확인해 주세요.</div>
 
 <script>
-  var PLACES = ${JSON.stringify(markerData)};
+  // 마커는 관광정보 API 응답이 온 뒤 __setPlaces 로 채워집니다.
+  var PLACES = [];
   var CENTER = ${JSON.stringify(center)};
   var ME = ${JSON.stringify(myLocation)};
   var LEVEL = ${level};
@@ -149,6 +159,7 @@ export function buildKakaoMapHtml({
 
   var meOverlay = null;      // 현위치 파란 점 (측위 결과가 오면 위치를 갱신)
   var overlays = {};         // id -> { overlay, el, category }
+  var category = INITIAL_CATEGORY;  // 현재 필터. 마커를 다시 그릴 때 기준이 됩니다.
   var searchOverlays = {};   // 검색 결과 id -> { overlay, el }
   var selectedId = null;
   var selectedSearchId = null;
@@ -172,6 +183,30 @@ export function buildKakaoMapHtml({
     return el;
   }
 
+  /** 기존 마커를 모두 걷어내고 PLACES 로 다시 그립니다. */
+  function renderPlaces() {
+    Object.keys(overlays).forEach(function (id) {
+      overlays[id].overlay.setMap(null);
+    });
+    overlays = {};
+    selectedId = null;
+
+    if (!map) return;
+
+    PLACES.forEach(function (place) {
+      var el = makePin(place);
+      var overlay = new kakao.maps.CustomOverlay({
+        // 처음부터 해당 카테고리만 올려서 깜빡임을 없앱니다.
+        map: place.category === category ? map : null,
+        position: new kakao.maps.LatLng(place.lat, place.lng),
+        content: el,
+        yAnchor: 1,       // 핀 꼬리 끝이 좌표를 가리키도록
+        clickable: true,  // 오버레이 안의 DOM 이벤트를 살립니다
+      });
+      overlays[place.id] = { overlay: overlay, el: el, category: place.category };
+    });
+  }
+
   function initMap() {
     map = new kakao.maps.Map(document.getElementById('map'), {
       center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
@@ -181,18 +216,7 @@ export function buildKakaoMapHtml({
     // 키워드 검색용 서비스 (SDK URL 의 libraries=services 로 로드됩니다)
     placesService = new kakao.maps.services.Places();
 
-    PLACES.forEach(function (place) {
-      var el = makePin(place);
-      var overlay = new kakao.maps.CustomOverlay({
-        // 처음부터 해당 카테고리만 올려서 깜빡임을 없앱니다.
-        map: place.category === INITIAL_CATEGORY ? map : null,
-        position: new kakao.maps.LatLng(place.lat, place.lng),
-        content: el,
-        yAnchor: 1,       // 핀 꼬리 끝이 좌표를 가리키도록
-        clickable: true,  // 오버레이 안의 DOM 이벤트를 살립니다
-      });
-      overlays[place.id] = { overlay: overlay, el: el, category: place.category };
-    });
+    renderPlaces();
 
     // 현위치 점
     var meEl = document.createElement('div');
@@ -210,15 +234,32 @@ export function buildKakaoMapHtml({
       send({ type: 'mapPress' });
     });
 
+    /**
+     * 지도 이동이 멎으면 새 중심을 알립니다.
+     * RN 이 "이 지역에서 재검색" 버튼을 띄울지 판단하는 데 씁니다.
+     * (idle 은 드래그·확대가 끝난 뒤 한 번만 오므로 요청이 남발되지 않습니다.)
+     */
+    kakao.maps.event.addListener(map, 'idle', function () {
+      var c = map.getCenter();
+      send({ type: 'centerChanged', lat: c.getLat(), lng: c.getLng() });
+    });
+
     send({ type: 'ready' });
   }
 
   /* ── RN 에서 호출하는 전역 함수들 ── */
 
-  window.__setCategory = function (category) {
+  /** 관광정보 API 결과로 마커를 통째로 교체합니다. */
+  window.__setPlaces = function (list) {
+    PLACES = Array.isArray(list) ? list : [];
+    renderPlaces();
+  };
+
+  window.__setCategory = function (next) {
+    category = next;
     Object.keys(overlays).forEach(function (id) {
       var item = overlays[id];
-      item.overlay.setMap(item.category === category ? map : null);
+      item.overlay.setMap(item.category === next ? map : null);
     });
   };
 

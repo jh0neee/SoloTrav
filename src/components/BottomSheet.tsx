@@ -21,6 +21,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 
+/**
+ * 본문 마지막 줄이 하단 탭바에 가리지 않도록 비워 두는 높이.
+ *
+ * 탭바(BottomTabNavigator)는 58px 이고 safe area 는 별도로 더합니다.
+ * 여기에 숨 쉴 틈 18px 을 얹었습니다. 가운데 마스코트가 탭바 위로 26px 튀어나오지만
+ * 폭이 좁아 본문을 가리지 않으므로 그만큼 더 비우지는 않습니다.
+ */
+const TAB_BAR_CLEARANCE = 76;
+
 type Props = {
   visible: boolean;
   onClose: () => void;
@@ -63,6 +72,16 @@ function BottomSheet({
   const [mounted, setMounted] = useState(false);
 
   /**
+   * 지금 머물러 있는 스냅의 offset.
+   *
+   * 시트는 늘 최대 높이로 그려 두고 아래로 밀어서 낮은 스냅을 표현합니다.
+   * 그래서 낮은 스냅에서는 시트 아래쪽 offset 만큼이 화면 밖에 있고, 그 안의
+   * ScrollView 도 같은 만큼 잘립니다. 본문을 끝까지 스크롤해도 마지막 offset
+   * 만큼은 화면에 못 올라오는데, 이 값을 아래 여백으로 더해 주면 해결됩니다.
+   */
+  const [snapOffset, setSnapOffset] = useState(defaultOffset);
+
+  /**
    * 실제 화면상의 위치를 posRef 로 추적합니다.
    * useNativeDriver 를 쓰면 값이 네이티브에 있어서 JS 가 바로 읽을 수 없는데,
    * 리스너를 붙여 두면 네이티브가 값 변화를 JS 로 보내 줍니다.
@@ -77,6 +96,10 @@ function BottomSheet({
 
   const animateTo = useCallback(
     (target: number, onDone?: () => void) => {
+      // 닫는 중(closedY)에는 여백을 건드리지 않습니다 — 내려가는 동안 본문이 들썩입니다.
+      if (target !== closedY) {
+        setSnapOffset(target);
+      }
       Animated.spring(translateY, {
         toValue: target,
         useNativeDriver: true,
@@ -87,7 +110,7 @@ function BottomSheet({
         if (finished) onDone?.();
       });
     },
-    [translateY],
+    [translateY, closedY],
   );
 
   // visible 변화에 따라 열기/닫기. 드래그 중이던 위치에서 이어서 애니메이션됩니다.
@@ -169,7 +192,10 @@ function BottomSheet({
         style={styles.body}
         contentContainerStyle={[
           styles.bodyContent,
-          { paddingBottom: insets.bottom + 96 }, // 떠 있는 탭바에 가리지 않게
+          {
+            // 하단 탭바 + 화면 밖으로 밀려난 시트 아랫부분만큼 비워 둡니다.
+            paddingBottom: insets.bottom + TAB_BAR_CLEARANCE + snapOffset,
+          },
         ]}
         showsVerticalScrollIndicator={false}>
         {children}
