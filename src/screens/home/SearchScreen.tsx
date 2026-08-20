@@ -405,6 +405,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: colors.textSecondary,
+    lineHeight: 18,
+    includeFontPadding: true,
   },
   regionTextActive: {
     color: '#ffffff',
@@ -429,6 +431,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.textSecondary,
+    lineHeight: 18,
+    includeFontPadding: true,
   },
   chipTextActive: {
     color: colors.bonusText,
@@ -491,6 +495,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.textPrimary,
+    lineHeight: 18,
+    includeFontPadding: true,
   },
 });
 

@@ -9,6 +9,7 @@ import type {
   MunicipalityQuery,
   RegionalSafetyQuery,
   TourInfoQuery,
+  VisitorRegionQuery,
 } from './travelDto';
 
 type QueryValue = string | number | boolean | undefined | null;
@@ -76,6 +77,18 @@ export const ENDPOINTS = {
   /** 기록 좋아요(POST) / 취소(DELETE) */
   recordLikes: (recordId: string) =>
     `/travel-records/${encodeURIComponent(recordId)}/likes`,
+
+  // ── 샛별이 (AI 여행 코스) ──
+  // "접수 → SSE 구독" 인 비동기 구조라 한 번의 대화에 세 경로를 씁니다.
+
+  /** 코스 생성 요청 접수 (POST) — requestId 를 돌려줍니다 */
+  saetbyeolChat: () => `/ai/saetbyeol/chat`,
+  /** 요청 최종 상태 조회 — 앱 재시작·화면 복귀 시 결과를 되찾을 때 씁니다 */
+  saetbyeolChatResult: (requestId: string) =>
+    `/ai/saetbyeol/chat/${encodeURIComponent(requestId)}`,
+  /** 결과 SSE 스트림 (text/event-stream) */
+  saetbyeolChatStream: (requestId: string) =>
+    `/ai/saetbyeol/chat/${encodeURIComponent(requestId)}/stream`,
 
   // SOS
   /** 현위치 기준 가장 가까운 안전 시설 조회 */
@@ -148,4 +161,11 @@ export const ENDPOINTS = {
   /** 기초지자체 중심 관광지 목록 (방문 상위 랭킹) */
   municipalityAttractions: (params: MunicipalityQuery) =>
     withQuery(`/travel/municipality/tourist-attractions/items`, params),
+
+  /** 기초 지자체(시군구) 지역방문자수 — 지역 필터가 없어 전국이 통째로 옵니다 */
+  visitorLocalGovernment: (params: VisitorRegionQuery) =>
+    withQuery(`/travel/visitor-region/local-government`, params),
+  /** 광역 지자체(시도) 지역방문자수 */
+  visitorMetropolitan: (params: VisitorRegionQuery) =>
+    withQuery(`/travel/visitor-region/metropolitan`, params),
 } as const;

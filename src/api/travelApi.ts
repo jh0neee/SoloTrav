@@ -18,7 +18,9 @@ import {
   toTourFestivals,
   toTourSpotDetail,
   toTourSpots,
+  toVisitorTotals,
   todayYmd,
+  type VisitorTotals,
 } from './travelMappers';
 import type { TourArrange, TourInfoQuery, TourMobileOs } from './travelDto';
 import type {
@@ -240,21 +242,103 @@ export const travelApi = {
     keyword?: string;
     page?: number;
     size?: number;
-  } = {}): Promise<GalleryPhoto[]> => {
+  } = {}): Promise<TourPage<GalleryPhoto>> => {
+    const pageNo = params.page ?? 1;
+    const size = params.size ?? 20;
     const query = {
       MobileOS: MOBILE_OS,
       MobileApp: APP_NAME,
       keyword: params.keyword,
       arrange: 'A' as const,
-      pageNo: params.page ?? 1,
-      numOfRows: params.size ?? 20,
+      pageNo,
+      numOfRows: size,
     };
     const { data } = await apiClient.get(
       params.keyword
         ? ENDPOINTS.tourGallerySearchList(query)
         : ENDPOINTS.tourGalleryList(query),
     );
-    return toGalleryPhotos(data);
+    return toPage(toGalleryPhotos(data), data, pageNo, size);
+  },
+
+  /**
+   * 조건에 맞는 관광정보가 몇 건인지만 셉니다.
+   * 목록은 필요 없고 숫자만 쓰는 자리(동네 인프라 통계)를 위해 1건만 받아
+   * totalCount 를 꺼냅니다.
+   */
+  countSpots: async (
+    params: { contentTypeId?: string } & RegionFilter,
+  ): Promise<number> => {
+    const { data } = await apiClient.get(
+      ENDPOINTS.tourAreaBasedList(
+        withDefaults({
+          contentTypeId: params.contentTypeId,
+          lDongRegnCd: params.regionCode,
+          lDongSignguCd: params.districtCode,
+          arrange: 'C',
+          pageNo: 1,
+          numOfRows: 1,
+        }),
+      ),
+    );
+    return toTotalCount(data);
+  },
+
+  /**
+   * 하루치 기초 지자체 방문자수를 시군구별로 합쳐서 돌려줍니다.
+   *
+   * 이 API 는 지역을 좁힐 수 없어 전국 800행이 통째로 옵니다. 그래서 관심 있는
+   * 시군구 코드를 함께 넘기면 파싱 단계에서 걸러 메모리에 남기지 않습니다.
+   */
+  getVisitorTotals: async (
+    ymd: string,
+    keepCodes?: string[],
+  ): Promise<Map<string, VisitorTotals>> => {
+    const { data } = await apiClient.get(
+      ENDPOINTS.visitorLocalGovernment({
+        startYmd: ymd,
+        endYmd: ymd,
+        pageNo: 1,
+        numOfRows: 1000,
+        MobileOS: MOBILE_OS,
+        MobileApp: APP_NAME,
+      }),
+    );
+    return toVisitorTotals(data, keepCodes);
+  },
+
+  /**
+   * 방문자수 데이터가 실제로 있는 가장 최근 날짜를 찾습니다.
+   *
+   * 집계가 한 달 넘게 밀려서(2026-08 기준 07-11 까지) 오늘 날짜로 조회하면
+   * 빈 배열이 옵니다. 주말 나들이 수요를 보려는 것이니 **토요일**만 훑습니다.
+   *
+   * 한 주씩 순서대로 두드리면 최악의 경우 왕복이 10번이라 홈 첫 로딩이 눈에
+   * 띄게 느려집니다. 건수만 확인하면 되는 가벼운 요청이라 전부 동시에 보내고
+   * 그중 가장 최근 날짜를 고릅니다(사실상 왕복 1번).
+   */
+  findLatestVisitorDate: async (maxWeeks = 10): Promise<string | null> => {
+    const candidates = recentSaturdays(maxWeeks);
+    const results = await Promise.all(
+      candidates.map(ymd =>
+        apiClient
+          .get(
+            ENDPOINTS.visitorLocalGovernment({
+              startYmd: ymd,
+              endYmd: ymd,
+              pageNo: 1,
+              numOfRows: 1,
+              MobileOS: MOBILE_OS,
+              MobileApp: APP_NAME,
+            }),
+          )
+          // 한 주가 실패해도 다른 주로 계속 갑니다.
+          .then(response => (toTotalCount(response.data) > 0 ? ymd : null))
+          .catch(() => null),
+      ),
+    );
+    // candidates 가 최신순이라 먼저 걸리는 값이 가장 최근 날짜입니다.
+    return results.find((ymd): ymd is string => ymd !== null) ?? null;
   },
 
   /**
@@ -308,6 +392,25 @@ export const travelApi = {
     return [];
   },
 };
+
+/**
+ * 가장 가까운 지난 토요일부터 주 단위로 거슬러 올라가며 YYYYMMDD 를 만듭니다.
+ * 오늘이 토요일이면 오늘은 아직 집계 전이므로 지난주부터 셉니다.
+ */
+function recentSaturdays(count: number): string[] {
+  const base = new Date();
+  // 0=일 … 6=토. 이번 주 토요일이 미래면 지난주 토요일로 내립니다.
+  const back = (base.getDay() + 1) % 7 || 7;
+  base.setDate(base.getDate() - back);
+
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(base);
+    date.setDate(date.getDate() - index * 7);
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${date.getFullYear()}${month}${day}`;
+  });
+}
 
 /** 지난달부터 count 개월치 YYYYMM 을 최신순으로 만듭니다. */
 function recentMonths(count: number): string[] {

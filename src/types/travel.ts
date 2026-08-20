@@ -113,13 +113,87 @@ export type RegionSafety = {
   regionType: string;
   baseYear: number;
   grades: SafetyCategoryGrades;
-  /** 6개 부문 평균 (낮을수록 안전) */
+  /** 6개 부문 단순 평균 (낮을수록 안전) — 행정안전부 원자료에 가장 가까운 값 */
   average: number;
-  /** 평균을 A~E 로 환산한 등급 */
+  /** 6개 부문 평균을 A~E 로 환산한 등급 */
   grade: string;
-  /** 평균을 0~100 으로 환산한 점수 (높을수록 안전) */
+  /** 6개 부문 평균을 0~100 으로 환산한 점수 (높을수록 안전) */
   score: number;
+
+  /**
+   * 혼행 안전 점수 (0~100, 높을수록 안전).
+   *
+   * 6개 부문을 그냥 평균 내면 자살·감염병처럼 여행자와 관계가 옅은 지표가
+   * 절반을 차지해, 치안이 나쁜 지역이 '안전한 곳' 1위가 되는 일이 생깁니다.
+   * 그래서 혼자 다닐 때 실제로 위험을 만드는 세 부문에만 가중치를 둡니다.
+   * (가중치는 travelMappers 의 SOLO_SAFETY_WEIGHTS 참고)
+   */
+  soloScore: number;
+  /** 혼행 안전 점수를 A~E 로 환산한 등급 */
+  soloGrade: string;
 };
+
+/**
+ * 지역안전지수 6개 부문의 표시 정보.
+ *
+ * 혼자 여행하는 사람이 실제로 신경 쓰는 순서로 배열해둡니다 — 치안(범죄)이
+ * 맨 앞이고, 야간 이동과 직결되는 생활안전·교통이 뒤따릅니다. 화면은 이 순서
+ * 그대로 그리면 됩니다.
+ */
+export const SAFETY_CATEGORIES: {
+  key: keyof SafetyCategoryGrades;
+  label: string;
+  /** 혼행 관점에서 왜 중요한지 — 상세 화면 설명용 */
+  note: string;
+}[] = [
+  { key: 'crime', label: '치안', note: '범죄 발생·검거 지표' },
+  { key: 'lifeSafety', label: '생활안전', note: '추락·중독 등 일상 사고' },
+  { key: 'traffic', label: '교통', note: '보행자 사고 포함' },
+  { key: 'fire', label: '화재', note: '숙소 선택에 영향' },
+  { key: 'infectiousDisease', label: '감염병', note: '' },
+  { key: 'suicide', label: '자살', note: '' },
+];
+
+/** 등급(1~5) → 사람이 읽는 말. 1이 가장 안전합니다. */
+export const SAFETY_GRADE_LABEL: Record<number, string> = {
+  1: '매우 안전',
+  2: '안전',
+  3: '보통',
+  4: '주의',
+  5: '각별 주의',
+};
+
+/** 기초 지자체 하루치 방문자 집계 (현지인/외지인/외국인 합산 후) */
+export type VisitorStat = {
+  /** 법정동 5자리 시군구 코드 (단양군 = '43800') */
+  districtCode: string;
+  districtName: string;
+  local: number;
+  visitor: number;
+  foreign: number;
+  /** 외지인 ÷ (현지인 + 외지인) × 100 — 여행지 집중도 */
+  visitorRatio: number;
+  /** 4주 전 같은 요일 대비 외지인 증감률(%). 비교 데이터가 없으면 null */
+  changeRate: number | null;
+  /** 집계 기준일 YYYYMMDD */
+  baseYmd: string;
+  /** 예: '토요일' */
+  dayLabel: string;
+};
+
+/** 홈 랭킹 탭 — 무엇을 기준으로 줄 세울지 */
+export const RANKING_KINDS = [
+  {
+    id: 'safe',
+    label: '안전한 곳',
+    /** 카드 아래 붙는 설명 */
+    caption: '혼행 안전 점수 순 (치안 50 · 생활안전 30 · 교통 20)',
+  },
+  { id: 'hot', label: '핫한 곳', caption: '주말 외지인 방문이 많은 순' },
+  { id: 'quiet', label: '한적한 곳', caption: '사람이 적어 혼자 걷기 좋은 순' },
+] as const;
+
+export type RankingKind = (typeof RANKING_KINDS)[number]['id'];
 
 /** 기초지자체 중심 관광지 (방문 상위 랭킹) */
 export type HubAttraction = {

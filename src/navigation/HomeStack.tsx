@@ -4,6 +4,7 @@
  * 안드로이드 하드웨어 back 으로도 pop 되게 처리합니다.
  *
  *   홈 → 검색 → 장소 상세
+ *   홈 → 사진첩
  *   홈 → 도시 선택 → 취향 프롬프트
  *   홈 → 취향 프롬프트 (홈 배너에서 바로 진입)
  *   홈 → 축제 카드 → 장소 상세
@@ -12,6 +13,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { BackHandler } from 'react-native';
 import HomeScreen from '../screens/home/HomeScreen';
 import SearchScreen from '../screens/home/SearchScreen';
+import GalleryScreen from '../screens/home/GalleryScreen';
 import SpotDetailScreen from '../screens/home/SpotDetailScreen';
 import CitySelectScreen from '../screens/home/CitySelectScreen';
 import PreferencePromptScreen from '../screens/home/PreferencePromptScreen';
@@ -26,8 +28,9 @@ import {
 type Route =
   | { name: 'home' }
   | { name: 'search' }
+  | { name: 'gallery' }
   | { name: 'spot'; spot: TourSpot }
-  | { name: 'citySelect' }
+  | { name: 'citySelect'; cityId?: string }
   | { name: 'preference'; city?: City };
 
 function HomeStack() {
@@ -66,11 +69,14 @@ function HomeStack() {
           onSelectSpot={spot => push({ name: 'spot', spot })}
         />
       );
+    case 'gallery':
+      return <GalleryScreen onBack={pop} />;
     case 'spot':
       return <SpotDetailScreen spot={current.spot} onBack={pop} />;
     case 'citySelect':
       return (
         <CitySelectScreen
+          initialCityId={current.cityId}
           onBack={pop}
           onCreateCourse={city => push({ name: 'preference', city })}
           onSelectSpot={spot => push({ name: 'spot', spot })}
@@ -108,7 +114,8 @@ function HomeStack() {
           onOpenPreference={() => push({ name: 'preference' })}
           onOpenSearch={() => push({ name: 'search' })}
           onOpenCitySelect={() => push({ name: 'citySelect' })}
-          onSelectCity={city => push({ name: 'preference', city })}
+          onOpenGallery={() => push({ name: 'gallery' })}
+          onSelectCity={city => push({ name: 'citySelect', cityId: city.id })}
           onSelectSpot={spot => push({ name: 'spot', spot })}
         />
       );

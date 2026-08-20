@@ -82,6 +82,24 @@ export type GalleryQuery = {
   title?: string;
 };
 
+/**
+ * 지역별 방문자수(/travel/visitor-region/*) 쿼리.
+ *
+ * ⚠️ 지역을 좁히는 파라미터가 **없습니다.** 하루치를 조회하면 전국 시군구
+ * 264곳 × 3구분 = 약 800행이 통째로 옵니다. 충북만 쓰려면 받아서 걸러야 합니다.
+ * 그래서 numOfRows 를 1000 으로 넉넉히 주고 한 번에 받습니다.
+ */
+export type VisitorRegionQuery = {
+  /** 조회 시작일 YYYYMMDD */
+  startYmd: string;
+  /** 조회 종료일 YYYYMMDD */
+  endYmd: string;
+  pageNo?: number;
+  numOfRows?: number;
+  MobileOS?: TourMobileOs;
+  MobileApp?: string;
+};
+
 /** 지역안전지수(/travel/regional-safety) 쿼리 */
 export type RegionalSafetyQuery = {
   baseYear?: string;
@@ -222,6 +240,28 @@ export type RegionalSafetyDto = {
   life_safety_grade?: number;
   suicide_grade?: number;
   infectious_disease_grade?: number;
+};
+
+/**
+ * 기초 지자체 방문자수 1건.
+ * 한 지역·하루가 현지인(a)/외지인(b)/외국인(c) 3행으로 나뉘어 옵니다.
+ * touNum 은 '107257.5' 처럼 소수점이 붙은 문자열입니다(추정 집계값).
+ */
+export type VisitorRegionDto = {
+  /** 시군구 코드 — 법정동 5자리 (단양군 = '43800') */
+  signguCode?: string;
+  signguNm?: string;
+  /** 광역 조회일 때만 옵니다 */
+  areaCode?: string;
+  areaNm?: string;
+  daywkDivCd?: string;
+  /** 예: '토요일' */
+  daywkDivNm?: string;
+  /** '1' 현지인 / '2' 외지인 / '3' 외국인 */
+  touDivCd?: string;
+  touDivNm?: string;
+  touNum?: string;
+  baseYmd?: string;
 };
 
 /**

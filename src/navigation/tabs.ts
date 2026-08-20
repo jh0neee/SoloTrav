@@ -11,7 +11,7 @@ import {
   type Icon,
 } from 'phosphor-react-native';
 import type { ComponentType } from 'react';
-import AssistantScreen from '../screens/AssistantScreen';
+import AssistantScreen from '../screens/assistant/AssistantScreen';
 import MapScreen from '../screens/map/MapScreen';
 import MyScreen from '../screens/MyScreen';
 import RecordScreen from '../screens/RecordScreen';

@@ -17,11 +17,13 @@ import type {
   TourImageDto,
   TourListDto,
   TourSpotDto,
+  VisitorRegionDto,
 } from './travelDto';
 import type {
   GalleryPhoto,
   HubAttraction,
   RegionSafety,
+  SafetyCategoryGrades,
   TourFestival,
   TourIntroFact,
   TourSpot,
@@ -314,6 +316,22 @@ export function toGalleryPhotos(payload: unknown): GalleryPhoto[] {
 // ─────────────────────────────── 지역안전지수
 
 /**
+ * 혼행 안전 점수의 가중치.
+ *
+ * 혼자 여행하는 사람에게 실제로 위험이 되는 건 밤길 치안, 생활 속 사고,
+ * 그리고 낯선 길에서의 교통사고입니다. 자살·감염병·화재는 지역 통계로는
+ * 중요하지만 하루 이틀 머무는 여행자의 체감 안전과는 거리가 있어 뺐습니다.
+ *
+ * 합이 1이어야 점수가 0~100 범위에 들어옵니다.
+ */
+const SOLO_SAFETY_WEIGHTS: { key: keyof SafetyCategoryGrades; weight: number }[] =
+  [
+    { key: 'crime', weight: 0.5 },
+    { key: 'lifeSafety', weight: 0.3 },
+    { key: 'traffic', weight: 0.2 },
+  ];
+
+/**
  * 평균 등급(1~5) → 화면 표기 등급.
  * 6개 부문 평균이 1에 가까울수록 안전합니다.
  */
@@ -355,6 +373,18 @@ export function toRegionSafetyList(payload: unknown): RegionSafety[] {
       const average =
         values.reduce((sum, value) => sum + value, 0) / values.length;
 
+      // 혼행 가중 평균 — 세 부문 중 빠진 게 있으면 있는 것만으로 비율을 다시 맞춥니다.
+      const usable = SOLO_SAFETY_WEIGHTS.filter(
+        item => grades[item.key] !== null,
+      );
+      const weightSum = usable.reduce((sum, item) => sum + item.weight, 0);
+      const soloAverage = weightSum
+        ? usable.reduce(
+            (sum, item) => sum + (grades[item.key] as number) * item.weight,
+            0,
+          ) / weightSum
+        : average;
+
       const safety: RegionSafety = {
         sido,
         sigungu: text(dto.sigungu),
@@ -372,11 +402,75 @@ export function toRegionSafetyList(payload: unknown): RegionSafety[] {
         grade: toSafetyGrade(average),
         // 1등급=100점, 5등급=0점으로 선형 환산
         score: Math.round(((5 - average) / 4) * 100),
+        soloScore: Math.round(((5 - soloAverage) / 4) * 100),
+        soloGrade: toSafetyGrade(soloAverage),
       };
       return safety;
     })
     .filter((safety): safety is RegionSafety => safety !== null);
 }
+
+// ─────────────────────────────── 지역별 방문자수
+
+/**
+ * 방문자수 응답을 시군구 단위로 합칩니다.
+ *
+ * 한 지역·하루가 현지인/외지인/외국인 3행으로 쪼개져 오므로 코드별로 모아
+ * 한 덩어리로 만듭니다. 전국이 통째로 오기 때문에 필요한 시군구 코드만
+ * 넘겨 받아 그 자리에서 걸러냅니다(800행을 다 들고 있을 이유가 없습니다).
+ */
+export function toVisitorTotals(
+  payload: unknown,
+  keepCodes?: string[],
+): Map<string, VisitorTotals> {
+  const keep = keepCodes ? new Set(keepCodes) : null;
+  const totals = new Map<string, VisitorTotals>();
+
+  for (const dto of itemsOf<VisitorRegionDto>(payload)) {
+    const code = text(dto.signguCode);
+    if (!code || (keep && !keep.has(code))) {
+      continue;
+    }
+    const current = totals.get(code) ?? {
+      districtCode: code,
+      districtName: text(dto.signguNm) ?? '',
+      local: 0,
+      visitor: 0,
+      foreign: 0,
+      baseYmd: text(dto.baseYmd) ?? '',
+      dayLabel: text(dto.daywkDivNm) ?? '',
+    };
+    const count = num(dto.touNum) ?? 0;
+
+    // touDivCd: 1 현지인 / 2 외지인 / 3 외국인
+    switch (text(dto.touDivCd)) {
+      case '1':
+        current.local += count;
+        break;
+      case '2':
+        current.visitor += count;
+        break;
+      case '3':
+        current.foreign += count;
+        break;
+      default:
+        break;
+    }
+    totals.set(code, current);
+  }
+  return totals;
+}
+
+/** 구분별로 합산만 끝난 중간 형태 — 비율·증감은 두 날짜를 비교해야 나옵니다 */
+export type VisitorTotals = {
+  districtCode: string;
+  districtName: string;
+  local: number;
+  visitor: number;
+  foreign: number;
+  baseYmd: string;
+  dayLabel: string;
+};
 
 // ─────────────────────────────── 기초지자체 중심 관광지
 

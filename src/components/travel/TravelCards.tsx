@@ -222,21 +222,132 @@ export function PhotoCard({
   );
 }
 
-// ─────────────────────────────── 안전 등급 필
+// ─────────────────────────────── 지역안전지수 막대
 
-export function SafetyPill({
-  grade,
-  score,
+/**
+ * 등급(1~5)에 맞는 색.
+ * 1·2 는 안전(초록), 3 은 보통(골드), 4·5 는 주의(빨강)로 묶습니다.
+ * 숫자만 보여주면 "3등급이 좋은 건가?" 를 매번 되묻게 되어 색으로 방향을 줍니다.
+ */
+export function gradeColor(grade: number): string {
+  if (grade <= 2) {
+    return colors.safeText;
+  }
+  if (grade === 3) {
+    return colors.goldDeep;
+  }
+  return colors.danger;
+}
+
+/**
+ * 지역안전지수 6개 부문 막대.
+ * 1등급이 가장 안전하므로 **막대가 길수록 안전**하도록 뒤집어 그립니다.
+ */
+export function SafetyBars({
+  grades,
+  categories,
+  gradeLabels,
 }: {
-  grade: string;
-  score?: number;
+  grades: Record<string, number>;
+  categories: { key: string; label: string; note: string }[];
+  gradeLabels: Record<number, string>;
 }) {
   return (
-    <View style={[styles.pill, styles.pillSafe]}>
-      <ShieldIcon color={colors.safeText} size={14} />
-      <Text style={styles.pillSafeText}>
-        안전 {grade}
-        {score !== undefined ? ` · ${score}점` : ''}
+    <View style={styles.barList}>
+      {categories.map(category => {
+        const grade = grades[category.key] ?? 0;
+        const color = gradeColor(grade);
+        // 1등급 100%, 5등급 20% — 0(값 없음)이면 빈 막대
+        const ratio = grade ? ((6 - grade) / 5) * 100 : 0;
+
+        return (
+          <View key={category.key} style={styles.barRow}>
+            <Text style={styles.barLabel}>{category.label}</Text>
+            <View style={styles.barTrack}>
+              <View
+                style={[
+                  styles.barFill,
+                  // 비율·색이 런타임 계산이라 inline 이 불가피합니다.
+                  { width: `${ratio}%`, backgroundColor: color },
+                ]}
+              />
+            </View>
+            <Text style={[styles.barGrade, { color }]}>
+              {grade ? gradeLabels[grade] ?? `${grade}등급` : '-'}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─────────────────────────────── 랭킹 한 줄
+
+export function RankingRow({
+  rank,
+  name,
+  value,
+  caption,
+  safetyGrade,
+  onPress,
+}: {
+  rank: number;
+  name: string;
+  value: string;
+  caption: string;
+  safetyGrade: string;
+  onPress: () => void;
+}) {
+  const isTop = rank <= 3;
+
+  return (
+    <Pressable style={styles.rankRow} onPress={onPress}>
+      <View
+        style={[styles.rankBadge, isTop && styles.rankBadgeTop]}>
+        <Text style={[styles.rankNum, isTop && styles.rankNumTop]}>{rank}</Text>
+      </View>
+      <View style={styles.rankBody}>
+        <View style={styles.rankNameLine}>
+          <Text style={styles.rankName}>{name}</Text>
+          <View style={styles.rankSafety}>
+            <ShieldIcon color={colors.safeText} size={12} />
+            <Text style={styles.rankSafetyText}>{safetyGrade}</Text>
+          </View>
+        </View>
+        <Text style={styles.rankCaption}>{caption}</Text>
+      </View>
+      <Text style={styles.rankValue}>{value}</Text>
+    </Pressable>
+  );
+}
+
+// ─────────────────────────────── 통계 타일
+
+/** 숫자 하나 + 라벨. 다크 배경(히어로)과 밝은 배경 양쪽에서 씁니다. */
+export function StatTile({
+  label,
+  value,
+  unit,
+  dark,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  dark?: boolean;
+}) {
+  return (
+    <View style={[styles.statTile, dark && styles.statTileDark]}>
+      <Text style={[styles.statLabel, dark && styles.statLabelDark]}>
+        {label}
+      </Text>
+      <Text style={[styles.statValue, dark && styles.statValueDark]}>
+        {value}
+        {unit ? (
+          <Text style={[styles.statUnit, dark && styles.statLabelDark]}>
+            {unit}
+          </Text>
+        ) : null}
       </Text>
     </View>
   );
@@ -417,21 +528,128 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // 안전 필
-  pill: {
+  // 지역안전지수 막대
+  barList: {
+    gap: 9,
+  },
+  barRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
+    gap: 10,
   },
-  pillSafe: {
-    backgroundColor: colors.safeBg,
-  },
-  pillSafeText: {
-    color: colors.safeText,
+  barLabel: {
+    width: 56,
     fontSize: 12,
     fontWeight: '700',
+    color: colors.textSecondary,
   },
+  barTrack: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.track,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  barGrade: {
+    width: 58,
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+
+  // 랭킹
+  rankRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 11,
+  },
+  rankBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  rankBadgeTop: {
+    backgroundColor: colors.ink,
+  },
+  rankNum: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.textSecondary,
+  },
+  rankNumTop: {
+    color: colors.gold,
+  },
+  rankBody: {
+    flex: 1,
+    gap: 3,
+  },
+  rankNameLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  rankName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  rankSafety: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 7,
+    backgroundColor: colors.safeBg,
+  },
+  rankSafetyText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.safeText,
+  },
+  rankCaption: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  rankValue: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+
+  // 통계 타일
+  statTile: {
+    flex: 1,
+    gap: 4,
+  },
+  statTileDark: {},
+  statLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  statLabelDark: {
+    color: colors.heroTextMuted,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  statValueDark: {
+    color: '#ffffff',
+  },
+  statUnit: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+
 });

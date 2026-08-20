@@ -1,18 +1,20 @@
 /**
- * 홈 화면 — 상단 다크 히어로(브랜드 + 인사 + 검색) + 실데이터 섹션 3개 + 빠른 시작.
+ * 홈 화면 — 다크 히어로(브랜드 + 인사 + 검색 + 충북 요약) 아래로 실데이터 섹션.
  *
- * 섹션은 모두 서버 API 로 채웁니다.
- *  - 숨은 동네   : 지역안전지수(안전등급) + 관광정보(대표 사진)
- *  - 지금 축제   : 행사정보조회
- *  - 계절 사진   : 관광사진갤러리
+ * 공모전 키워드가 '혼자 여행 · 안전' 이라 화면 위쪽일수록 안전 정보를 둡니다.
+ *  - 히어로 통계 : 충북에 볼 것이 얼마나 있고, 안전 데이터는 언제 기준인지
+ *  - 혼행 랭킹   : 안전한 곳 / 핫한 곳 / 한적한 곳 (지역안전지수 + 지역방문자수)
+ *  - 숨은 동네   : 대표 사진 + 치안 등급 + 주말 외지인 비율
+ *  - 축제 / 사진 : 행사정보조회, 관광사진갤러리
  *
  * 섹션마다 독립적으로 로딩·실패하므로 하나가 실패해도 나머지는 그대로 뜹니다.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Image,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   View,
@@ -26,30 +28,38 @@ import {
   Chevron,
   PinIcon,
   SearchIcon,
+  ShieldIcon,
   SparkIcon,
 } from '../../components/icons/UiIcons';
 import {
   FestivalCard,
   PhotoCard,
-  SafetyPill,
+  RankingRow,
   SectionState,
+  StatTile,
 } from '../../components/travel/TravelCards';
 import {
   safetyOf,
+  useCityRankings,
   useGalleryPhotos,
   useRegionSafety,
+  useSpotTotal,
   useSpotlightCities,
   useUpcomingFestivals,
+  useVisitorStats,
   type SpotlightCity,
+  type VisitorMap,
 } from '../../travel/homeQueries';
 import type { SafetyMap } from '../../travel/homeQueries';
-import type { TourSpot } from '../../types/travel';
+import { RANKING_KINDS, type RankingKind, type TourSpot } from '../../types/travel';
 
 type Props = {
   /** 검색 화면 열기 */
   onOpenSearch: () => void;
   /** 도시 선택 화면 열기 */
   onOpenCitySelect: () => void;
+  /** 사진첩 화면 열기 */
+  onOpenGallery: () => void;
   onSelectCity: (city: City) => void;
   onOpenPreference: () => void;
   /** 축제·장소 카드 탭 → 상세 화면 */
@@ -61,26 +71,42 @@ type Props = {
 function HomeScreen({
   onOpenSearch,
   onOpenCitySelect,
+  onOpenGallery,
   onSelectCity,
   onOpenPreference,
   onSelectSpot,
   preferenceSummary,
 }: Props) {
-  const profile = useMyProfile();
   const insets = useSafeAreaInsets();
+  const profile = useMyProfile();
   const hasPreference = !!preferenceSummary;
 
   const safety = useRegionSafety();
+  const visitors = useVisitorStats();
+  const spotTotal = useSpotTotal();
   const spotlight = useSpotlightCities();
   const festivals = useUpcomingFestivals();
   const photos = useGalleryPhotos();
+  const ranking = useCityRankings();
+
+  const [rankingKind, setRankingKind] = useState<RankingKind>('safe');
+  const rankedCities = ranking.rankings[rankingKind].slice(0, 5);
+  const rankingCaption =
+    RANKING_KINDS.find(kind => kind.id === rankingKind)?.caption ?? '';
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}>
+      {/*
+        히어로가 상태바 아래까지 어둡게 깔리므로 아이콘을 흰색으로 바꿉니다.
+        (앱 기본값은 dark-content — 이 화면을 벗어나면 자동으로 되돌아갑니다)
+      */}
+      <StatusBar barStyle="light-content" />
+
       {/* ── 다크 히어로 ── */}
+      {/* 상태바 높이만큼 내려 브랜드 로고가 노치에 가리지 않게 합니다 */}
       <View style={[styles.hero, { paddingTop: insets.top + 12 }]}>
         <View style={styles.heroTop}>
           <View style={styles.brandRow}>
@@ -108,6 +134,38 @@ function HomeScreen({
           <View style={styles.searchDivider} />
           <PinIcon color={colors.goldDeep} size={20} />
         </Pressable>
+
+        {/* 충북 요약 — 공공데이터로 채운 세 칸 */}
+        <View style={styles.heroStats}>
+          <StatTile
+            dark
+            label="충북 관광정보"
+            value={
+              spotTotal.data !== null && spotTotal.data !== undefined
+                ? spotTotal.data.toLocaleString()
+                : '—'
+            }
+            unit="곳"
+          />
+          <View style={styles.heroStatDivider} />
+          <StatTile
+            dark
+            label="진행·예정 축제"
+            value={festivals.data ? `${festivals.data.length}` : '—'}
+            unit="개"
+          />
+          <View style={styles.heroStatDivider} />
+          <StatTile
+            dark
+            label="안전 데이터"
+            value={
+              safety.data
+                ? `${Object.values(safety.data)[0]?.baseYear ?? '—'}`
+                : '—'
+            }
+            unit="년"
+          />
+        </View>
       </View>
 
       {/* ── 취향 프롬프트 배너 ── */}
@@ -142,6 +200,73 @@ function HomeScreen({
         </View>
       </Pressable>
 
+      {/* ── 혼행 랭킹 ── */}
+      <View style={styles.section}>
+        <SectionHead
+          kicker="혼행 랭킹 · 충북 11개 시군"
+          title="어떤 기준으로 고를까요?"
+          onMore={onOpenCitySelect}
+        />
+
+        <View style={styles.rankTabs}>
+          {RANKING_KINDS.map(kind => {
+            const active = rankingKind === kind.id;
+            return (
+              <Pressable
+                key={kind.id}
+                style={[styles.rankTab, active && styles.rankTabActive]}
+                onPress={() => setRankingKind(kind.id)}>
+                <Text
+                  style={[
+                    styles.rankTabText,
+                    active && styles.rankTabTextActive,
+                  ]}>
+                  {kind.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={styles.rankCard}>
+          <Text style={styles.rankHint}>
+            {rankingCaption}
+            {rankingKind === 'safe'
+              ? ' · 행정안전부 지역안전지수'
+              : ranking.visitorBaseLabel
+              ? ` · 한국관광공사 지역방문자수 ${ranking.visitorBaseLabel}`
+              : ''}
+          </Text>
+
+          <SectionState
+            status={
+              ranking.isLoading
+                ? 'loading'
+                : ranking.error
+                ? 'error'
+                : 'ready'
+            }
+            error={ranking.error}
+            isEmpty={rankedCities.length === 0}
+            emptyText="랭킹을 만들 데이터가 아직 없어요"
+            onRetry={ranking.reload}
+            height={180}
+          />
+
+          {rankedCities.map(item => (
+            <RankingRow
+              key={item.city.id}
+              rank={item.rank}
+              name={item.city.name}
+              value={item.value}
+              caption={item.caption}
+              safetyGrade={item.safetyGrade}
+              onPress={() => onSelectCity(item.city)}
+            />
+          ))}
+        </View>
+      </View>
+
       {/* ── 숨은 동네 ── */}
       <View style={styles.section}>
         <SectionHead
@@ -156,7 +281,7 @@ function HomeScreen({
           isEmpty={spotlight.data?.length === 0}
           emptyText="추천할 동네를 불러오지 못했어요"
           onRetry={spotlight.reload}
-          height={230}
+          height={250}
         />
 
         {spotlight.data && spotlight.data.length > 0 ? (
@@ -169,6 +294,7 @@ function HomeScreen({
                 key={item.city.id}
                 item={item}
                 safety={safety.data}
+                visitors={visitors.data?.stats ?? null}
                 onPress={() => onSelectCity(item.city)}
               />
             ))}
@@ -178,10 +304,7 @@ function HomeScreen({
 
       {/* ── 지금 열리는 축제 ── */}
       <View style={styles.section}>
-        <SectionHead
-          kicker="FESTIVAL"
-          title="지금 충북에서 열리는 축제"
-        />
+        <SectionHead kicker="FESTIVAL" title="지금 충북에서 열리는 축제" />
 
         <SectionState
           status={festivals.status}
@@ -213,6 +336,8 @@ function HomeScreen({
         <SectionHead
           kicker="PHOTO"
           title="사진으로 먼저 만나는 충북"
+          moreLabel="더 보기"
+          onMore={onOpenGallery}
         />
 
         <SectionState
@@ -230,7 +355,7 @@ function HomeScreen({
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.photoRow}>
             {photos.data.map(photo => (
-              <PhotoCard key={photo.id} photo={photo} />
+              <PhotoCard key={photo.id} photo={photo} onPress={onOpenGallery} />
             ))}
           </ScrollView>
         ) : null}
@@ -267,25 +392,27 @@ function HomeScreen({
   );
 }
 
-/** 섹션 제목 줄 — 오른쪽 '전체' 버튼은 onMore 를 준 섹션에만 붙습니다 */
+/** 섹션 제목 줄 — 오른쪽 버튼은 onMore 를 준 섹션에만 붙습니다 */
 function SectionHead({
   kicker,
   title,
+  moreLabel = '전체',
   onMore,
 }: {
   kicker: string;
   title: string;
+  moreLabel?: string;
   onMore?: () => void;
 }) {
   return (
     <View style={styles.sectionHead}>
-      <View>
+      <View style={styles.sectionHeadTexts}>
         <Text style={styles.sectionKicker}>{kicker}</Text>
         <Text style={styles.sectionTitle}>{title}</Text>
       </View>
       {onMore ? (
         <Pressable style={styles.moreBtn} onPress={onMore}>
-          <Text style={styles.moreText}>전체</Text>
+          <Text style={styles.moreText}>{moreLabel}</Text>
           <Chevron direction="right" color={colors.textSecondary} size={16} />
         </Pressable>
       ) : null}
@@ -303,18 +430,25 @@ function Lighthouse() {
   );
 }
 
-/** 숨은 동네 카드 — 사진은 그 지역 관광정보에서, 안전등급은 지역안전지수에서 */
+/**
+ * 숨은 동네 카드.
+ * 사진은 그 지역 관광정보에서, 치안 등급은 지역안전지수에서, 아래 한 줄은
+ * 주말 방문자 집계에서 옵니다 — 세 공공데이터가 카드 하나에 모입니다.
+ */
 function SpotlightCard({
   item,
   safety,
+  visitors,
   onPress,
 }: {
   item: SpotlightCity;
   safety: SafetyMap | null;
+  visitors: VisitorMap | null;
   onPress: () => void;
 }) {
   const { city, imageUrl, imageCaption } = item;
   const citySafety = safetyOf(city, safety);
+  const visitor = visitors?.[city.municipalityCode] ?? null;
 
   return (
     <Pressable style={styles.card} onPress={onPress}>
@@ -340,12 +474,35 @@ function SpotlightCard({
         <Text style={styles.cardDesc} numberOfLines={2}>
           {city.description}
         </Text>
+
+        {/* 혼행 안전 등급 + 치안 등급 */}
         <View style={styles.cardPills}>
-          <SafetyPill grade={citySafety.grade} />
-          <View style={[styles.pill, styles.pillBonus]}>
-            <Text style={styles.pillBonusText}>+{city.stats.bonus} 추천가산점</Text>
+          <View style={[styles.pill, styles.pillSafe]}>
+            <ShieldIcon color={colors.safeText} size={14} />
+            <Text style={styles.pillSafeText}>
+              혼행 안전 {citySafety.grade}
+            </Text>
           </View>
+          {citySafety.crimeGrade ? (
+            <View style={[styles.pill, styles.pillBonus]}>
+              <Text style={styles.pillBonusText}>
+                치안 {citySafety.crimeGrade}등급
+              </Text>
+            </View>
+          ) : null}
         </View>
+
+        {/* 주말 방문자 — 데이터가 오기 전에는 줄 자체를 숨깁니다 */}
+        {visitor ? (
+          <Text style={styles.cardVisitor}>
+            주말 방문객의 {visitor.visitorRatio}% 가 외지인
+            {visitor.changeRate !== null
+              ? ` · 4주 전 대비 ${visitor.changeRate > 0 ? '+' : ''}${
+                  visitor.changeRate
+                }%`
+              : ''}
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -364,8 +521,8 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.heroBg,
     paddingHorizontal: 20,
-    // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
-    paddingBottom: 24,
+    // paddingTop 은 화면에서 insets.top 을 더해 지정합니다.
+    paddingBottom: 20,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
@@ -424,6 +581,21 @@ const styles = StyleSheet.create({
     width: 1,
     height: 24,
     backgroundColor: colors.border,
+  },
+  heroStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 14,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: colors.heroCard,
+    borderWidth: 1,
+    borderColor: colors.heroCardBorder,
+  },
+  heroStatDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: colors.heroCardBorder,
   },
 
   // 로고
@@ -506,19 +678,23 @@ const styles = StyleSheet.create({
   // 섹션 공통
   section: {
     paddingHorizontal: 20,
-    marginTop: 22,
+    marginTop: 24,
   },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     marginBottom: 14,
+    gap: 12,
+  },
+  sectionHeadTexts: {
+    flex: 1,
   },
   sectionKicker: {
     color: colors.goldDeep,
     fontSize: 12,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
     marginBottom: 4,
   },
   sectionTitle: {
@@ -537,6 +713,52 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  // 혼행 랭킹
+  rankTabs: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  rankTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  rankTabActive: {
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
+  },
+  rankTabText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textSecondary,
+    lineHeight: 18,
+    includeFontPadding: true,
+  },
+  rankTabTextActive: {
+    color: '#ffffff',
+  },
+  rankCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  rankHint: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+
   // 스포트라이트 카드
   spotlightRow: {
     gap: 14,
@@ -547,7 +769,7 @@ const styles = StyleSheet.create({
     paddingRight: 8,
   },
   card: {
-    width: 220,
+    width: 240,
     backgroundColor: '#ffffff',
     borderRadius: 18,
     overflow: 'hidden',
@@ -614,6 +836,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
+  cardVisitor: {
+    marginTop: 10,
+    fontSize: 11,
+    color: colors.textSecondary,
+    lineHeight: 16,
+  },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -621,6 +849,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
+  },
+  pillSafe: {
+    backgroundColor: colors.safeBg,
+  },
+  pillSafeText: {
+    color: colors.safeText,
+    fontSize: 12,
+    fontWeight: '700',
   },
   pillBonus: {
     backgroundColor: colors.bonusBg,

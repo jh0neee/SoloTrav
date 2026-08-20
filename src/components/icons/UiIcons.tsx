@@ -392,3 +392,36 @@ export function SparkIcon({ color, size = 18 }: IconProps) {
     </View>
   );
 }
+
+/** 더하기 (첨부·추가) */
+export function PlusIcon({ color, size = 20 }: IconProps) {
+  const bar = size * 0.62;
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ position: 'absolute', width: bar, height: 2, borderRadius: 1, backgroundColor: color }} />
+      <View style={{ position: 'absolute', width: 2, height: bar, borderRadius: 1, backgroundColor: color }} />
+    </View>
+  );
+}
+
+/** 점 세 개 (더보기 메뉴) */
+export function DotsIcon({ color, size = 20 }: IconProps) {
+  const dot = Math.max(3, size * 0.18);
+  return (
+    <View style={{ width: size, height: size, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: color, marginHorizontal: dot * 0.35 }} />
+      <View style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: color, marginHorizontal: dot * 0.35 }} />
+      <View style={{ width: dot, height: dot, borderRadius: dot / 2, backgroundColor: color, marginHorizontal: dot * 0.35 }} />
+    </View>
+  );
+}
+
+/** 시계 (일정 시각) */
+export function ClockIcon({ color, size = 14 }: IconProps) {
+  return (
+    <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 1.5, borderColor: color, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ position: 'absolute', width: 1.5, height: size * 0.3, borderRadius: 1, backgroundColor: color, top: size * 0.18 }} />
+      <View style={{ position: 'absolute', width: size * 0.24, height: 1.5, borderRadius: 1, backgroundColor: color, left: size * 0.46, top: size * 0.44 }} />
+    </View>
+  );
+}
