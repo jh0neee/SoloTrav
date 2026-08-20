@@ -257,7 +257,7 @@ export const tourApi = {
         .catch(() => ({} as Raw)),
       apiClient
         .get(
-          ENDPOINTS.tourDetailImage({ ...params, imageYN: 'Y', numOfRows: '10' }),
+          ENDPOINTS.tourDetailImage({ ...params, imageYN: 'Y', numOfRows: 10 }),
           { signal },
         )
         .then(res => rawItems(res.data))
@@ -321,8 +321,8 @@ export const tourApi = {
         ENDPOINTS.tourSearchKeyword({
           ...COMMON_PARAMS,
           keyword,
-          numOfRows: String(rows),
-          pageNo: String(pageNo),
+          numOfRows: rows,
+          pageNo,
           arrange: 'O', // 제목순
         }),
         { signal },
@@ -363,8 +363,8 @@ export const tourApi = {
           ...COMMON_PARAMS,
           eventStartDate,
           eventEndDate,
-          numOfRows: String(rows),
-          pageNo: '1',
+          numOfRows: rows,
+          pageNo: 1,
           arrange: 'A', // 제목순 — 어차피 화면에서 거리순으로 다시 정렬합니다.
         }),
         { signal },

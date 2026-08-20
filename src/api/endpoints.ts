@@ -105,21 +105,6 @@ export const ENDPOINTS = {
    */
   tourLocationBased: (params: Record<string, QueryValue>) =>
     withQuery(`/travel/information/location-based-list`, params),
-  /** 키워드 검색: /searchKeyword2 */
-  tourSearchKeyword: (params: Record<string, QueryValue>) =>
-    withQuery(`/travel/information/search-keyword`, params),
-  /** 행사정보 조회: /searchFestival2 */
-  tourSearchFestival: (params: Record<string, QueryValue>) =>
-    withQuery(`/travel/information/search-festival`, params),
-  /** 공통정보 조회(개요·주소·좌표): /detailCommon2 */
-  tourDetailCommon: (params: Record<string, QueryValue>) =>
-    withQuery(`/travel/information/detail-common`, params),
-  /** 소개정보 조회(운영시간·휴무일·주차): /detailIntro2 */
-  tourDetailIntro: (params: Record<string, QueryValue>) =>
-    withQuery(`/travel/information/detail-intro`, params),
-  /** 이미지정보 조회: /detailImage2 */
-  tourDetailImage: (params: Record<string, QueryValue>) =>
-    withQuery(`/travel/information/detail-image`, params),
 
   // 관광사진갤러리
   /**
@@ -128,16 +113,6 @@ export const ENDPOINTS = {
    */
   gallerySearch: (params: Record<string, QueryValue>) =>
     withQuery(`/travel/photozone/gallery-search-list`, params),
-
-  // 지역안전지수 (행정안전부)
-  /**
-   * 시도명으로 지역안전지수 조회 — 해당 시도의 SIDO 행 + 시군구 행이 함께 옵니다.
-   *
-   * 목록 엔드포인트(`/travel/regional-safety`)도 있지만 파라미터 조합에 따라
-   * 500 이 나거나 빈 배열을 돌려주는 상태라, 안정적으로 동작하는 이쪽만 씁니다.
-   */
-  regionalSafetyBySido: (params: { sido: string; baseYear?: string }) =>
-    withQuery(`/travel/regional-safety/sido`, params),
 
   // 댓글
   /** 기록의 댓글 조회(GET) / 등록(POST) */

@@ -67,6 +67,9 @@ export type TourInfoQuery = {
   /** 행사 시작일 YYYYMMDD — 이 날짜 이후 행사만 */
   eventStartDate?: string;
   eventEndDate?: string;
+
+  /** 이미지 조회 — 콘텐츠 이미지를 포함할지 여부 (detail-image 전용) */
+  imageYN?: 'Y' | 'N';
 };
 
 /** 관광사진 갤러리(/travel/photozone/*) 쿼리 */
