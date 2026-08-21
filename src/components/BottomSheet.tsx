@@ -209,8 +209,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.14,
-    shadowRadius: 20,
-    elevation: 20,
+    shadowRadius: 8,
+    elevation: 10,
   },
   handleZone: {
     alignItems: 'center',

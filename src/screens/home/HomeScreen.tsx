@@ -14,7 +14,6 @@ import {
   Image,
   Pressable,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   View,
@@ -51,7 +50,11 @@ import {
   type VisitorMap,
 } from '../../travel/homeQueries';
 import type { SafetyMap } from '../../travel/homeQueries';
-import { RANKING_KINDS, type RankingKind, type TourSpot } from '../../types/travel';
+import {
+  RANKING_KINDS,
+  type RankingKind,
+  type TourSpot,
+} from '../../types/travel';
 
 type Props = {
   /** 검색 화면 열기 */
@@ -98,14 +101,9 @@ function HomeScreen({
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}>
-      {/*
-        히어로가 상태바 아래까지 어둡게 깔리므로 아이콘을 흰색으로 바꿉니다.
-        (앱 기본값은 dark-content — 이 화면을 벗어나면 자동으로 되돌아갑니다)
-      */}
-      <StatusBar barStyle="light-content" />
-
-      {/* ── 다크 히어로 ── */}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ── 히어로 ── */}
       {/* 상태바 높이만큼 내려 브랜드 로고가 노치에 가리지 않게 합니다 */}
       <View style={[styles.hero, { paddingTop: insets.top + 12 }]}>
         <View style={styles.heroTop}>
@@ -114,7 +112,7 @@ function HomeScreen({
             <Text style={styles.brand}>혼행등대</Text>
           </View>
           <View style={styles.bellBtn}>
-            <BellIcon color="#ffffff" size={20} />
+            <BellIcon color={colors.textPrimary} size={20} />
           </View>
         </View>
 
@@ -128,44 +126,15 @@ function HomeScreen({
           style={styles.searchBox}
           onPress={onOpenSearch}
           accessibilityRole="search"
-          accessibilityLabel="가고 싶은 도시 또는 키워드 검색">
+          accessibilityLabel="가고 싶은 도시 또는 키워드 검색"
+        >
           <SearchIcon color={colors.textSecondary} size={20} />
-          <Text style={styles.searchPlaceholder}>가고 싶은 도시 또는 키워드</Text>
+          <Text style={styles.searchPlaceholder}>
+            가고 싶은 도시 또는 키워드
+          </Text>
           <View style={styles.searchDivider} />
           <PinIcon color={colors.goldDeep} size={20} />
         </Pressable>
-
-        {/* 충북 요약 — 공공데이터로 채운 세 칸 */}
-        <View style={styles.heroStats}>
-          <StatTile
-            dark
-            label="충북 관광정보"
-            value={
-              spotTotal.data !== null && spotTotal.data !== undefined
-                ? spotTotal.data.toLocaleString()
-                : '—'
-            }
-            unit="곳"
-          />
-          <View style={styles.heroStatDivider} />
-          <StatTile
-            dark
-            label="진행·예정 축제"
-            value={festivals.data ? `${festivals.data.length}` : '—'}
-            unit="개"
-          />
-          <View style={styles.heroStatDivider} />
-          <StatTile
-            dark
-            label="안전 데이터"
-            value={
-              safety.data
-                ? `${Object.values(safety.data)[0]?.baseYear ?? '—'}`
-                : '—'
-            }
-            unit="년"
-          />
-        </View>
       </View>
 
       {/* ── 취향 프롬프트 배너 ── */}
@@ -173,7 +142,8 @@ function HomeScreen({
         style={styles.promptCard}
         onPress={onOpenPreference}
         accessibilityRole="button"
-        accessibilityLabel="취향 프롬프트 설정하기">
+        accessibilityLabel="취향 프롬프트 설정하기"
+      >
         <View style={styles.promptIcon}>
           <SparkIcon color={colors.goldDeep} size={24} />
         </View>
@@ -215,12 +185,14 @@ function HomeScreen({
               <Pressable
                 key={kind.id}
                 style={[styles.rankTab, active && styles.rankTabActive]}
-                onPress={() => setRankingKind(kind.id)}>
+                onPress={() => setRankingKind(kind.id)}
+              >
                 <Text
                   style={[
                     styles.rankTabText,
                     active && styles.rankTabTextActive,
-                  ]}>
+                  ]}
+                >
                   {kind.label}
                 </Text>
               </Pressable>
@@ -240,11 +212,7 @@ function HomeScreen({
 
           <SectionState
             status={
-              ranking.isLoading
-                ? 'loading'
-                : ranking.error
-                ? 'error'
-                : 'ready'
+              ranking.isLoading ? 'loading' : ranking.error ? 'error' : 'ready'
             }
             error={ranking.error}
             isEmpty={rankedCities.length === 0}
@@ -288,7 +256,8 @@ function HomeScreen({
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.spotlightRow}>
+            contentContainerStyle={styles.spotlightRow}
+          >
             {spotlight.data.map(item => (
               <SpotlightCard
                 key={item.city.id}
@@ -319,7 +288,8 @@ function HomeScreen({
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.spotlightRow}>
+            contentContainerStyle={styles.spotlightRow}
+          >
             {festivals.data.map(festival => (
               <FestivalCard
                 key={festival.contentId}
@@ -353,7 +323,8 @@ function HomeScreen({
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.photoRow}>
+            contentContainerStyle={styles.photoRow}
+          >
             {photos.data.map(photo => (
               <PhotoCard key={photo.id} photo={photo} onPress={onOpenGallery} />
             ))}
@@ -367,10 +338,15 @@ function HomeScreen({
         <View style={styles.quickRow}>
           <Pressable
             style={[styles.tile, styles.tileLight]}
-            onPress={onOpenCitySelect}>
+            onPress={onOpenCitySelect}
+          >
             <View style={styles.tileTop}>
               <SparkIcon color={colors.goldDeep} size={18} />
-              <Chevron direction="right" color={colors.textSecondary} size={16} />
+              <Chevron
+                direction="right"
+                color={colors.textSecondary}
+                size={16}
+              />
             </View>
             <Text style={styles.tileTitle}>AI 코스 짜기</Text>
             <Text style={styles.tileSub}>취향 기반 자동 일정</Text>
@@ -378,14 +354,48 @@ function HomeScreen({
 
           <Pressable style={[styles.tile, styles.tileDark]}>
             <View style={styles.tileTop}>
-              <SparkIcon color={colors.gold} size={18} />
-              <Chevron direction="right" color="#8b93a7" size={16} />
+              <SparkIcon color="#ffffff" size={18} />
+              <Chevron
+                direction="right"
+                color="rgba(255,255,255,0.7)"
+                size={16}
+              />
             </View>
             <Text style={[styles.tileTitle, styles.tileTitleDark]}>
               샛별이에게 묻기
             </Text>
-            <Text style={[styles.tileSub, styles.tileSubDark]}>대화로 여행 계획</Text>
+            <Text style={[styles.tileSub, styles.tileSubDark]}>
+              대화로 여행 계획
+            </Text>
           </Pressable>
+        </View>
+        {/* 충북 요약 — 공공데이터로 채운 세 칸 */}
+        <View style={styles.heroStats}>
+          <StatTile
+            label="충북 관광정보"
+            value={
+              spotTotal.data !== null && spotTotal.data !== undefined
+                ? spotTotal.data.toLocaleString()
+                : '—'
+            }
+            unit="곳"
+          />
+          <View style={styles.heroStatDivider} />
+          <StatTile
+            label="진행·예정 축제"
+            value={festivals.data ? `${festivals.data.length}` : '—'}
+            unit="개"
+          />
+          <View style={styles.heroStatDivider} />
+          <StatTile
+            label="안전 데이터"
+            value={
+              safety.data
+                ? `${Object.values(safety.data)[0]?.baseYear ?? '—'}`
+                : '—'
+            }
+            unit="년"
+          />
         </View>
       </View>
     </ScrollView>
@@ -523,8 +533,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     // paddingTop 은 화면에서 insets.top 을 더해 지정합니다.
     paddingBottom: 20,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
   },
   heroTop: {
     flexDirection: 'row',
@@ -538,39 +546,45 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   brand: {
-    color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '800',
+    color: colors.textPrimary,
+    fontSize: 19,
+    fontWeight: '700',
+    letterSpacing: -0.4,
   },
   bellBtn: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroKicker: {
-    color: colors.gold,
-    fontSize: 14,
+    color: colors.primary,
+    fontSize: 13,
     fontWeight: '600',
     marginBottom: 6,
+    letterSpacing: -0.2,
   },
   heroTitle: {
-    color: '#ffffff',
-    fontSize: 28,
-    fontWeight: '800',
-    lineHeight: 38,
-    marginBottom: 20,
+    color: colors.textPrimary,
+    fontSize: 26,
+    fontWeight: '700',
+    lineHeight: 36,
+    marginBottom: 18,
+    letterSpacing: -0.7,
   },
+  // 레퍼런스처럼 검색창만 블루 테두리로 시선을 모읍니다.
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
     paddingHorizontal: 16,
-    height: 56,
-    gap: 12,
+    height: 54,
+    gap: 10,
   },
   searchPlaceholder: {
     flex: 1,
@@ -594,7 +608,7 @@ const styles = StyleSheet.create({
   },
   heroStatDivider: {
     width: 1,
-    height: 30,
+    height: 28,
     backgroundColor: colors.heroCardBorder,
   },
 
@@ -605,14 +619,14 @@ const styles = StyleSheet.create({
   logoLight: {
     width: 12,
     height: 8,
-    backgroundColor: colors.gold,
+    backgroundColor: colors.primary,
     borderTopLeftRadius: 6,
     borderTopRightRadius: 6,
   },
   logoTower: {
     width: 15,
     height: 15,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.textPrimary,
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 2,
   },
@@ -643,13 +657,13 @@ const styles = StyleSheet.create({
   },
   promptKicker: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.bonusText,
     marginBottom: 4,
   },
   promptTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
     lineHeight: 21,
   },
@@ -672,7 +686,7 @@ const styles = StyleSheet.create({
   promptBtnText: {
     color: '#ffffff',
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 
   // 섹션 공통
@@ -693,14 +707,14 @@ const styles = StyleSheet.create({
   sectionKicker: {
     color: colors.goldDeep,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 0.3,
     marginBottom: 4,
   },
   sectionTitle: {
     color: colors.textPrimary,
     fontSize: 19,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   moreBtn: {
     flexDirection: 'row',
@@ -733,7 +747,7 @@ const styles = StyleSheet.create({
   },
   rankTabText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
     lineHeight: 18,
     includeFontPadding: true,
@@ -748,9 +762,9 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
   },
   rankHint: {
     fontSize: 11,
@@ -775,9 +789,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
   },
   cardImage: {
     height: 110,
@@ -801,7 +815,7 @@ const styles = StyleSheet.create({
   cardBadgeText: {
     color: '#e7e9f0',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   cardCaption: {
     position: 'absolute',
@@ -810,7 +824,7 @@ const styles = StyleSheet.create({
     bottom: 8,
     color: '#ffffff',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     // 사진 위 글씨라 그림자로 가독성을 확보합니다.
     textShadowColor: 'rgba(0,0,0,0.6)',
     textShadowOffset: { width: 0, height: 1 },
@@ -821,7 +835,7 @@ const styles = StyleSheet.create({
   },
   cardCity: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: 4,
   },
@@ -856,7 +870,7 @@ const styles = StyleSheet.create({
   pillSafeText: {
     color: colors.safeText,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   pillBonus: {
     backgroundColor: colors.bonusBg,
@@ -864,13 +878,13 @@ const styles = StyleSheet.create({
   pillBonusText: {
     color: colors.bonusText,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
   },
 
   // 빠른 시작
   quickTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: 12,
   },
@@ -886,10 +900,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   tileLight: {
-    backgroundColor: colors.goldSoft,
+    backgroundColor: colors.primarySoft,
   },
   tileDark: {
-    backgroundColor: colors.darkCard,
+    backgroundColor: colors.primary,
   },
   tileTop: {
     flexDirection: 'row',
@@ -898,7 +912,7 @@ const styles = StyleSheet.create({
   },
   tileTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
     marginTop: 'auto',
   },
@@ -911,7 +925,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   tileSubDark: {
-    color: '#c7cbd6',
+    color: 'rgba(255,255,255,0.78)',
   },
 });
 

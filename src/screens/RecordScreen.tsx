@@ -431,9 +431,13 @@ function RecordCard({
         </Text>
       ) : null}
       {record.tags.length > 0 ? (
-        <Text style={styles.tags}>
-          {record.tags.map(tag => `#${tag}`).join(' ')}
-        </Text>
+        <View style={styles.tagRow}>
+          {record.tags.map(tag => (
+            <View key={tag} style={styles.tagChip}>
+              <Text style={styles.tagChipText}>#{tag}</Text>
+            </View>
+          ))}
+        </View>
       ) : null}
     </Pressable>
   );
@@ -461,14 +465,14 @@ const styles = StyleSheet.create({
   },
   kicker: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 0.5,
     color: colors.goldDeep,
     marginBottom: 4,
   },
   title: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   writeBtn: {
@@ -480,7 +484,7 @@ const styles = StyleSheet.create({
   writeText: {
     color: colors.inkText,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 
   // 전체 / 내 기록
@@ -502,15 +506,23 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   segmentItemOn: {
-    backgroundColor: colors.ink,
+    // 선택 항목만 흰 알약으로 떠오르게 합니다.
+    // 파란 면으로 절반을 채우면 목록보다 탭이 더 눈에 띄어 버립니다.
+    backgroundColor: colors.background,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
   },
   segmentText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   segmentTextOn: {
-    color: colors.inkText,
+    color: colors.primary,
+    fontWeight: '700',
   },
 
   filterRow: {
@@ -548,7 +560,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.mascotFace,
   },
   postHeadTexts: {
@@ -556,7 +568,7 @@ const styles = StyleSheet.create({
   },
   author: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   postMeta: {
@@ -623,7 +635,7 @@ const styles = StyleSheet.create({
   },
   safetyGrade: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   gradeA: {
     color: colors.safeText,
@@ -638,6 +650,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 18,
     marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   action: {
     flexDirection: 'row',
@@ -646,7 +661,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
 
@@ -657,11 +672,24 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.textPrimary,
   },
-  tags: {
-    marginTop: 6,
-    fontSize: 13,
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
+  tagChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 9,
+    backgroundColor: colors.primarySoft,
+  },
+  tagChipText: {
+    fontSize: 12,
     fontWeight: '600',
-    color: colors.goldDeep,
+    color: colors.primary,
+    lineHeight: 17,
+    includeFontPadding: true,
   },
 
   // 빈 상태
@@ -685,7 +713,7 @@ const styles = StyleSheet.create({
   },
   emptyCtaText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.inkText,
   },
 });

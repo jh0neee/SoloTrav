@@ -183,9 +183,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroPlaceholderText: {
-    color: colors.goldSoft,
+    color: colors.textTertiary,
     fontSize: 56,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   backBtn: {
     position: 'absolute',
@@ -216,12 +216,12 @@ const styles = StyleSheet.create({
   },
   typeBadgeText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.bonusText,
   },
   title: {
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
     lineHeight: 32,
   },
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
 
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   factLabel: {
     width: 72,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   factValue: {
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   overview: {

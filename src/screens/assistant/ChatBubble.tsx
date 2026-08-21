@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.chatStarterText,
   },
 });

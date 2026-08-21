@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   headerSub: {
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
     // 한글 받침이 잘리지 않도록 줄 높이를 넉넉히 잡습니다.
     // (안드로이드는 includeFontPadding 을 끄면 '충'이 '초'처럼 보입니다)
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   },
   cellTitle: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   cellLocation: {
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 19,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   modalMeta: {
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   },
   modalCloseText: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
 });

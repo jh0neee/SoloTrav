@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.safeText,
   },
   distance: {
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
     letterSpacing: -0.5,
   },
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   statValueOn: {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.inkText,
   },
   iconButton: {
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
   },
   reviewTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   reviewCount: {
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   },
   writePillText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.bonusText,
   },
 
@@ -293,12 +293,12 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   author: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   timeAgo: {
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   },
   reviewBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.safeText,
   },
   reviewText: {
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   reviewTag: {
     marginLeft: 'auto',
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.bonusText,
   },
 });

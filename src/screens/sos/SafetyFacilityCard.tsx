@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.goldSoft,
     marginBottom: 11,
   },
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.inkText,
   },
   meta: {
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.inkText,
   },
 });

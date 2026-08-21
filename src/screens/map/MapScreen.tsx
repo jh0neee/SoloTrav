@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 1,
   },
   searchBar: {
     flex: 1,
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 8,
-    elevation: 4,
+    elevation: 1,
   },
   searchText: {
     flex: 1,
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   },
   gradeBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.bonusText,
   },
   clearButton: {
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
   clearButtonText: {
     fontSize: 14,
     lineHeight: 17,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
 
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
-    elevation: 3,
+    elevation: 1,
   },
   chipOn: {
     backgroundColor: colors.ink,
@@ -465,11 +465,11 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   chipCount: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   chipCountOn: {
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.14,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 1,
   },
 
   zoomGroup: {
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.14,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 1,
   },
   zoomButton: {
     width: 42,
@@ -539,13 +539,13 @@ const styles = StyleSheet.create({
     shadowColor: colors.danger,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.45,
-    shadowRadius: 12,
+    shadowRadius: 8,
     elevation: 10,
   },
   sosText: {
     marginTop: 1,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textOnPrimary,
   },
 
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   },
   resultBannerText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.inkText,
   },
 });

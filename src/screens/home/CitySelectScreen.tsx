@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   content: {
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 26,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
     lineHeight: 34,
     marginTop: 8,
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   // 보기 전환
   segment: {
     flexDirection: 'row',
-    backgroundColor: '#e8e3d8',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 4,
     marginBottom: 18,
@@ -563,13 +563,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.03,
     shadowRadius: 3,
-    elevation: 2,
+    elevation: 1,
   },
   segmentText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
     lineHeight: 21,
     includeFontPadding: true,
@@ -602,7 +602,7 @@ const styles = StyleSheet.create({
   },
   mapChipText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   mapChipDot: {
     position: 'absolute',
@@ -660,7 +660,7 @@ const styles = StyleSheet.create({
   },
   sortChipText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
     lineHeight: 18,
     includeFontPadding: true,
@@ -682,9 +682,9 @@ const styles = StyleSheet.create({
     gap: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
   },
   detailHead: {
     flexDirection: 'row',
@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
   },
   detailName: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   detailTag: {
@@ -709,7 +709,7 @@ const styles = StyleSheet.create({
   },
   detailTagText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.bonusText,
   },
   gradeRow: {
@@ -719,7 +719,7 @@ const styles = StyleSheet.create({
   },
   gradeText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.safeText,
   },
   detailDesc: {
@@ -737,7 +737,7 @@ const styles = StyleSheet.create({
     marginTop: -6,
   },
   trendValue: {
-    fontWeight: '800',
+    fontWeight: '700',
   },
 
   // 상세 안 블록
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
   },
   blockTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   blockNote: {
@@ -770,7 +770,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   soloNoteStrong: {
-    fontWeight: '800',
+    fontWeight: '700',
   },
 
   // 관광정보 건수
@@ -788,7 +788,7 @@ const styles = StyleSheet.create({
   },
   countValue: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   countLabel: {
@@ -814,13 +814,13 @@ const styles = StyleSheet.create({
   },
   hubRank: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.goldDeep,
   },
   hubName: {
     flexShrink: 1,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   hubCategory: {
@@ -841,7 +841,7 @@ const styles = StyleSheet.create({
   ctaText: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 
   // 둘러보기 · 축제
@@ -851,7 +851,7 @@ const styles = StyleSheet.create({
   },
   exploreTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   exploreRow: {
@@ -873,13 +873,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   explorePlaceholderText: {
-    color: colors.goldSoft,
+    color: colors.textTertiary,
     fontSize: 26,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   exploreName: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   exploreType: {

@@ -22,7 +22,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '../../components/Chip';
-import { Chevron } from '../../components/icons/UiIcons';
+import DatePickerSheet from '../../components/DatePickerSheet';
+import { CalendarIcon, Chevron } from '../../components/icons/UiIcons';
 import { colors } from '../../theme/colors';
 import { MAX_RECORD_IMAGES, pickRecordImages } from '../../media/imagePicker';
 import { SAFETY_GRADES, type TravelRecordInput } from '../../types/travelRecord';
@@ -45,6 +46,14 @@ type Props = {
 const DESCRIPTION_MAX = 300;
 
 /** 오늘 날짜를 'YYYY-MM-DD' 로 (기기 시간 기준) */
+/** '2026-08-21' → '2026년 8월 21일 (목)' — 입력칸에 그대로 보여줄 문구 */
+function formatDateLabel(value: string): string {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  const weekday = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+  return `${year}년 ${month}월 ${day}일 (${weekday})`;
+}
+
 function today(): string {
   const now = new Date();
   const month = `${now.getMonth() + 1}`.padStart(2, '0');
@@ -81,6 +90,7 @@ function RecordFormScreen({
   const insets = useSafeAreaInsets();
   const isEditing = !!initial;
   const [date, setDate] = useState(() => initial?.date || today());
+  const [isPickerOpen, setPickerOpen] = useState(false);
   const [safetyGrade, setSafetyGrade] = useState<string>(
     initial?.safetyGrade || SAFETY_GRADES[0],
   );
@@ -148,18 +158,17 @@ function RecordFormScreen({
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.label}>다녀온 날짜</Text>
-        <TextInput
-          style={[styles.input, !isDateValid && styles.inputInvalid]}
-          value={date}
-          onChangeText={setDate}
-          placeholder="2026-08-04"
-          placeholderTextColor={colors.textSecondary}
-          keyboardType="numbers-and-punctuation"
-          maxLength={10}
-        />
-        {!isDateValid ? (
-          <Text style={styles.hint}>YYYY-MM-DD 형식으로 적어주세요.</Text>
-        ) : null}
+        <Pressable
+          style={[styles.input, styles.dateField]}
+          onPress={() => setPickerOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`다녀온 날짜 ${date || '선택 안 됨'}, 눌러서 달력 열기`}
+        >
+          <Text style={[styles.dateText, !date && styles.datePlaceholder]}>
+            {date ? formatDateLabel(date) : '날짜를 선택해주세요'}
+          </Text>
+          <CalendarIcon color={colors.textSecondary} size={18} />
+        </Pressable>
 
         <Text style={[styles.label, styles.labelSpaced]}>안전 등급</Text>
         <Text style={styles.hint}>
@@ -295,6 +304,13 @@ function RecordFormScreen({
           </Text>
         </Pressable>
       </View>
+
+      <DatePickerSheet
+        visible={isPickerOpen}
+        value={date}
+        onSelect={setDate}
+        onClose={() => setPickerOpen(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -358,7 +374,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
 
@@ -369,7 +385,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: 10,
   },
@@ -392,9 +408,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textPrimary,
   },
-  inputInvalid: {
-    borderColor: colors.danger,
-  },
   chipWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -409,7 +422,7 @@ const styles = StyleSheet.create({
   },
   tagPillText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.goldDeep,
   },
 
@@ -464,7 +477,7 @@ const styles = StyleSheet.create({
   thumbFailedText: {
     fontSize: 11,
     lineHeight: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
     textAlign: 'center',
   },
@@ -478,7 +491,7 @@ const styles = StyleSheet.create({
   },
   thumbBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#ffffff',
     textAlign: 'center',
   },
@@ -495,7 +508,7 @@ const styles = StyleSheet.create({
   },
   thumbRemoveText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     lineHeight: 14,
     color: '#ffffff',
   },
@@ -511,15 +524,30 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: '#ffffff',
   },
+  dateField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    // TextInput 과 높이를 맞춥니다(입력칸처럼 보여야 하므로).
+    paddingVertical: 14,
+  },
+  dateText: {
+    fontSize: 15,
+    color: colors.textPrimary,
+    lineHeight: 21,
+  },
+  datePlaceholder: {
+    color: colors.textSecondary,
+  },
   addPhotoPlus: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: '600',
     lineHeight: 26,
     color: colors.goldDeep,
   },
   addPhotoText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   photoError: {
@@ -556,7 +584,7 @@ const styles = StyleSheet.create({
   ctaText: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   ctaTextOff: {
     color: colors.ctaDisabledText,

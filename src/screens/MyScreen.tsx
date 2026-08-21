@@ -202,7 +202,7 @@ function MyScreen() {
             accessibilityRole="button"
             accessibilityLabel="알림"
           >
-            <BellIcon color="#ffffff" size={20} />
+            <BellIcon color={colors.textPrimary} size={20} />
           </Pressable>
         </View>
 
@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.mascotFace,
   },
   heroTexts: {
@@ -653,13 +653,14 @@ const styles = StyleSheet.create({
   },
   heroName: {
     fontSize: 20,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontWeight: '700',
+    color: colors.textPrimary,
+    letterSpacing: -0.4,
   },
   heroTitle: {
     fontSize: 15,
-    fontWeight: '700',
-    color: colors.gold,
+    fontWeight: '600',
+    color: colors.primary,
   },
   heroMeta: {
     marginTop: 6,
@@ -670,7 +671,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -697,8 +698,8 @@ const styles = StyleSheet.create({
   statValue: {
     marginTop: 4,
     fontSize: 20,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
 
   // 섹션 공통
@@ -719,7 +720,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   sectionHint: {
@@ -770,7 +771,7 @@ const styles = StyleSheet.create({
   },
   prefCtaText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#ffffff',
   },
   prefRow: {
@@ -785,7 +786,7 @@ const styles = StyleSheet.create({
   },
   prefValue: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   moodWrap: {
@@ -841,15 +842,15 @@ const styles = StyleSheet.create({
   },
   courseThumbText: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#ffffff',
+    fontWeight: '700',
+    color: colors.textSecondary,
   },
   courseBody: {
     flex: 1,
   },
   courseTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   courseMeta: {
@@ -870,7 +871,7 @@ const styles = StyleSheet.create({
   },
   coursePillText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.safeText,
   },
   heartBtn: {
@@ -915,7 +916,7 @@ const styles = StyleSheet.create({
   },
   badgeName: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   badgeNameOff: {
@@ -951,7 +952,7 @@ const styles = StyleSheet.create({
   },
   safetyTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   safetySub: {
@@ -973,7 +974,7 @@ const styles = StyleSheet.create({
   contactLabel: {
     flex: 1,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   contactValue: {
@@ -993,7 +994,7 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.danger,
   },
 });

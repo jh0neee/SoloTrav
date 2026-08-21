@@ -4,12 +4,12 @@
  * - variant 'center' 탭은 가운데 볼록 튀어나온 샛별이 버튼으로 렌더링됩니다.
  */
 import {
-  HouseIcon,
-  MapTrifoldIcon,
-  NotePencilIcon,
-  UserIcon,
-  type Icon,
-} from 'phosphor-react-native';
+  House,
+  Map,
+  SquarePen,
+  User,
+  type LucideIcon,
+} from 'lucide-react-native';
 import type { ComponentType } from 'react';
 import AssistantScreen from '../screens/assistant/AssistantScreen';
 import MapScreen from '../screens/map/MapScreen';
@@ -24,7 +24,7 @@ export type TabItem = {
   label: string;
   variant: 'default' | 'center';
   component: ComponentType;
-  Icon?: Icon; // center 탭은 마스코트를 쓰므로 아이콘이 없습니다.
+  Icon?: LucideIcon; // center 탭은 마스코트를 쓰므로 아이콘이 없습니다.
 };
 
 export const TABS: TabItem[] = [
@@ -33,14 +33,14 @@ export const TABS: TabItem[] = [
     label: '홈',
     variant: 'default',
     component: HomeStack,
-    Icon: HouseIcon,
+    Icon: House,
   },
   {
     key: 'map',
     label: '지도',
     variant: 'default',
     component: MapScreen,
-    Icon: MapTrifoldIcon,
+    Icon: Map,
   },
   {
     key: 'assistant',
@@ -53,13 +53,13 @@ export const TABS: TabItem[] = [
     label: '기록',
     variant: 'default',
     component: RecordScreen,
-    Icon: NotePencilIcon,
+    Icon: SquarePen,
   },
   {
     key: 'my',
     label: '마이',
     variant: 'default',
     component: MyScreen,
-    Icon: UserIcon,
+    Icon: User,
   },
 ];

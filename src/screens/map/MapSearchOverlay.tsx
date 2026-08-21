@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
   clearButtonText: {
     fontSize: 14,
     lineHeight: 17,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
 
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 8,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   hint: {
@@ -555,7 +555,7 @@ const styles = StyleSheet.create({
   },
   rowIndexText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.bonusText,
   },
   rowBody: {
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   },
   rowTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   rowSub: {
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
   },
   rowBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.safeText,
   },
   rowMeta: {
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   emptyText: {

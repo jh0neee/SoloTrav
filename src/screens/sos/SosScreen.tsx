@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.inkText,
   },
   closeButton: {
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
   headline: {
     fontSize: 21,
     lineHeight: 29,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.inkText,
     textAlign: 'center',
   },
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
-    shadowRadius: 18,
+    shadowRadius: 8,
     elevation: 12,
   },
   sirenButtonOff: {
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
   },
   sirenLabel: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.inkText,
   },
   sirenLabelOn: {
