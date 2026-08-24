@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
   topTitle: {
     flex: 1,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   topRight: {
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   },
   ownerAction: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   ownerDanger: {
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.inkText,
   },
 
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.mascotFace,
   },
   postHeadTexts: {
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
   },
   author: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   postMeta: {
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
   },
   safetyGrade: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   gradeA: {
     color: colors.safeText,
@@ -662,7 +662,7 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   caption: {
@@ -685,7 +685,7 @@ const styles = StyleSheet.create({
   },
   commentHeadText: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   commentRow: {
@@ -712,7 +712,7 @@ const styles = StyleSheet.create({
   },
   commentAvatarText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   commentBody: {
@@ -725,7 +725,7 @@ const styles = StyleSheet.create({
   },
   commentAuthor: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   commentDate: {
@@ -745,7 +745,7 @@ const styles = StyleSheet.create({
   },
   commentAction: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   commentLike: {
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
   },
   commentLikeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
 
@@ -782,12 +782,12 @@ const styles = StyleSheet.create({
   },
   editingText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.goldDeep,
   },
   editingCancel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   composerRow: {

@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   },
   stepCount: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
 
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 21,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
     lineHeight: 29,
   },
@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   fieldHint: {
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   },
   budgetValue: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   budgetNote: {
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
   ctaText: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   ctaTextOff: {
     color: colors.ctaDisabledText,

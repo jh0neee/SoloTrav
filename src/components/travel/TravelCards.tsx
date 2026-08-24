@@ -324,30 +324,22 @@ export function RankingRow({
 
 // ─────────────────────────────── 통계 타일
 
-/** 숫자 하나 + 라벨. 다크 배경(히어로)과 밝은 배경 양쪽에서 씁니다. */
+/** 숫자 하나 + 라벨 */
 export function StatTile({
   label,
   value,
   unit,
-  dark,
 }: {
   label: string;
   value: string;
   unit?: string;
-  dark?: boolean;
 }) {
   return (
-    <View style={[styles.statTile, dark && styles.statTileDark]}>
-      <Text style={[styles.statLabel, dark && styles.statLabelDark]}>
-        {label}
-      </Text>
-      <Text style={[styles.statValue, dark && styles.statValueDark]}>
+    <View style={styles.statTile}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>
         {value}
-        {unit ? (
-          <Text style={[styles.statUnit, dark && styles.statLabelDark]}>
-            {unit}
-          </Text>
-        ) : null}
+        {unit ? <Text style={styles.statUnit}>{unit}</Text> : null}
       </Text>
     </View>
   );
@@ -376,7 +368,7 @@ const styles = StyleSheet.create({
   },
   retryText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
 
@@ -387,9 +379,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   placeholderText: {
-    color: colors.goldSoft,
+    color: colors.textTertiary,
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 
   // 검색 결과 줄
@@ -416,7 +408,7 @@ const styles = StyleSheet.create({
   rowTitle: {
     flexShrink: 1,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   typeBadge: {
@@ -427,7 +419,7 @@ const styles = StyleSheet.create({
   },
   typeBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.bonusText,
   },
   rowAddress: {
@@ -436,7 +428,7 @@ const styles = StyleSheet.create({
   },
   rowDistance: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.goldDeep,
   },
 
@@ -448,9 +440,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
   },
   festivalImage: {
     width: '100%',
@@ -471,7 +463,7 @@ const styles = StyleSheet.create({
   ddayText: {
     color: '#ffffff',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   ddayTextOngoing: {
     color: '#ffffff',
@@ -482,13 +474,13 @@ const styles = StyleSheet.create({
   },
   festivalTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
     lineHeight: 20,
   },
   festivalPeriod: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.goldDeep,
   },
   festivalPlace: {
@@ -520,7 +512,7 @@ const styles = StyleSheet.create({
   photoTitle: {
     color: '#ffffff',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   photoLocation: {
     color: '#d7dbe4',
@@ -540,7 +532,7 @@ const styles = StyleSheet.create({
   barLabel: {
     width: 56,
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
   barTrack: {
@@ -557,7 +549,7 @@ const styles = StyleSheet.create({
   barGrade: {
     width: 58,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     textAlign: 'right',
   },
 
@@ -581,11 +573,12 @@ const styles = StyleSheet.create({
   },
   rankNum: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textSecondary,
   },
   rankNumTop: {
-    color: colors.gold,
+    // 배지 배경이 포인트 블루라 숫자는 흰색이어야 읽힙니다.
+    color: '#ffffff',
   },
   rankBody: {
     flex: 1,
@@ -598,7 +591,7 @@ const styles = StyleSheet.create({
   },
   rankName: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   rankSafety: {
@@ -612,7 +605,7 @@ const styles = StyleSheet.create({
   },
   rankSafetyText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.safeText,
   },
   rankCaption: {
@@ -621,7 +614,7 @@ const styles = StyleSheet.create({
   },
   rankValue: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
 
@@ -630,25 +623,18 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 4,
   },
-  statTileDark: {},
   statLabel: {
     fontSize: 11,
     color: colors.textSecondary,
   },
-  statLabelDark: {
-    color: colors.heroTextMuted,
-  },
   statValue: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
-  },
-  statValueDark: {
-    color: '#ffffff',
   },
   statUnit: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
   },
 

@@ -85,8 +85,8 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.16,
-    shadowRadius: 14,
-    elevation: 8,
+    shadowRadius: 8,
+    elevation: 1,
   },
   top: {
     flexDirection: 'row',
@@ -103,13 +103,13 @@ const styles = StyleSheet.create({
   },
   indexBadgeText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textOnPrimary,
   },
   name: {
     flex: 1,
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
     letterSpacing: -0.3,
   },
@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
   },
   category: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.bonusText,
   },
   distance: {
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
   },
   navButtonText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   navCount: {

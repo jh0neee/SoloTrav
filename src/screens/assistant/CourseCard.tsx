@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.chatCardText,
   },
   summary: {
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   },
   dayBadgeText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.chatStarterText,
   },
   dayTitle: {
@@ -281,14 +281,14 @@ const styles = StyleSheet.create({
   },
   stopTitle: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.chatCardText,
   },
   categoryBadge: {
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 8,
-    backgroundColor: colors.chatQuickBg,
+    backgroundColor: colors.chatBadgeBg,
   },
   categoryText: {
     fontSize: 10,
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   },
   totalValue: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.chatStarterText,
   },
 
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   },
   noteTitle: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 6,
   },
   noteTitleSafety: {

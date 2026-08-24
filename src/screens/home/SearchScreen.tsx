@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   },
   regionText: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
     lineHeight: 18,
     includeFontPadding: true,
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: colors.bonusText,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 
   resultContent: {
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
   },
   resultCount: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: colors.textSecondary,
     paddingTop: 12,
   },
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
   },
   idleTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   keywordWrap: {

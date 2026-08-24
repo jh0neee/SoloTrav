@@ -58,7 +58,7 @@ type TabProps = {
   onPress: () => void;
 };
 
-/** 일반 탭 — 아이콘 + 라벨. 선택 시 Phosphor weight 를 fill 로 바꿔 강조합니다. */
+/** 일반 탭 — 아이콘 + 라벨. 선택 시 색과 선 굵기로만 강조합니다(채우지 않습니다). */
 function DefaultTab({ tab, focused, onPress }: TabProps) {
   const color = focused ? colors.tabActive : colors.tabInactive;
   const Icon = tab.Icon;
@@ -70,7 +70,7 @@ function DefaultTab({ tab, focused, onPress }: TabProps) {
       accessibilityState={{ selected: focused }}
       accessibilityLabel={tab.label}>
       {Icon ? (
-        <Icon color={color} size={24} weight={focused ? 'fill' : 'regular'} />
+        <Icon color={color} size={24} strokeWidth={focused ? 2.2 : 1.6} />
       ) : null}
       <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
         {tab.label}
@@ -146,8 +146,8 @@ const styles = StyleSheet.create({
     shadowColor: colors.mascotDeep,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowRadius: 8,
+    elevation: 1,
   },
   mascotGlow: {
     position: 'absolute',

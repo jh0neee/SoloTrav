@@ -22,7 +22,7 @@ type Star = {
   opacity: number;
 };
 
-const STAR_COUNT = 46;
+const STAR_COUNT = 30;
 
 /** 선형 합동 생성기 — 시드가 같으면 항상 같은 수열이 나옵니다. */
 function createRandom(seed: number): () => number {
@@ -43,7 +43,8 @@ function createStars(): Star[] {
       y: random() * 96,
       width,
       height: width * (1.2 + random() * 1.4),
-      opacity: 0.18 + random() * 0.5,
+      // 글자 뒤에서 어른거리지 않도록 눈에 겨우 보일 만큼만 남깁니다.
+      opacity: 0.08 + random() * 0.2,
     };
   });
 }
