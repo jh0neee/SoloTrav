@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import {
+  FireTruckIcon,
   FirstAidIcon,
   MapPinAreaIcon,
   PhoneCallIcon,
@@ -25,6 +26,7 @@ import type { SafetyFacility, SafetyFacilityType } from '../../api/sos';
 
 const TYPE_ICON: Record<SafetyFacilityType, Icon> = {
   police: ShieldCheckIcon,
+  fire: FireTruckIcon,
   store: StorefrontIcon,
   medical: FirstAidIcon,
   etc: MapPinAreaIcon,

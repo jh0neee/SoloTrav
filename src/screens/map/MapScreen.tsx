@@ -5,6 +5,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,13 +14,18 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  BedIcon,
   Chevron,
-  CommentIcon,
+  FestivalIcon,
   FilterIcon,
-  PersonIcon,
-  PinIcon,
+  FoodIcon,
+  MountainIcon,
+  MuseumIcon,
+  MyLocationIcon,
+  RouteIcon,
   SearchIcon,
-  ShieldIcon,
+  ShoppingIcon,
+  SportsIcon,
 } from '../../components/icons/UiIcons';
 import { SirenIcon } from 'phosphor-react-native';
 import { colors } from '../../theme/colors';
@@ -63,15 +69,19 @@ const CATEGORIES: TourCategory[] = [
   'festival',
 ];
 
+/**
+ * 칩 아이콘 — 지도 핀의 글리프와 같은 그림입니다.
+ * 바꿀 때는 kakaoMapHtml.ts 의 GLYPHS 도 함께 맞춰 주세요.
+ */
 const CATEGORY_ICON: Record<TourCategory, IconComponent> = {
-  attraction: ShieldIcon,
-  food: CommentIcon,
-  culture: PersonIcon,
-  stay: PersonIcon,
-  festival: CommentIcon,
-  course: PinIcon,
-  leports: PersonIcon,
-  shopping: CommentIcon,
+  attraction: MountainIcon,
+  food: FoodIcon,
+  culture: MuseumIcon,
+  stay: BedIcon,
+  festival: FestivalIcon,
+  course: RouteIcon,
+  leports: SportsIcon,
+  shopping: ShoppingIcon,
 };
 
 /**
@@ -85,7 +95,13 @@ function MapScreen() {
   const mapRef = useRef<KakaoMapHandle>(null);
 
   // 현위치 — 지도 파란 점과 비상벨의 안전시설 조회가 같은 좌표를 씁니다.
-  const { coords: myLocation, status: locationStatus } = useCurrentLocation();
+  const {
+    coords: myLocation,
+    status: locationStatus,
+    refresh: refreshLocation,
+  } = useCurrentLocation();
+  /** 안내를 닫으면 이 화면에 있는 동안은 다시 띄우지 않습니다. */
+  const [locationNoticeClosed, setLocationNoticeClosed] = useState(false);
 
   const [category, setCategory] = useState<TourCategory>('attraction');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -163,6 +179,39 @@ function MapScreen() {
    * 축제 기간 칩이 한 줄 더 생기면 그만큼 밀어 내립니다.
    */
   const topLayerBottom = insets.top + 128 + (isFestival ? 42 : 0);
+
+  /**
+   * 현위치를 못 쓰는 상태의 안내.
+   * 좌표가 기본값(단양)으로 떨어져 있는데 아무 설명이 없으면, 사용자는 왜 엉뚱한
+   * 지역이 보이는지 알 방법이 없습니다.
+   */
+  const locationNotice = (() => {
+    if (locationNoticeClosed) {
+      return null;
+    }
+    if (locationStatus === 'blocked') {
+      return {
+        text: '위치 권한이 꺼져 있어 기본 지역을 보여주고 있어요',
+        action: '설정 열기',
+        onAction: () => Linking.openSettings(),
+      };
+    }
+    if (locationStatus === 'denied') {
+      return {
+        text: '위치 권한을 허용하면 내 주변을 볼 수 있어요',
+        action: '허용하기',
+        onAction: refreshLocation,
+      };
+    }
+    if (locationStatus === 'unavailable') {
+      return {
+        text: '현위치를 찾지 못해 기본 지역을 보여주고 있어요',
+        action: '다시 시도',
+        onAction: refreshLocation,
+      };
+    }
+    return null;
+  })();
 
   const selectedPoiIndex = useMemo(
     () => searchResults.findIndex(poi => poi.id === selectedPoiId),
@@ -396,7 +445,7 @@ function MapScreen() {
           onPress={() => mapRef.current?.moveToMyLocation()}
           accessibilityRole="button"
           accessibilityLabel="현위치로 이동">
-          <PinIcon color={colors.textPrimary} size={20} />
+          <MyLocationIcon color={colors.textPrimary} size={20} />
         </Pressable>
 
         {/* 확대/축소 — 핀치 제스처가 안 먹는 환경(에뮬레이터 등)에서도 쓸 수 있게 둡니다 */}
@@ -431,8 +480,34 @@ function MapScreen() {
         </Pressable>
       )}
 
+      {/* 현위치를 못 쓸 때의 안내 — 왜 기본 지역이 보이는지 알리고 복구 수단을 줍니다.
+          아래 재검색·재시도 버튼과 자리가 같으므로 이 안내가 우선입니다. */}
+      {locationNotice && !selectedPlace && !selectedPoi && (
+        <View style={[styles.locationNotice, { top: topLayerBottom }]}>
+          <Text style={styles.locationNoticeText} numberOfLines={2}>
+            {locationNotice.text}
+          </Text>
+          <Pressable
+            style={styles.locationNoticeAction}
+            onPress={locationNotice.onAction}
+            accessibilityRole="button"
+            accessibilityLabel={locationNotice.action}>
+            <Text style={styles.locationNoticeActionText}>
+              {locationNotice.action}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setLocationNoticeClosed(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="안내 닫기">
+            <Text style={styles.locationNoticeClose}>×</Text>
+          </Pressable>
+        </View>
+      )}
+
       {/* 지도를 옮겼을 때의 재검색 버튼 — 상세시트·검색카드에 가리지 않게 숨깁니다 */}
-      {canResearch && !selectedPlace && !selectedPoi && (
+      {canResearch && !locationNotice && !selectedPlace && !selectedPoi && (
         <Pressable
           style={[styles.researchButton, { top: topLayerBottom }]}
           onPress={handleResearch}
@@ -447,7 +522,7 @@ function MapScreen() {
       )}
 
       {/* 조회 실패 안내 — 지도는 그대로 두고 다시 시도만 권합니다 */}
-      {placesError && !placesLoading && (
+      {placesError && !placesLoading && !locationNotice && (
         <Pressable
           style={[styles.researchButton, { top: topLayerBottom }]}
           onPress={retryPlaces}
@@ -765,6 +840,50 @@ const styles = StyleSheet.create({
   },
 
   // 이 지역에서 재검색 — 필터/현위치 버튼과 같은 높이의 중앙 알약 버튼
+  locationNotice: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingLeft: 14,
+    paddingRight: 10,
+    paddingVertical: 9,
+    borderRadius: 19,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  locationNoticeText: {
+    flex: 1,
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: colors.textPrimary,
+  },
+  locationNoticeAction: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+  },
+  locationNoticeActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textOnPrimary,
+  },
+  locationNoticeClose: {
+    fontSize: 20,
+    lineHeight: 22,
+    color: colors.textSecondary,
+    paddingHorizontal: 2,
+  },
+
   researchButton: {
     position: 'absolute',
     alignSelf: 'center',

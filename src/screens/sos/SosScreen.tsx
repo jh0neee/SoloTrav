@@ -18,6 +18,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   Vibration,
   View,
 } from 'react-native';
@@ -31,7 +32,17 @@ import SafetyFacilityCard from './SafetyFacilityCard';
 /** 사이렌이 울리는 동안 반복할 진동 패턴 (진동 0.6s / 쉼 0.4s) */
 const VIBRATION_PATTERN = [0, 600, 400];
 
-const BUTTON_SIZE = 152;
+/**
+ * 비상벨 버튼 지름 — 화면 폭에 비례합니다.
+ * 급할 때 보지 않고 눌러야 하는 버튼이라 최대한 크게 잡되, 좁은 기기에서
+ * 카드가 밀려나지 않도록 하한을, 태블릿에서 과하게 커지지 않도록 상한을 둡니다.
+ */
+const BUTTON_RATIO = 0.62;
+const BUTTON_MIN = 170;
+const BUTTON_MAX = 300;
+/** 버튼 바깥으로 퍼지는 물결 링의 여유 폭 */
+const RING_GAP = 64;
+
 const FACILITY_LIMIT = 3;
 
 type Props = {
@@ -41,6 +52,11 @@ type Props = {
 
 function SosScreen({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const buttonSize = Math.round(
+    Math.min(Math.max(width * BUTTON_RATIO, BUTTON_MIN), BUTTON_MAX),
+  );
+  const ringSize = buttonSize + RING_GAP;
   // 측위 실패·권한 거절이면 단양읍 기본 좌표로 떨어지므로 항상 값이 있습니다.
   const { coords } = useCurrentLocation();
 
@@ -148,7 +164,7 @@ function SosScreen({ visible, onClose }: Props) {
           ]}
           showsVerticalScrollIndicator={false}>
           {/* 제목·부제는 한 덩어리 — space-between 이 둘 사이를 벌리지 않게 합니다 */}
-          <View>
+          <View style={styles.headGroup}>
             <Text style={styles.headline}>
               {sirenOn
                 ? '사이렌이 울리고 있어요'
@@ -161,13 +177,18 @@ function SosScreen({ visible, onClose }: Props) {
             </Text>
           </View>
 
-          <View style={styles.buttonArea}>
-            <PulseRing size={BUTTON_SIZE + 64} delay={0} />
-            <PulseRing size={BUTTON_SIZE + 64} delay={900} />
+          <View style={[styles.buttonArea, { height: ringSize + 32 }]}>
+            <PulseRing size={ringSize} delay={0} />
+            <PulseRing size={ringSize} delay={900} />
             <Pressable
               onPress={() => setSirenOn(prev => !prev)}
               style={({ pressed }) => [
                 styles.sirenButton,
+                {
+                  width: buttonSize,
+                  height: buttonSize,
+                  borderRadius: buttonSize / 2,
+                },
                 sirenOn ? styles.sirenButtonOn : styles.sirenButtonOff,
                 pressed && styles.sirenButtonPressed,
               ]}
@@ -176,11 +197,15 @@ function SosScreen({ visible, onClose }: Props) {
               accessibilityLabel={sirenOn ? '비상벨 끄기' : '비상벨 울리기'}>
               <SirenIcon
                 color={sirenOn ? colors.sosActiveBg : colors.inkText}
-                size={30}
+                size={Math.round(buttonSize * 0.22)}
                 weight="fill"
               />
               <Text
-                style={[styles.sirenLabel, sirenOn && styles.sirenLabelOn]}>
+                style={[
+                  styles.sirenLabel,
+                  { fontSize: Math.min(Math.round(buttonSize * 0.1), 20) },
+                  sirenOn && styles.sirenLabelOn,
+                ]}>
                 {sirenOn ? '벨 끄기' : '비상벨 울리기'}
               </Text>
             </Pressable>
@@ -288,6 +313,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 18,
   },
+  headGroup: {
+    // 제목도 auto 마진을 하나 가집니다. 버튼의 위아래 auto 와 합쳐 남는 세로
+    // 공간이 3등분되어, 헤더 바로 밑에 붙지 않고 아래로 내려옵니다.
+    marginTop: 'auto',
+  },
   headline: {
     fontSize: 21,
     lineHeight: 29,
@@ -305,13 +335,16 @@ const styles = StyleSheet.create({
   buttonArea: {
     alignItems: 'center',
     justifyContent: 'center',
-    // 링(BUTTON_SIZE + 64)이 커질 여유까지 감안한 높이
-    height: BUTTON_SIZE + 96,
-    marginTop: 26,
+    // 높이는 링 크기에 맞춰 화면에서 계산해 넘깁니다.
+    //
+    // 위아래 auto 마진으로 남는 세로 공간을 절반씩 나눠 가집니다.
+    // 예전에는 cardSlot 만 marginTop:'auto' 여서 남는 공간이 전부 버튼 아래로
+    // 몰렸고, 그래서 버튼이 화면 위쪽에 붙어 보였습니다.
+    marginTop: 'auto',
+    marginBottom: 'auto',
   },
   cardSlot: {
-    // 카드는 항상 화면 아래쪽에 붙습니다.
-    marginTop: 'auto',
+    // 버튼의 marginBottom:'auto' 가 카드를 아래로 밀어 줍니다.
   },
   ring: {
     position: 'absolute',
@@ -320,9 +353,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
   sirenButton: {
-    width: BUTTON_SIZE,
-    height: BUTTON_SIZE,
-    borderRadius: BUTTON_SIZE / 2,
+    // 지름은 화면 폭에 맞춰 계산해 넘깁니다.
     alignItems: 'center',
     justifyContent: 'center',
     gap: 7,
@@ -345,7 +376,7 @@ const styles = StyleSheet.create({
     opacity: 0.88,
   },
   sirenLabel: {
-    fontSize: 15,
+    // 크기는 버튼 지름에 비례해 화면에서 넘깁니다.
     fontWeight: '700',
     color: colors.inkText,
   },

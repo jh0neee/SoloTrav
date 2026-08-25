@@ -70,7 +70,7 @@ function DefaultTab({ tab, focused, onPress }: TabProps) {
       accessibilityState={{ selected: focused }}
       accessibilityLabel={tab.label}>
       {Icon ? (
-        <Icon color={color} size={24} strokeWidth={focused ? 2.2 : 1.6} />
+        <Icon color={color} size={24} weight={focused ? 'bold' : 'regular'} />
       ) : null}
       <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
         {tab.label}
