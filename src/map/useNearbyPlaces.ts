@@ -55,7 +55,9 @@ export function useNearbyPlaces(
     }
 
     const controller = new AbortController();
-    setState(prev => ({ ...prev, loading: true, error: null }));
+    // 조회 중심이 바뀐 동안 이전 지역 마커가 남아 있으면 현재 지역 결과로
+    // 오해할 수 있으므로 새 응답이 올 때까지 비웁니다.
+    setState({ places: [], loading: true, error: null, totalCount: 0 });
 
     tourApi
       .nearby({ lat, lng, radius, category }, controller.signal)

@@ -2,7 +2,13 @@
  * 지도 화면 — 카카오맵 위에 검색바·필터칩·현위치·SOS·장소 바텀시트를 얹습니다.
  * 지도는 절대배치로 화면을 꽉 채우고, 나머지 UI 는 그 위에 떠 있습니다.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -27,7 +33,7 @@ import {
   ShoppingIcon,
   SportsIcon,
 } from '../../components/icons/UiIcons';
-import { SirenIcon } from 'phosphor-react-native';
+import { ShieldCheckIcon, SirenIcon } from 'phosphor-react-native';
 import { colors } from '../../theme/colors';
 import KakaoMap, { type KakaoMapHandle } from './KakaoMap';
 import MapSearchOverlay from './MapSearchOverlay';
@@ -53,6 +59,10 @@ import {
   type TourPlace,
 } from '../../types/tourPlace';
 import type { SearchPoi } from './searchTypes';
+import { type SafetyPlaceType } from '../../api/safetyPlaceApi';
+import { useSafetyPlaces, type MapBounds } from '../../map/useSafetyPlaces';
+import type { SafetyMapMarker } from './kakaoMapHtml';
+import SafetyFilterSheet, { SAFETY_FILTERS } from './SafetyFilterSheet';
 
 type IconComponent = React.ComponentType<{ color: string; size?: number }>;
 
@@ -105,6 +115,12 @@ function MapScreen() {
 
   const [category, setCategory] = useState<TourCategory>('attraction');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [safetyTypes, setSafetyTypes] = useState<SafetyPlaceType[]>([]);
+  const [draftSafetyTypes, setDraftSafetyTypes] = useState<SafetyPlaceType[]>(
+    [],
+  );
+  const [safetyFilterOpen, setSafetyFilterOpen] = useState(false);
+  const [selectedSafetyId, setSelectedSafetyId] = useState<string | null>(null);
 
   /**
    * 마커를 조회한 기준점. 지도를 끌고 다녀도 여기는 그대로 두었다가
@@ -113,6 +129,32 @@ function MapScreen() {
   const [queryCenter, setQueryCenter] = useState<Coords>(myLocation);
   /** 지도가 지금 보고 있는 중심 (idle 마다 갱신) */
   const [mapCenter, setMapCenter] = useState<Coords>(myLocation);
+  const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
+
+  const safety = useSafetyPlaces(
+    queryCenter,
+    safetyTypes,
+    safetyFilterOpen,
+    mapCenter,
+    mapBounds,
+  );
+  const selectedSafetyPlace = useMemo(
+    () => safety.places.find(place => place.id === selectedSafetyId) ?? null,
+    [safety.places, selectedSafetyId],
+  );
+  const safetyMarkers = useMemo<SafetyMapMarker[]>(() => {
+    const metadata = Object.fromEntries(
+      SAFETY_FILTERS.map(item => [item.key, item]),
+    ) as Record<SafetyPlaceType, (typeof SAFETY_FILTERS)[number]>;
+    return safety.places.map(place => ({
+      id: place.id,
+      lat: place.lat,
+      lng: place.lng,
+      type: place.type,
+      color: metadata[place.type].color,
+      glyph: metadata[place.type].glyph,
+    }));
+  }, [safety.places]);
 
   // 측위가 끝나면 조회 기준점을 실제 현위치로 한 번 옮깁니다.
   useEffect(() => {
@@ -220,16 +262,28 @@ function MapScreen() {
   const selectedPoi =
     selectedPoiIndex >= 0 ? searchResults[selectedPoiIndex] : null;
 
-  const handleCategory = useCallback((next: TourCategory) => {
-    setCategory(next);
-    setSelectedId(null); // 필터가 바뀌면 열려 있던 시트를 닫습니다.
-  }, []);
+  const handleCategory = useCallback(
+    (next: TourCategory) => {
+      setCategory(next);
+      setQueryCenter(mapCenter);
+      setSelectedId(null); // 현재 보고 있는 지역을 기준으로 새 카테고리를 조회합니다.
+    },
+    [mapCenter],
+  );
 
   /** 지금 보고 있는 지역으로 마커를 다시 조회합니다. */
   const handleResearch = useCallback(() => {
     setSelectedId(null);
     setQueryCenter(mapCenter);
   }, [mapCenter]);
+
+  const handleViewportChanged = useCallback(
+    (center: Coords, bounds?: MapBounds) => {
+      setMapCenter(center);
+      if (bounds) setMapBounds(bounds);
+    },
+    [],
+  );
 
   const handleMarkerPress = useCallback((id: string) => {
     setSelectedId(id);
@@ -244,7 +298,36 @@ function MapScreen() {
 
   const handleMapPress = useCallback(() => {
     setSelectedId(null);
+    setSelectedSafetyId(null);
     setSelectedPoiId(null);
+  }, []);
+
+  const toggleDraftSafetyType = useCallback((type: SafetyPlaceType) => {
+    setDraftSafetyTypes(current =>
+      current.includes(type)
+        ? current.filter(item => item !== type)
+        : [...current, type],
+    );
+  }, []);
+
+  const openSafetyFilter = useCallback(() => {
+    setDraftSafetyTypes(safetyTypes);
+    setSelectedId(null);
+    setSelectedSafetyId(null);
+    setSafetyFilterOpen(true);
+  }, [safetyTypes]);
+
+  const applySafetyFilter = useCallback(() => {
+    setSafetyTypes(draftSafetyTypes);
+    setQueryCenter(mapCenter);
+    setSelectedSafetyId(null);
+    setSafetyFilterOpen(false);
+  }, [draftSafetyTypes, mapCenter]);
+
+  const handleSafetyMarkerPress = useCallback((id: string) => {
+    setSelectedId(null);
+    setSelectedPoiId(null);
+    setSelectedSafetyId(id);
   }, []);
 
   const closeSheet = useCallback(() => setSelectedId(null), []);
@@ -307,7 +390,8 @@ function MapScreen() {
     (delta: number) => {
       if (!searchResults.length || selectedPoiIndex < 0) return;
       const next =
-        (selectedPoiIndex + delta + searchResults.length) % searchResults.length;
+        (selectedPoiIndex + delta + searchResults.length) %
+        searchResults.length;
       const id = searchResults[next].id;
       setSelectedPoiId(id);
       mapRef.current?.selectSearchMarker(id);
@@ -335,22 +419,27 @@ function MapScreen() {
         places={places}
         category={category}
         selectedId={selectedId}
+        safetyPlaces={safetyMarkers}
+        selectedSafetyId={selectedSafetyId}
         myLocation={myLocation}
         onMarkerPress={handleMarkerPress}
+        onSafetyMarkerPress={handleSafetyMarkerPress}
         onSearchMarkerPress={handleSearchMarkerPress}
         onMapPress={handleMapPress}
-        onCenterChanged={setMapCenter}
+        onCenterChanged={handleViewportChanged}
       />
 
       {/* 상단 검색바 + 필터칩 — pointerEvents="box-none" 이라야 빈 곳으로 지도 조작이 통과합니다 */}
       <View
         style={[styles.topLayer, { paddingTop: insets.top + 8 }]}
-        pointerEvents="box-none">
+        pointerEvents="box-none"
+      >
         <View style={styles.searchRow}>
           <Pressable
             style={styles.circleButton}
             accessibilityRole="button"
-            accessibilityLabel="뒤로">
+            accessibilityLabel="뒤로"
+          >
             <Chevron direction="left" color={colors.textPrimary} size={18} />
           </Pressable>
 
@@ -358,7 +447,8 @@ function MapScreen() {
             style={styles.searchBar}
             onPress={() => setSearchOpen(true)}
             accessibilityRole="search"
-            accessibilityLabel="장소 검색">
+            accessibilityLabel="장소 검색"
+          >
             <SearchIcon color={colors.textSecondary} size={18} />
             <Text style={styles.searchText} numberOfLines={1}>
               {searchQuery ||
@@ -372,7 +462,8 @@ function MapScreen() {
                 onPress={clearSearch}
                 hitSlop={10}
                 accessibilityRole="button"
-                accessibilityLabel="검색 결과 지우기">
+                accessibilityLabel="검색 결과 지우기"
+              >
                 <View style={styles.clearButton}>
                   <Text style={styles.clearButtonText}>×</Text>
                 </View>
@@ -391,7 +482,21 @@ function MapScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}>
+          contentContainerStyle={styles.chipRow}
+        >
+          <FilterChip
+            label={
+              safetyTypes.length ? `안전시설 ${safetyTypes.length}` : '안전시설'
+            }
+            count={
+              safetyTypes.length && !safety.loading
+                ? safety.places.length
+                : null
+            }
+            Icon={ShieldCheckIcon}
+            selected={safetyTypes.length > 0}
+            onPress={openSafetyFilter}
+          />
           {CATEGORIES.map(key => (
             <FilterChip
               key={key}
@@ -403,6 +508,19 @@ function MapScreen() {
               onPress={() => handleCategory(key)}
             />
           ))}
+          {safety.loading && (
+            <ActivityIndicator size="small" color={colors.textSecondary} />
+          )}
+          {!!safety.errors.length && !safety.loading && (
+            <Pressable
+              onPress={safety.retry}
+              accessibilityRole="button"
+              accessibilityLabel="안전 장소 다시 불러오기"
+              style={styles.safetyRetry}
+            >
+              <Text style={styles.safetyRetryText}>일부 실패 · 재시도</Text>
+            </Pressable>
+          )}
         </ScrollView>
 
         {/* 축제를 골랐을 때만 뜨는 기간 칩 */}
@@ -419,7 +537,8 @@ function MapScreen() {
                   }}
                   accessibilityRole="button"
                   accessibilityState={{ selected: on }}
-                  style={[styles.rangeChip, on && styles.rangeChipOn]}>
+                  style={[styles.rangeChip, on && styles.rangeChipOn]}
+                >
                   <Text style={[styles.rangeText, on && styles.rangeTextOn]}>
                     {FESTIVAL_RANGE_LABEL[key]}
                   </Text>
@@ -433,18 +552,21 @@ function MapScreen() {
       {/* 우측 플로팅 버튼 */}
       <View
         style={[styles.sideLayer, { top: topLayerBottom }]}
-        pointerEvents="box-none">
+        pointerEvents="box-none"
+      >
         <Pressable
           style={styles.floatButton}
           accessibilityRole="button"
-          accessibilityLabel="상세 필터">
+          accessibilityLabel="상세 필터"
+        >
           <FilterIcon color={colors.textPrimary} size={18} />
         </Pressable>
         <Pressable
           style={styles.floatButton}
           onPress={() => mapRef.current?.moveToMyLocation()}
           accessibilityRole="button"
-          accessibilityLabel="현위치로 이동">
+          accessibilityLabel="현위치로 이동"
+        >
           <MyLocationIcon color={colors.textPrimary} size={20} />
         </Pressable>
 
@@ -454,7 +576,8 @@ function MapScreen() {
             style={styles.zoomButton}
             onPress={() => mapRef.current?.zoomIn()}
             accessibilityRole="button"
-            accessibilityLabel="확대">
+            accessibilityLabel="확대"
+          >
             <Text style={styles.zoomText}>+</Text>
           </Pressable>
           <View style={styles.zoomDivider} />
@@ -462,19 +585,21 @@ function MapScreen() {
             style={styles.zoomButton}
             onPress={() => mapRef.current?.zoomOut()}
             accessibilityRole="button"
-            accessibilityLabel="축소">
+            accessibilityLabel="축소"
+          >
             <Text style={styles.zoomText}>−</Text>
           </Pressable>
         </View>
       </View>
 
       {/* SOS — 시트나 검색 카드가 열리면 가려지지 않게 숨깁니다 */}
-      {!selectedPlace && !selectedPoi && (
+      {!selectedPlace && !selectedPoi && !selectedSafetyPlace && (
         <Pressable
           style={[styles.sos, { bottom: insets.bottom + 96 }]}
           onPress={() => setSosOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel="긴급 SOS">
+          accessibilityLabel="긴급 SOS"
+        >
           <SirenIcon color={colors.textOnPrimary} size={22} weight="fill" />
           <Text style={styles.sosText}>SOS</Text>
         </Pressable>
@@ -491,7 +616,8 @@ function MapScreen() {
             style={styles.locationNoticeAction}
             onPress={locationNotice.onAction}
             accessibilityRole="button"
-            accessibilityLabel={locationNotice.action}>
+            accessibilityLabel={locationNotice.action}
+          >
             <Text style={styles.locationNoticeActionText}>
               {locationNotice.action}
             </Text>
@@ -500,7 +626,8 @@ function MapScreen() {
             onPress={() => setLocationNoticeClosed(true)}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="안내 닫기">
+            accessibilityLabel="안내 닫기"
+          >
             <Text style={styles.locationNoticeClose}>×</Text>
           </Pressable>
         </View>
@@ -512,7 +639,8 @@ function MapScreen() {
           style={[styles.researchButton, { top: topLayerBottom }]}
           onPress={handleResearch}
           accessibilityRole="button"
-          accessibilityLabel="이 지역에서 재검색">
+          accessibilityLabel="이 지역에서 재검색"
+        >
           {placesLoading ? (
             <ActivityIndicator size="small" color={colors.textPrimary} />
           ) : (
@@ -527,7 +655,8 @@ function MapScreen() {
           style={[styles.researchButton, { top: topLayerBottom }]}
           onPress={retryPlaces}
           accessibilityRole="button"
-          accessibilityLabel="주변 정보 다시 불러오기">
+          accessibilityLabel="주변 정보 다시 불러오기"
+        >
           <Text style={styles.researchText}>불러오지 못했어요 · 다시 시도</Text>
         </Pressable>
       )}
@@ -536,7 +665,8 @@ function MapScreen() {
       {searchResults.length > 0 && !selectedPoi && !selectedPlace && (
         <View
           style={[styles.resultBanner, { bottom: insets.bottom + 24 }]}
-          pointerEvents="none">
+          pointerEvents="none"
+        >
           <Text style={styles.resultBannerText}>
             "{searchQuery}" 검색 결과 {searchResults.length}곳
           </Text>
@@ -556,7 +686,57 @@ function MapScreen() {
         </View>
       )}
 
+      {selectedSafetyPlace && (
+        <View style={[styles.safetyCard, { bottom: insets.bottom + 20 }]}>
+          <View style={styles.safetyCardHeader}>
+            <Text style={styles.safetyCardKind}>
+              {
+                SAFETY_FILTERS.find(
+                  item => item.key === selectedSafetyPlace.type,
+                )?.label
+              }
+            </Text>
+            <Pressable
+              onPress={() => setSelectedSafetyId(null)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="안전 장소 정보 닫기"
+            >
+              <Text style={styles.safetyCardClose}>×</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.safetyCardTitle}>{selectedSafetyPlace.name}</Text>
+          {!!selectedSafetyPlace.address && (
+            <Text style={styles.safetyCardAddress} numberOfLines={2}>
+              {selectedSafetyPlace.address}
+            </Text>
+          )}
+          {!!selectedSafetyPlace.phone && (
+            <Pressable
+              onPress={() =>
+                Linking.openURL(`tel:${selectedSafetyPlace.phone}`)
+              }
+            >
+              <Text style={styles.safetyCardPhone}>
+                {selectedSafetyPlace.phone}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
       <TourPlaceSheet place={selectedPlace} onClose={closeSheet} />
+
+      <SafetyFilterSheet
+        visible={safetyFilterOpen}
+        selected={draftSafetyTypes}
+        counts={safety.counts}
+        loadingTypes={safety.loadingTypes}
+        onToggle={toggleDraftSafetyType}
+        onClear={() => setDraftSafetyTypes([])}
+        onApply={applySafetyFilter}
+        onClose={() => setSafetyFilterOpen(false)}
+      />
 
       <SosScreen visible={sosOpen} onClose={() => setSosOpen(false)} />
 
@@ -589,7 +769,8 @@ function FilterChip({ label, count, Icon, selected, onPress }: ChipProps) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      style={[styles.chip, selected ? styles.chipOn : styles.chipOff]}>
+      style={[styles.chip, selected ? styles.chipOn : styles.chipOff]}
+    >
       <Icon color={tint} size={16} />
       <Text style={[styles.chipText, { color: tint }]}>{label}</Text>
       {count !== null && (
@@ -683,6 +864,59 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 4,
+  },
+  safetyRetry: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 14,
+    backgroundColor: colors.background,
+  },
+  safetyRetryText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  safetyCard: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    padding: 18,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  safetyCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  safetyCardKind: { fontSize: 12, fontWeight: '700', color: colors.primary },
+  safetyCardClose: {
+    fontSize: 24,
+    lineHeight: 26,
+    color: colors.textSecondary,
+  },
+  safetyCardTitle: {
+    marginTop: 8,
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  safetyCardAddress: {
+    marginTop: 6,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textSecondary,
+  },
+  safetyCardPhone: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
   },
   chip: {
     flexDirection: 'row',

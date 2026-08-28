@@ -39,6 +39,15 @@ export type MapMarker = {
   color: string;
 };
 
+export type SafetyMapMarker = {
+  id: string;
+  lat: number;
+  lng: number;
+  type: string;
+  color: string;
+  glyph: string;
+};
+
 /** TourPlace 배열을 웹뷰가 쓰는 마커 데이터로 줄입니다. */
 export function toMapMarkers(
   places: { id: string; lat: number; lng: number; category: TourCategory }[],
@@ -101,6 +110,13 @@ export function buildKakaoMapHtml({
   .spin.on .drop { fill:#1b2233; }
   .spin text { font:700 13px -apple-system, BlinkMacSystemFont,
     'Apple SD Gothic Neo', sans-serif; }
+  .safety-pin { width:30px; height:30px; cursor:pointer; border-radius:9px;
+    display:flex; align-items:center; justify-content:center; color:#fff;
+    border:2px solid #fff; box-sizing:border-box; font:700 12px -apple-system,
+    BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+    box-shadow:0 3px 6px rgba(0,0,0,.3); transform-origin:50% 50%;
+    transition:transform .16s ease; }
+  .safety-pin.on { transform:scale(1.22); }
 
   /* ── 현위치 파란 점 ── */
   .me { position:relative; width:20px; height:20px; }
@@ -187,6 +203,7 @@ export function buildKakaoMapHtml({
   var overlays = {};         // id -> { overlay, el, category }
   var category = INITIAL_CATEGORY;  // 현재 필터. 마커를 다시 그릴 때 기준이 됩니다.
   var searchOverlays = {};   // 검색 결과 id -> { overlay, el }
+  var safetyOverlays = {};   // 안전 장소 id -> { overlay, el }
   var selectedId = null;
   var selectedSearchId = null;
   var placesService = null;  // kakao.maps.services.Places
@@ -260,12 +277,27 @@ export function buildKakaoMapHtml({
      * RN 이 "이 지역에서 재검색" 버튼을 띄울지 판단하는 데 씁니다.
      * (idle 은 드래그·확대가 끝난 뒤 한 번만 오므로 요청이 남발되지 않습니다.)
      */
-    kakao.maps.event.addListener(map, 'idle', function () {
+    function sendViewport() {
       var c = map.getCenter();
-      send({ type: 'centerChanged', lat: c.getLat(), lng: c.getLng() });
-    });
+      var bounds = map.getBounds();
+      var sw = bounds.getSouthWest();
+      var ne = bounds.getNorthEast();
+      send({
+        type: 'centerChanged',
+        lat: c.getLat(),
+        lng: c.getLng(),
+        south: sw.getLat(),
+        west: sw.getLng(),
+        north: ne.getLat(),
+        east: ne.getLng(),
+        level: map.getLevel()
+      });
+    }
+
+    kakao.maps.event.addListener(map, 'idle', sendViewport);
 
     send({ type: 'ready' });
+    sendViewport();
   }
 
   /* ── RN 에서 호출하는 전역 함수들 ── */
@@ -294,6 +326,40 @@ export function buildKakaoMapHtml({
       // 바텀시트에 가리지 않도록 살짝 위로 올려 중심에 둡니다.
       map.panTo(overlays[id].overlay.getPosition());
     }
+  };
+
+  window.__setSafetyPlaces = function (list) {
+    Object.keys(safetyOverlays).forEach(function (id) {
+      safetyOverlays[id].overlay.setMap(null);
+    });
+    safetyOverlays = {};
+    if (!map || !Array.isArray(list)) return;
+    list.forEach(function (place) {
+      var el = document.createElement('div');
+      el.className = 'safety-pin';
+      el.style.backgroundColor = place.color;
+      el.textContent = place.glyph;
+      el.addEventListener('click', function (e) {
+        e.stopPropagation();
+        send({ type: 'safetyMarkerPress', id: place.id });
+      });
+      var overlay = new kakao.maps.CustomOverlay({
+        map: map,
+        position: new kakao.maps.LatLng(place.lat, place.lng),
+        content: el,
+        yAnchor: .5,
+        zIndex: 4,
+        clickable: true,
+      });
+      safetyOverlays[place.id] = { overlay: overlay, el: el };
+    });
+  };
+
+  window.__selectSafetyPlace = function (id) {
+    Object.keys(safetyOverlays).forEach(function (key) {
+      safetyOverlays[key].el.classList.toggle('on', key === id);
+    });
+    if (id && safetyOverlays[id]) map.panTo(safetyOverlays[id].overlay.getPosition());
   };
 
   window.__moveToMyLocation = function () {

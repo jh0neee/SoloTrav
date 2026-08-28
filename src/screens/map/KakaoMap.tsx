@@ -22,7 +22,11 @@ import RNWebView, {
 import { KAKAO_WEBVIEW_ORIGIN, isKakaoKeyConfigured } from '../../config/kakao';
 import { MAP_CENTER, MY_LOCATION } from '../../data/mapDefaults';
 import { colors } from '../../theme/colors';
-import { buildKakaoMapHtml, toMapMarkers } from './kakaoMapHtml';
+import {
+  buildKakaoMapHtml,
+  toMapMarkers,
+  type SafetyMapMarker,
+} from './kakaoMapHtml';
 import type { TourCategory, TourPlace } from '../../types/tourPlace';
 import type { SearchPoi, SearchStatus } from './searchTypes';
 
@@ -60,13 +64,19 @@ type Props = {
   places: TourPlace[];
   category: TourCategory;
   selectedId: string | null;
+  safetyPlaces?: SafetyMapMarker[];
+  selectedSafetyId?: string | null;
   /** 측위된 현위치. 바뀌면 지도의 파란 점도 따라 옮겨집니다. */
   myLocation: { lat: number; lng: number };
   onMarkerPress: (id: string) => void;
+  onSafetyMarkerPress?: (id: string) => void;
   onSearchMarkerPress: (id: string) => void;
   onMapPress: () => void;
   /** 지도 이동이 멎었을 때의 새 중심 — "이 지역에서 재검색" 판단에 씁니다. */
-  onCenterChanged?: (center: { lat: number; lng: number }) => void;
+  onCenterChanged?: (
+    center: { lat: number; lng: number },
+    bounds?: { south: number; west: number; north: number; east: number },
+  ) => void;
 };
 
 /** 검색 요청은 비동기라 reqId 로 응답을 짝지어 줍니다. */
@@ -77,8 +87,11 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
     places,
     category,
     selectedId,
+    safetyPlaces = [],
+    selectedSafetyId = null,
     myLocation,
     onMarkerPress,
+    onSafetyMarkerPress,
     onSearchMarkerPress,
     onMapPress,
     onCenterChanged,
@@ -134,7 +147,10 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
         };
         pendingSearch.current.set(reqId, finish);
         // 응답이 영영 안 오는 경우(네트워크 끊김 등) 화면이 계속 로딩에 머물지 않도록
-        setTimeout(() => finish({ items: [], status: 'ERROR' }), SEARCH_TIMEOUT_MS);
+        setTimeout(
+          () => finish({ items: [], status: 'ERROR' }),
+          SEARCH_TIMEOUT_MS,
+        );
         run(`window.__search(${JSON.stringify(query)}, ${reqId})`);
       }),
 
@@ -167,6 +183,16 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
     run(`window.__selectPlace(${JSON.stringify(selectedId)})`);
   }, [ready, selectedId, run]);
 
+  useEffect(() => {
+    if (!ready) return;
+    run(`window.__setSafetyPlaces(${JSON.stringify(safetyPlaces)})`);
+  }, [ready, safetyPlaces, run]);
+
+  useEffect(() => {
+    if (!ready) return;
+    run(`window.__selectSafetyPlace(${JSON.stringify(selectedSafetyId)})`);
+  }, [ready, selectedSafetyId, run]);
+
   // 측위 결과가 늦게 도착해도 ready 이후 한 번 더 흘려보내 파란 점을 맞춥니다.
   useEffect(() => {
     if (!ready) return;
@@ -184,6 +210,10 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
         status?: SearchStatus;
         lat?: number;
         lng?: number;
+        south?: number;
+        west?: number;
+        north?: number;
+        east?: number;
       };
       try {
         payload = JSON.parse(event.nativeEvent.data);
@@ -199,6 +229,9 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
         case 'markerPress':
           if (payload.id) onMarkerPress(payload.id);
           break;
+        case 'safetyMarkerPress':
+          if (payload.id) onSafetyMarkerPress?.(payload.id);
+          break;
         case 'searchMarkerPress':
           if (payload.id) onSearchMarkerPress(payload.id);
           break;
@@ -210,7 +243,22 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
             typeof payload.lat === 'number' &&
             typeof payload.lng === 'number'
           ) {
-            onCenterChanged?.({ lat: payload.lat, lng: payload.lng });
+            const hasBounds =
+              typeof payload.south === 'number' &&
+              typeof payload.west === 'number' &&
+              typeof payload.north === 'number' &&
+              typeof payload.east === 'number';
+            onCenterChanged?.(
+              { lat: payload.lat, lng: payload.lng },
+              hasBounds
+                ? {
+                    south: payload.south!,
+                    west: payload.west!,
+                    north: payload.north!,
+                    east: payload.east!,
+                  }
+                : undefined,
+            );
           }
           break;
         case 'searchResult': {
@@ -230,7 +278,13 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
           break;
       }
     },
-    [onMarkerPress, onSearchMarkerPress, onMapPress, onCenterChanged],
+    [
+      onMarkerPress,
+      onSafetyMarkerPress,
+      onSearchMarkerPress,
+      onMapPress,
+      onCenterChanged,
+    ],
   );
 
   // 키를 아직 안 넣었으면 빈 회색 지도 대신 무엇을 해야 하는지 알려줍니다.

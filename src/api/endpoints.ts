@@ -105,6 +105,14 @@ export const ENDPOINTS = {
     limit?: number;
   }) => withQuery(`/sos/safety-facilities`, params),
 
+  // 지도 안전 장소 레이어
+  hospitals: () => `/hospitals`,
+  femaleSafetyHouses: () => `/female-safety-houses`,
+  cctvs: () => `/cctvs`,
+  smartStreetlights: () => `/smart-streetlights`,
+  chungbukFoods: (params?: { currentPage?: number; perPage?: number }) =>
+    withQuery(`/foods/chungbuk`, params),
+
   // 관광정보 (한국관광공사 TourAPI 프록시)
   /**
    * 위치기반 관광정보 조회: /locationBasedList2
