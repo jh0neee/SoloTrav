@@ -106,7 +106,17 @@ function FavoriteCoursesSection({ limit }: Props) {
   const items = limit === undefined ? favorites : favorites.slice(0, limit);
   const canOpenDetail = limit === undefined;
   if (items.length === 0) {
-    return <Text style={styles.emptyText}>AI가 만든 코스를 관심에 추가하면 여기에 모아볼 수 있어요.</Text>;
+    return (
+      <View style={styles.emptyCard}>
+        <View style={styles.emptyIconWrap}>
+          <HeartIcon color={colors.goldDeep} size={28} />
+        </View>
+        <Text style={styles.emptyTitle}>아직 관심 코스가 없어요</Text>
+        <Text style={styles.emptyDescription}>
+          AI가 생성한 코스에서 하트를 누르면{`\n`}이곳에서 다시 확인할 수 있어요.
+        </Text>
+      </View>
+    );
   }
 
   return (
@@ -164,6 +174,10 @@ const styles = StyleSheet.create({
   detailLinkText: { fontSize: 14, fontWeight: '700', color: colors.primary },
   heartButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   empty: { paddingVertical: 8 },
+  emptyCard: { alignItems: 'center', paddingHorizontal: 24, paddingVertical: 30, borderRadius: 18, borderWidth: 1, borderColor: colors.border, backgroundColor: '#ffffff' },
+  emptyIconWrap: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center', borderRadius: 28, backgroundColor: colors.goldSoft },
+  emptyTitle: { marginTop: 14, fontSize: 16, fontWeight: '800', color: colors.textPrimary },
+  emptyDescription: { marginTop: 7, fontSize: 13, lineHeight: 20, color: colors.textSecondary, textAlign: 'center' },
   emptyText: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
   retry: { marginTop: 6, fontSize: 13, fontWeight: '700', color: colors.goldDeep },
   loader: { paddingVertical: 18 },
