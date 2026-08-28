@@ -97,7 +97,9 @@ function ChatBubble({ message, onRetry }: Props) {
         </Pressable>
       ) : null}
 
-      {message.course ? <CourseCard course={message.course} /> : null}
+      {message.course ? (
+        <CourseCard course={message.course} requestId={message.requestId} />
+      ) : null}
     </View>
   );
 }

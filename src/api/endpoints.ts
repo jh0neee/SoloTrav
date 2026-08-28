@@ -90,6 +90,13 @@ export const ENDPOINTS = {
   saetbyeolChatStream: (requestId: string) =>
     `/ai/saetbyeol/chat/${encodeURIComponent(requestId)}/stream`,
 
+  // AI 코스 찜
+  /** AI 코스 찜 등록(POST) / 내 찜 목록 조회(GET) */
+  aiFavorites: () => `/ai/favorites`,
+  /** 찜 상세 조회(GET) / 찜 해제(DELETE) */
+  aiFavorite: (favoriteId: string) =>
+    `/ai/favorites/${encodeURIComponent(favoriteId)}`,
+
   // SOS
   /** 현위치 기준 가장 가까운 안전 시설 조회 */
   safetyFacilities: (params: {

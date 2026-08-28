@@ -91,6 +91,7 @@ export type ChatMessage = {
   text: string;
   /** 코스가 딸려 온 답변이면 말풍선 아래에 타임라인 카드를 붙입니다 */
   course: TravelCourse | null;
+  requestId: string | null;
   state: ChatMessageState;
   /** 표시용 시각 (epoch ms) */
   createdAt: number;

@@ -1,6 +1,6 @@
 /**
  * 마이 화면 — 상단 다크 히어로(프로필 + 활동 통계) 아래로
- * 나의 여행 취향 / 찜한 코스 / 나의 배지 / 안전 설정을 구성합니다.
+ * 나의 여행 취향 / 관심 코스 / 나의 배지 / 안전 설정을 구성합니다.
  * 안전 설정은 SOS 단축 버튼을 포함한 토글(Switch) 목록입니다.
  */
 import React, { useEffect, useState } from 'react';
@@ -28,8 +28,9 @@ import {
 } from '../preferences/preferenceStore';
 import { badgeStore, countEarned, useBadges } from '../badges/badgeStore';
 import PreferencePromptScreen from './home/PreferencePromptScreen';
+import FavoriteCoursesSection from './favorites/FavoriteCoursesSection';
+import { favoriteStore } from '../favorites/favoriteStore';
 import { highlightPreferences } from '../data/preferences';
-import { getCityById } from '../data/cities';
 import type { Badge, BadgeIcon } from '../types/badge';
 import type { BadgeState } from '../badges/badgeStore';
 import {
@@ -37,9 +38,7 @@ import {
   PROFILE,
   PROFILE_STATS,
   SAFETY_SETTINGS,
-  SAVED_COURSES,
   type SafetyIcon,
-  type SavedCourse,
 } from '../data/profile';
 import {
   BellIcon,
@@ -90,27 +89,20 @@ function MyScreen() {
       userStore.refresh(),
       preferenceStore.reload(),
       badgeStore.reload(),
+      favoriteStore.reload(),
     ]);
     setRefreshing(false);
   };
   // 취향 편집은 이 화면 위에 전체 화면으로 띄웁니다.
   // (탭 안이라 홈 스택처럼 push 할 곳이 없습니다)
   const [editingPreference, setEditingPreference] = useState(false);
-  // 찜 해제해도 목록에는 남기고 하트만 꺼지도록 id 집합으로 관리합니다.
-  const [savedIds, setSavedIds] = useState<string[]>(
-    SAVED_COURSES.map(course => course.id),
-  );
+  const [viewingSavedCourses, setViewingSavedCourses] = useState(false);
   const [safety, setSafety] = useState<Record<string, boolean>>(() =>
     SAFETY_SETTINGS.reduce<Record<string, boolean>>((acc, setting) => {
       acc[setting.key] = setting.defaultOn;
       return acc;
     }, {}),
   );
-
-  const toggleSaved = (id: string) =>
-    setSavedIds(prev =>
-      prev.includes(id) ? prev.filter(saved => saved !== id) : [...prev, id],
-    );
 
   const toggleSafety = (key: string) =>
     setSafety(prev => ({ ...prev, [key]: !prev[key] }));
@@ -126,6 +118,17 @@ function MyScreen() {
     });
     return () => sub.remove();
   }, [editingPreference]);
+
+  useEffect(() => {
+    if (!viewingSavedCourses) {
+      return;
+    }
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setViewingSavedCourses(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [viewingSavedCourses]);
 
   const confirmLogout = () =>
     Alert.alert('로그아웃', '로그아웃 하시겠어요?', [
@@ -155,6 +158,14 @@ function MyScreen() {
             // 실패 메시지는 위저드 하단에 뜹니다. 답변이 날아가지 않게 열어둡니다.
           }
         }}
+      />
+    );
+  }
+
+  if (viewingSavedCourses) {
+    return (
+      <SavedCoursesListScreen
+        onBack={() => setViewingSavedCourses(false)}
       />
     );
   }
@@ -229,22 +240,13 @@ function MyScreen() {
         />
       </Section>
 
-      {/* ── 찜한 코스 ── */}
+      {/* ── 관심 코스 ── */}
       <Section
-        title="찜한 코스@"
-        hint={`${savedIds.length}개`}
+        title="관심 코스"
         actionLabel="전체"
+        onAction={() => setViewingSavedCourses(true)}
       >
-        <View style={styles.courseList}>
-          {SAVED_COURSES.map(course => (
-            <CourseCard
-              key={course.id}
-              course={course}
-              saved={savedIds.includes(course.id)}
-              onToggleSave={() => toggleSaved(course.id)}
-            />
-          ))}
-        </View>
+        <FavoriteCoursesSection limit={2} />
       </Section>
 
       {/* ── 나의 배지 ── */}
@@ -342,6 +344,35 @@ function MyScreen() {
 }
 
 /** 섹션 헤더 + 본문 */
+function SavedCoursesListScreen({
+  onBack,
+}: {
+  onBack: () => void;
+}) {
+  return (
+    <View style={styles.fullListScreen}>
+      <View style={styles.fullListHeader}>
+        <Pressable
+          onPress={onBack}
+          style={styles.fullListBackButton}
+          accessibilityRole="button"
+          accessibilityLabel="뒤로 가기">
+          <Chevron direction="left" color={colors.textPrimary} size={22} />
+        </Pressable>
+        <Text style={styles.fullListTitle}>관심 코스</Text>
+        <View style={styles.fullListBackButton} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.fullListContent}
+        showsVerticalScrollIndicator={false}>
+        <Text style={styles.fullListSectionTitle}>내 관심 코스</Text>
+        <FavoriteCoursesSection />
+      </ScrollView>
+    </View>
+  );
+}
+
 function Section({
   title,
   hint,
@@ -475,51 +506,7 @@ function PreferenceRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** 찜한 코스 카드 */
-function CourseCard({
-  course,
-  saved,
-  onToggleSave,
-}: {
-  course: SavedCourse;
-  saved: boolean;
-  onToggleSave: () => void;
-}) {
-  const city = getCityById(course.cityId);
-  return (
-    <Pressable style={styles.courseCard} accessibilityRole="button">
-      <View style={styles.courseThumb}>
-        <View style={styles.courseMoon} />
-        <Text style={styles.courseThumbText}>{city.name}</Text>
-      </View>
-
-      <View style={styles.courseBody}>
-        <Text style={styles.courseTitle} numberOfLines={1}>
-          {course.title}
-        </Text>
-        <Text style={styles.courseMeta} numberOfLines={1}>
-          {course.period} · {course.spotCount}곳 · {course.savedAt} 저장
-        </Text>
-        <View style={styles.coursePill}>
-          <ShieldIcon color={colors.safeText} size={13} />
-          <Text style={styles.coursePillText}>안전 {course.safetyGrade}</Text>
-        </View>
-      </View>
-
-      <Pressable
-        style={styles.heartBtn}
-        onPress={onToggleSave}
-        hitSlop={8}
-        accessibilityRole="button"
-        accessibilityState={{ selected: saved }}
-        accessibilityLabel={saved ? '찜 해제' : '찜하기'}
-      >
-        <HeartIcon color={saved ? colors.goldDeep : colors.border} size={20} />
-      </Pressable>
-    </Pressable>
-  );
-}
-
+/** 관심 코스 카드 */
 /**
  * 나의 배지 목록.
  * 조회 중 / 실패 / 아직 배지 없음 / 목록 네 가지 상태를 다룹니다.
@@ -610,6 +597,46 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.cream,
+  },
+  fullListScreen: {
+    flex: 1,
+    backgroundColor: colors.cream,
+  },
+  fullListHeader: {
+    height: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: '#ffffff',
+  },
+  fullListBackButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullListTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  fullListContent: {
+    padding: 20,
+    paddingBottom: 32,
+  },
+  fullListSectionTitle: {
+    marginBottom: 12,
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  fullListDivider: {
+    height: 1,
+    marginVertical: 28,
+    backgroundColor: colors.border,
   },
   content: {
     paddingBottom: 28,
@@ -809,9 +836,14 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 
-  // 찜한 코스
+  // 관심 코스
   courseList: {
     gap: 10,
+  },
+  emptySavedText: {
+    paddingVertical: 12,
+    fontSize: 14,
+    color: colors.textSecondary,
   },
   courseCard: {
     flexDirection: 'row',

@@ -60,13 +60,13 @@ function SheetBody({ place }: { place: Place }) {
           <View key={stat.label} style={styles.statBox}>
             <Text style={styles.statLabel}>{stat.label}</Text>
             <Text style={[styles.statValue, stat.highlight && styles.statValueOn]}>
-              {stat.value}
+              {stat.value} 
             </Text>
           </View>
         ))}
       </View>
 
-      {/* 길찾기 + 찜 + 공유 */}
+      {/* 길찾기 + 관심 등록 + 공유 */}
       <View style={styles.actionRow}>
         <Pressable style={styles.primaryButton} accessibilityRole="button">
           <Text style={styles.primaryButtonText}>길찾기</Text>
@@ -74,7 +74,7 @@ function SheetBody({ place }: { place: Place }) {
         <Pressable
           style={styles.iconButton}
           accessibilityRole="button"
-          accessibilityLabel="찜하기">
+          accessibilityLabel="관심 코스 추가">
           <HeartIcon color={colors.textSecondary} size={20} />
         </Pressable>
         <Pressable

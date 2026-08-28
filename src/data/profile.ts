@@ -36,7 +36,7 @@ export type SavedCourse = {
   savedAt: string;
 };
 
-/** 찜한 코스 */
+/** 관심 코스 */
 export const SAVED_COURSES: SavedCourse[] = [
   {
     id: 'danyang-night',

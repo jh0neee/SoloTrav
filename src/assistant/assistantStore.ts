@@ -109,14 +109,14 @@ function applyResult(messageId: string, result: ChatResult): void {
   const text =
     result.answer ??
     (course ? '요청하신 코스를 준비했어요.' : '답변을 준비하지 못했어요.');
-  patchMessage(messageId, { text, course, state: 'done' });
+  patchMessage(messageId, { text, course, requestId: result.requestId, state: 'done' });
   setState({ pending: null });
   closeStream();
 }
 
 /** 실패했을 때 말풍선을 오류 상태로 바꿉니다. */
 function applyFailure(messageId: string, message: string): void {
-  patchMessage(messageId, { text: message, course: null, state: 'failed' });
+  patchMessage(messageId, { text: message, course: null, requestId: null, state: 'failed' });
   setState({ pending: null });
   closeStream();
 }
@@ -217,6 +217,7 @@ export const assistantStore = {
       role: 'user',
       text,
       course: null,
+      requestId: null,
       state: 'done',
       createdAt: Date.now(),
     };
@@ -225,6 +226,7 @@ export const assistantStore = {
       role: 'assistant',
       text: THINKING_TEXT,
       course: null,
+      requestId: null,
       state: 'pending',
       createdAt: Date.now(),
     };

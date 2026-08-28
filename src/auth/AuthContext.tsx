@@ -27,6 +27,7 @@ import { badgeStore } from '../badges/badgeStore';
 import { recordStore } from '../records/recordStore';
 import { commentStore } from '../records/commentStore';
 import { assistantStore } from '../assistant/assistantStore';
+import { favoriteStore } from '../favorites/favoriteStore';
 import type { AuthStatus } from '../types/auth';
 
 type AuthContextValue = {
@@ -93,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       recordStore.reset();
       commentStore.reset();
       assistantStore.reset();
+      favoriteStore.reset();
       setStatus('unauthenticated');
       setError('로그인이 만료되었습니다. 다시 로그인해주세요.');
     });
@@ -131,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     recordStore.reset();
     commentStore.reset();
     assistantStore.reset();
+    favoriteStore.reset();
     if (!mounted.current) {
       return;
     }

@@ -13,10 +13,12 @@
  * safetyNotes 와 assumptions 는 "영업시간·막차·가격은 변할 수 있다" 는 전제를
  * 사용자에게 반드시 보여줘야 해서, 값이 있으면 접지 않고 항상 펼쳐 둡니다.
  */
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../theme/colors';
 import type { CourseDay, CourseStop, TravelCourse } from '../../types/assistant';
+import { favoriteStore } from '../../favorites/favoriteStore';
+import { HeartIcon } from '../../components/icons/UiIcons';
 
 /** 12000 → '1.2만원' 처럼 짧게. 만원 미만은 그대로 원 단위로 씁니다. */
 function formatCost(amount: number): string {
@@ -159,10 +161,40 @@ function NoteBox({
   );
 }
 
-function CourseCard({ course }: { course: TravelCourse }) {
+function CourseCard({ course, requestId }: { course: TravelCourse; requestId: string | null }) {
+  const [isSaving, setIsSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    if (!requestId || isSaving || saved) return;
+    setIsSaving(true);
+    try {
+      await favoriteStore.register(requestId);
+      setSaved(true);
+    } catch {
+      Alert.alert('관심 코스 추가 실패', '잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <View style={styles.card}>
-      {course.title ? <Text style={styles.title}>{course.title}</Text> : null}
+      <View style={styles.titleRow}>
+        {course.title ? <Text style={styles.title}>{course.title}</Text> : <View />}
+        {requestId ? (
+          <Pressable
+            onPress={save}
+            disabled={isSaving || saved}
+            accessibilityRole="button"
+            accessibilityState={{ selected: saved, busy: isSaving }}
+            accessibilityLabel={saved ? '관심 코스에 추가됨' : '관심 코스에 추가'}
+            style={styles.favoriteButton}>
+            <HeartIcon color={saved ? colors.goldDeep : colors.chatStarterText} size={20} filled={saved} />
+            <Text style={styles.favoriteText}>{saved ? '추가됨' : isSaving ? '추가 중' : '관심'}</Text>
+          </Pressable>
+        ) : null}
+      </View>
       {course.summary ? (
         <Text style={styles.summary}>{course.summary}</Text>
       ) : null}
@@ -200,9 +232,29 @@ const styles = StyleSheet.create({
     borderColor: colors.chatCardBorder,
   },
   title: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '600',
     color: colors.chatCardText,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  favoriteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    backgroundColor: colors.chatStarterBg,
+  },
+  favoriteText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.chatStarterText,
   },
   summary: {
     marginTop: 6,
