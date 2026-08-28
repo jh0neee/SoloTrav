@@ -372,7 +372,6 @@ function SavedCoursesListScreen({
       <ScrollView
         contentContainerStyle={styles.fullListContent}
         showsVerticalScrollIndicator={false}>
-        <Text style={styles.fullListSectionTitle}>내 관심 코스</Text>
         <FavoriteCoursesSection />
       </ScrollView>
     </View>

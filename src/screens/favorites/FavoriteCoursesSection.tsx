@@ -104,6 +104,7 @@ function FavoriteCoursesSection({ limit }: Props) {
   }
 
   const items = limit === undefined ? favorites : favorites.slice(0, limit);
+  const canOpenDetail = limit === undefined;
   if (items.length === 0) {
     return <Text style={styles.emptyText}>AI가 만든 코스를 관심에 추가하면 여기에 모아볼 수 있어요.</Text>;
   }
@@ -112,26 +113,38 @@ function FavoriteCoursesSection({ limit }: Props) {
     <View style={styles.list}>
       {items.map(item => (
         <View key={item.id} style={styles.card}>
-          <Pressable onPress={() => openDetail(item.id)} style={styles.cardMain} accessibilityRole="button">
-            <View style={styles.cardBody}>
-              <Text style={styles.title} numberOfLines={1}>{item.title ?? 'AI 여행 코스'}</Text>
-              <Text style={styles.summary}>
-                {firstSentence(item.summary ?? 'AI가 추천한 여행 동선입니다.')}
-              </Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title} numberOfLines={1}>{item.title ?? 'AI 여행 코스'}</Text>
+            <Pressable
+              onPress={() => remove(item)}
+              disabled={removingId !== null}
+              style={styles.heartButton}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="관심 해제">
+              <HeartIcon color={colors.goldDeep} size={21} filled />
+            </Pressable>
+          </View>
+          <Text style={styles.summary}>
+            {firstSentence(item.summary ?? 'AI가 추천한 여행 동선입니다.')}
+          </Text>
+          {item.course || canOpenDetail ? (
+            <View style={styles.footer}>
               {item.course ? (
                 <Text style={styles.meta}>{item.course.days.length}일 일정{item.course.estimatedTotalCostKrw !== null ? ` · ${item.course.estimatedTotalCostKrw.toLocaleString('ko-KR')}원` : ''}</Text>
+              ) : <View />}
+              {canOpenDetail ? (
+                <Pressable
+                  onPress={() => openDetail(item.id)}
+                  style={({ pressed }) => [styles.detailLink, pressed && styles.detailLinkPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.title ?? 'AI 여행 코스'} 상세 보기`}>
+                  <Text style={styles.detailLinkText}>코스 상세보기</Text>
+                  <Chevron direction="right" color={colors.primary} size={14} />
+                </Pressable>
               ) : null}
             </View>
-          </Pressable>
-          <Pressable
-            onPress={() => remove(item)}
-            disabled={removingId !== null}
-            style={styles.heartButton}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="관심 해제">
-            <HeartIcon color={colors.goldDeep} size={21} filled />
-          </Pressable>
+          ) : null}
         </View>
       ))}
     </View>
@@ -140,13 +153,16 @@ function FavoriteCoursesSection({ limit }: Props) {
 
 const styles = StyleSheet.create({
   list: { gap: 10 },
-  card: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 16, borderWidth: 1, borderColor: colors.border, padding: 12 },
-  cardMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cardBody: { flex: 1 },
-  title: { fontSize: 15, fontWeight: '800', color: colors.textPrimary },
-  summary: { marginTop: 4, fontSize: 12, lineHeight: 17, color: colors.textSecondary },
-  meta: { marginTop: 7, fontSize: 11, fontWeight: '600', color: colors.goldDeep },
-  heartButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
+  card: { backgroundColor: '#ffffff', borderRadius: 18, borderWidth: 1, borderColor: colors.border, padding: 20 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  title: { flex: 1, fontSize: 18, fontWeight: '800', color: colors.textPrimary },
+  summary: { marginTop: 10, fontSize: 14, lineHeight: 22, color: colors.textSecondary },
+  footer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border },
+  meta: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  detailLink: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  detailLinkPressed: { opacity: 0.62 },
+  detailLinkText: { fontSize: 14, fontWeight: '700', color: colors.primary },
+  heartButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   empty: { paddingVertical: 8 },
   emptyText: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
   retry: { marginTop: 6, fontSize: 13, fontWeight: '700', color: colors.goldDeep },
