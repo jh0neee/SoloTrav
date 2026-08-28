@@ -349,9 +349,15 @@ function SavedCoursesListScreen({
 }: {
   onBack: () => void;
 }) {
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={styles.fullListScreen}>
-      <View style={styles.fullListHeader}>
+      <View
+        style={[
+          styles.fullListHeader,
+          { height: 60 + insets.top, paddingTop: insets.top },
+        ]}>
         <Pressable
           onPress={onBack}
           style={styles.fullListBackButton}
