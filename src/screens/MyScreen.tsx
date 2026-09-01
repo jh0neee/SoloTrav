@@ -164,9 +164,7 @@ function MyScreen() {
 
   if (viewingSavedCourses) {
     return (
-      <SavedCoursesListScreen
-        onBack={() => setViewingSavedCourses(false)}
-      />
+      <SavedCoursesListScreen onBack={() => setViewingSavedCourses(false)} />
     );
   }
 
@@ -208,13 +206,6 @@ function MyScreen() {
               {earnedBadgeCount}개
             </Text>
           </View>
-          <Pressable
-            style={styles.bellBtn}
-            accessibilityRole="button"
-            accessibilityLabel="알림"
-          >
-            <BellIcon color={colors.textPrimary} size={20} />
-          </Pressable>
         </View>
 
         <View style={styles.statRow}>
@@ -259,10 +250,7 @@ function MyScreen() {
         }
         actionLabel={badges.badges.length > 0 ? '전체' : undefined}
       >
-        <BadgeSection
-          state={badges}
-          onRetry={() => badgeStore.reload()}
-        />
+        <BadgeSection state={badges} onRetry={() => badgeStore.reload()} />
       </Section>
 
       {/* ── 안전 설정 (토글) ── */}
@@ -344,11 +332,7 @@ function MyScreen() {
 }
 
 /** 섹션 헤더 + 본문 */
-function SavedCoursesListScreen({
-  onBack,
-}: {
-  onBack: () => void;
-}) {
+function SavedCoursesListScreen({ onBack }: { onBack: () => void }) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -357,12 +341,14 @@ function SavedCoursesListScreen({
         style={[
           styles.fullListHeader,
           { height: 60 + insets.top, paddingTop: insets.top },
-        ]}>
+        ]}
+      >
         <Pressable
           onPress={onBack}
           style={styles.fullListBackButton}
           accessibilityRole="button"
-          accessibilityLabel="뒤로 가기">
+          accessibilityLabel="뒤로 가기"
+        >
           <Chevron direction="left" color={colors.textPrimary} size={22} />
         </Pressable>
         <Text style={styles.fullListTitle}>관심 코스</Text>
@@ -371,7 +357,8 @@ function SavedCoursesListScreen({
 
       <ScrollView
         contentContainerStyle={styles.fullListContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         <FavoriteCoursesSection />
       </ScrollView>
     </View>
@@ -474,7 +461,10 @@ function TravelPreferenceCard({
   const highlights = highlightPreferences(state.answers);
   return (
     <View style={styles.card}>
-      <PreferenceRow label="여행 기간" value={highlights.duration ?? '미설정'} />
+      <PreferenceRow
+        label="여행 기간"
+        value={highlights.duration ?? '미설정'}
+      />
       <PreferenceRow label="여행 페이스" value={highlights.pace ?? '미설정'} />
       <PreferenceRow
         label="하루 예산"
@@ -698,14 +688,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 13,
     color: colors.heroTextMuted,
-  },
-  bellBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   // 히어로 통계
