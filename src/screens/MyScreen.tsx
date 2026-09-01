@@ -20,6 +20,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { useAuth } from '../auth/AuthContext';
+import { toApiError } from '../api/errors';
 import { useMyProfile, userStore } from '../user/userStore';
 import {
   preferenceStore,
@@ -68,13 +69,14 @@ const SAFETY_ICONS: Record<SafetyIcon, IconComponent> = {
 };
 
 function MyScreen() {
-  const { logout } = useAuth();
+  const { logout, withdraw } = useAuth();
   const insets = useSafeAreaInsets();
   const profile = useMyProfile();
   const preferences = usePreferences();
   const badges = useBadges();
   const earnedBadgeCount = countEarned(badges.badges);
   const [refreshing, setRefreshing] = useState(false);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   // 마이 탭에 들어올 때마다 내 정보를 서버 기준으로 다시 불러옵니다.
   // (로그인 직후 한 번만 받으면 다른 기기에서 바꾼 닉네임 등이 반영되지 않습니다)
@@ -142,6 +144,31 @@ function MyScreen() {
         },
       },
     ]);
+
+  const confirmWithdrawal = () =>
+    Alert.alert(
+      '회원탈퇴',
+      '탈퇴 즉시 계정 이용이 중지되며, 사용자 데이터와 원본 이미지는 요청 90일 후 영구 삭제됩니다. 정말 탈퇴하시겠어요?',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '회원탈퇴',
+          style: 'destructive',
+          onPress: async () => {
+            setIsWithdrawing(true);
+            try {
+              await withdraw();
+            } catch (error) {
+              setIsWithdrawing(false);
+              Alert.alert(
+                '탈퇴하지 못했어요',
+                toApiError(error).message,
+              );
+            }
+          },
+        },
+      ],
+    );
 
   if (editingPreference) {
     return (
@@ -333,10 +360,29 @@ function MyScreen() {
         <Pressable
           style={styles.logoutBtn}
           onPress={confirmLogout}
+          disabled={isWithdrawing}
           accessibilityRole="button"
           accessibilityLabel="로그아웃"
         >
           <Text style={styles.logoutText}>로그아웃</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [
+            styles.withdrawalBtn,
+            pressed ? styles.accountBtnPressed : null,
+            isWithdrawing ? styles.accountBtnDisabled : null,
+          ]}
+          onPress={confirmWithdrawal}
+          disabled={isWithdrawing}
+          accessibilityRole="button"
+          accessibilityLabel="회원탈퇴"
+          accessibilityState={{ disabled: isWithdrawing }}
+        >
+          {isWithdrawing ? (
+            <ActivityIndicator color={colors.textSecondary} size="small" />
+          ) : (
+            <Text style={styles.withdrawalText}>회원탈퇴</Text>
+          )}
         </Pressable>
       </Section>
     </ScrollView>
@@ -1033,6 +1079,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.danger,
+  },
+  withdrawalBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
+    marginTop: 8,
+    borderRadius: 16,
+  },
+  withdrawalText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textDecorationLine: 'underline',
+  },
+  accountBtnPressed: {
+    backgroundColor: colors.surface,
+  },
+  accountBtnDisabled: {
+    opacity: 0.5,
   },
 });
 

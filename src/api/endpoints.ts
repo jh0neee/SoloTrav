@@ -46,6 +46,8 @@ export const ENDPOINTS = {
     withQuery(`/auth/kakao/callback`, params),
   /** Kakao Native SDK access token 로그인 */
   kakaoNativeLogin: () => `/auth/kakao/native`,
+  /** 카카오 재인증으로 회원 탈퇴 예약 취소 */
+  cancelWithdrawal: () => `/auth/withdrawal/cancel`,
 
   // 인증 — 세션
   /** 서비스 refresh token 으로 JWT 재발급 */
@@ -56,6 +58,8 @@ export const ENDPOINTS = {
   // 마이페이지
   /** 내 정보 조회 */
   me: () => `/users/me`,
+  /** 회원 탈퇴 예약 */
+  withdrawal: () => `/auth/me`,
   /** 내 여행 취향 프롬프트 조회(GET) / 등록·편집(POST) */
   travelPreferences: () => `/users/me/travel-preferences`,
   /** 내 여행 배지 조회 */

@@ -21,6 +21,11 @@ export const userApi = {
     return toMeUser(data);
   },
 
+  /** DELETE /auth/me — 현재 로그인한 회원의 탈퇴 예약 */
+  requestWithdrawal: async (): Promise<void> => {
+    await apiClient.delete(ENDPOINTS.withdrawal());
+  },
+
   /**
    * GET /users/me/travel-preferences — 내 여행 취향 조회.
    * 한 번도 등록하지 않았으면 null 입니다.
