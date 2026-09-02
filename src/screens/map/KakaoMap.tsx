@@ -204,6 +204,7 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
       let payload: {
         type?: string;
         id?: string;
+        title?: string;
         message?: string;
         reqId?: number;
         items?: SearchPoi[];
@@ -227,7 +228,17 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
           setReady(true);
           break;
         case 'markerPress':
-          if (payload.id) onMarkerPress(payload.id);
+          if (payload.id) {
+            if (__DEV__) {
+              console.debug('[MapMarkerPress]', {
+                id: payload.id,
+                title: payload.title,
+                lat: payload.lat,
+                lng: payload.lng,
+              });
+            }
+            onMarkerPress(payload.id);
+          }
           break;
         case 'safetyMarkerPress':
           if (payload.id) onSafetyMarkerPress?.(payload.id);

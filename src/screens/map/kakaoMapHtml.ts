@@ -33,6 +33,7 @@ import { TOUR_CATEGORY_COLOR, type TourCategory } from '../../types/tourPlace';
 /** 웹뷰로 넘기는 마커 한 건 — 좌표·색만 있으면 그릴 수 있습니다. */
 export type MapMarker = {
   id: string;
+  title: string;
   lat: number;
   lng: number;
   category: TourCategory;
@@ -50,10 +51,17 @@ export type SafetyMapMarker = {
 
 /** TourPlace 배열을 웹뷰가 쓰는 마커 데이터로 줄입니다. */
 export function toMapMarkers(
-  places: { id: string; lat: number; lng: number; category: TourCategory }[],
+  places: {
+    id: string;
+    title: string;
+    lat: number;
+    lng: number;
+    category: TourCategory;
+  }[],
 ): MapMarker[] {
   return places.map(p => ({
     id: p.id,
+    title: p.title,
     lat: p.lat,
     lng: p.lng,
     category: p.category,
@@ -117,6 +125,11 @@ export function buildKakaoMapHtml({
     box-shadow:0 3px 6px rgba(0,0,0,.3); transform-origin:50% 50%;
     transition:transform .16s ease; }
   .safety-pin.on { transform:scale(1.22); }
+  .cluster { min-width:38px; height:38px; padding:0 8px; box-sizing:border-box;
+    display:flex; align-items:center; justify-content:center; border-radius:20px;
+    background:#1b2233; color:#fff; border:3px solid rgba(255,255,255,.95);
+    box-shadow:0 3px 8px rgba(0,0,0,.32); cursor:pointer;
+    font:700 13px -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif; }
 
   /* ── 현위치 파란 점 ── */
   .me { position:relative; width:20px; height:20px; }
@@ -216,33 +229,95 @@ export function buildKakaoMapHtml({
     // 지도 드래그와 섞이지 않게 탭만 잡습니다.
     el.addEventListener('click', function (e) {
       e.stopPropagation();
-      send({ type: 'markerPress', id: place.id });
+      send({
+        type: 'markerPress',
+        id: place.id,
+        title: place.title,
+        lat: place.lat,
+        lng: place.lng
+      });
     });
     return el;
   }
 
+  function addPlaceOverlay(place) {
+    var el = makePin(place);
+    var overlay = new kakao.maps.CustomOverlay({
+      map: map,
+      position: new kakao.maps.LatLng(place.lat, place.lng),
+      content: el,
+      yAnchor: 1,
+      clickable: true,
+    });
+    overlays[place.id] = { overlay: overlay, el: el, category: place.category };
+  }
+
+  function addClusterOverlay(group, key) {
+    var lat = 0;
+    var lng = 0;
+    group.forEach(function (place) { lat += place.lat; lng += place.lng; });
+    var center = new kakao.maps.LatLng(lat / group.length, lng / group.length);
+    var el = document.createElement('div');
+    el.className = 'cluster';
+    el.textContent = String(group.length);
+    el.setAttribute('aria-label', group.length + '개 장소 확대해서 보기');
+    el.addEventListener('click', function (e) {
+      e.stopPropagation();
+      map.setLevel(Math.max(MIN_LEVEL, map.getLevel() - 2), {
+        anchor: center,
+        animate: true
+      });
+      map.panTo(center);
+    });
+    var overlay = new kakao.maps.CustomOverlay({
+      map: map,
+      position: center,
+      content: el,
+      yAnchor: .5,
+      zIndex: 3,
+      clickable: true,
+    });
+    overlays['cluster-' + key] = { overlay: overlay, el: el, category: category };
+  }
+
   /** 기존 마커를 모두 걷어내고 PLACES 로 다시 그립니다. */
   function renderPlaces() {
+    var previousSelectedId = selectedId;
     Object.keys(overlays).forEach(function (id) {
       overlays[id].overlay.setMap(null);
     });
     overlays = {};
-    selectedId = null;
 
     if (!map) return;
 
-    PLACES.forEach(function (place) {
-      var el = makePin(place);
-      var overlay = new kakao.maps.CustomOverlay({
-        // 처음부터 해당 카테고리만 올려서 깜빡임을 없앱니다.
-        map: place.category === category ? map : null,
-        position: new kakao.maps.LatLng(place.lat, place.lng),
-        content: el,
-        yAnchor: 1,       // 핀 꼬리 끝이 좌표를 가리키도록
-        clickable: true,  // 오버레이 안의 DOM 이벤트를 살립니다
-      });
-      overlays[place.id] = { overlay: overlay, el: el, category: place.category };
+    var visible = PLACES.filter(function (place) {
+      return place.category === category;
     });
+
+    // 축소된 지도에서는 52px 안에 모인 핀을 하나로 묶어 잘못된 핀을 누르는 일을 줄입니다.
+    if (map.getLevel() >= 4 && visible.length > 1) {
+      var projection = map.getProjection();
+      var groups = {};
+      visible.forEach(function (place) {
+        var point = projection.containerPointFromCoords(
+          new kakao.maps.LatLng(place.lat, place.lng)
+        );
+        var key = Math.floor(point.x / 52) + ':' + Math.floor(point.y / 52);
+        (groups[key] || (groups[key] = [])).push(place);
+      });
+      Object.keys(groups).forEach(function (key) {
+        var group = groups[key];
+        if (group.length === 1) addPlaceOverlay(group[0]);
+        else addClusterOverlay(group, key);
+      });
+    } else {
+      visible.forEach(addPlaceOverlay);
+    }
+
+    selectedId = previousSelectedId;
+    if (selectedId && overlays[selectedId]) {
+      overlays[selectedId].el.classList.add('on');
+    }
   }
 
   function initMap() {
@@ -294,7 +369,10 @@ export function buildKakaoMapHtml({
       });
     }
 
-    kakao.maps.event.addListener(map, 'idle', sendViewport);
+    kakao.maps.event.addListener(map, 'idle', function () {
+      renderPlaces();
+      sendViewport();
+    });
 
     send({ type: 'ready' });
     sendViewport();
@@ -310,10 +388,7 @@ export function buildKakaoMapHtml({
 
   window.__setCategory = function (next) {
     category = next;
-    Object.keys(overlays).forEach(function (id) {
-      var item = overlays[id];
-      item.overlay.setMap(item.category === next ? map : null);
-    });
+    renderPlaces();
   };
 
   window.__selectPlace = function (id) {

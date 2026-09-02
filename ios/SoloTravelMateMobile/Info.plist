@@ -62,7 +62,7 @@
 	</dict>
 	<!-- 주변 안전 시설을 찾고 지도에 현위치를 표시할 때 iOS 가 이 문구를 보여줍니다. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>주변 안전 시설을 찾고 지도에 현위치를 표시하는 데 사용합니다.</string>
+	<string>방문을 인증하고 주변 안전 시설과 지도에서 현위치를 확인하는 데 사용합니다. 위치 좌표는 서버에 저장하지 않습니다.</string>
 	<!-- 여행 기록에 붙일 사진을 고를 때 iOS 가 이 문구를 보여줍니다. -->
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>여행 기록에 사진을 올리기 위해 사진 접근이 필요합니다.</string>

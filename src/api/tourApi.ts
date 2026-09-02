@@ -14,9 +14,7 @@ import { ENDPOINTS } from './endpoints';
 import { toApiError } from './errors';
 import { APP_NAME } from '../config/userAgent';
 import {
-  CATEGORY_TO_CONTENT_TYPE,
   CONTENT_TYPE_TO_CATEGORY,
-  type TourCategory,
   type TourPlace,
   type TourPlaceDetail,
   type TourPlacePage,
@@ -28,8 +26,11 @@ const COMMON_PARAMS = {
   MobileApp: APP_NAME,
 } as const;
 
-/** 한 번에 가져올 기본 개수 — 지도 마커가 너무 빽빽해지지 않는 선 */
+/** 일반 목록 API의 기본 페이지 크기. */
 const DEFAULT_ROWS = 50;
+
+/** 신규 지역 조회 API의 페이지 크기. 지역 전체는 훅에서 끝 페이지까지 조회합니다. */
+export const REGION_PAGE_SIZE = 100;
 
 /**
  * 축제는 지역·좌표로 좁힐 수 없어 전국 목록을 통째로 받습니다.
@@ -46,9 +47,6 @@ export const DEFAULT_RADIUS = 5000;
  * 대부분의 지역에서 결과가 0건이 됩니다.
  */
 export const FESTIVAL_RADIUS = 50000;
-
-/** TourAPI 가 허용하는 최대 반경(m). 넘기면 결과가 비어 옵니다. */
-const MAX_RADIUS = 20000;
 
 type Raw = Record<string, unknown>;
 
@@ -70,8 +68,8 @@ function num(raw: Raw, key: string): number | null {
  */
 function normalize(raw: Raw): TourPlace | null {
   const id = str(raw, 'contentid');
-  const lat = num(raw, 'mapy');
-  const lng = num(raw, 'mapx');
+  const lat = num(raw, 'latitude') ?? num(raw, 'mapy');
+  const lng = num(raw, 'longitude') ?? num(raw, 'mapx');
   const contentTypeId = str(raw, 'contenttypeid');
   const category = CONTENT_TYPE_TO_CATEGORY[contentTypeId];
 
@@ -183,47 +181,42 @@ function toPage(data: unknown): TourPlacePage {
 
   return {
     items,
-    pageNo: num(payload, 'pageNo') ?? 1,
-    numOfRows: num(payload, 'numOfRows') ?? items.length,
-    totalCount: num(payload, 'totalCount') ?? items.length,
+    pageNo: num(payload, 'pageNo') ?? num(payload, 'pageno') ?? 1,
+    numOfRows:
+      num(payload, 'numOfRows') ?? num(payload, 'numofrows') ?? items.length,
+    totalCount:
+      num(payload, 'totalCount') ?? num(payload, 'totalcount') ?? items.length,
   };
 }
 
 export type NearbyParams = {
-  lat: number;
-  lng: number;
-  /** 검색 반경(m). 기본 5000, 최대 20000 */
-  radius?: number;
-  /** 지정하면 해당 카테고리만 서버에서 걸러 옵니다. */
-  category?: TourCategory;
+  /** 조회할 행정구역명 (예: '단양군') */
+  regionName: string;
   rows?: number;
   pageNo?: number;
 };
 
 export const tourApi = {
   /**
-   * 위치기반 관광정보 — 지도 마커의 기본 공급원.
+   * 지역 전체 관광정보 한 페이지 — 지도 마커의 기본 공급원.
    *
-   * arrange='E' 는 거리순 정렬입니다(이미지 유무와 무관). 대표 이미지가 필요해
-   * firstImageYN 을 켜고, 좌표·주소도 함께 받습니다.
+   * 개인 위치나 지도 중심 좌표를 자체 서버에 전달하지 않습니다. 카테고리·거리
+   * 필터와 정렬은 useNearbyPlaces 에서 기기 안에서 수행합니다.
    */
   nearby: async (
-    { lat, lng, radius = DEFAULT_RADIUS, category, rows = DEFAULT_ROWS, pageNo = 1 }: NearbyParams,
+    {
+      regionName,
+      rows = REGION_PAGE_SIZE,
+      pageNo = 1,
+    }: NearbyParams,
     signal?: AbortSignal,
   ): Promise<TourPlacePage> => {
     try {
       const { data } = await apiClient.get(
-        ENDPOINTS.tourLocationBased({
-          ...COMMON_PARAMS,
-          mapX: String(lng),
-          mapY: String(lat),
-          radius: String(Math.min(radius, MAX_RADIUS)),
+        ENDPOINTS.tourRegionBased({
+          regionName,
           numOfRows: String(rows),
           pageNo: String(pageNo),
-          arrange: 'E', // 거리순
-          contentTypeId: category
-            ? CATEGORY_TO_CONTENT_TYPE[category]
-            : undefined,
         }),
         { signal },
       );
@@ -321,6 +314,8 @@ export const tourApi = {
         ENDPOINTS.tourSearchKeyword({
           ...COMMON_PARAMS,
           keyword,
+          // 지도 검색 결과도 서비스 범위인 충북으로 제한합니다.
+          lDongRegnCd: '43',
           numOfRows: rows,
           pageNo,
           arrange: 'O', // 제목순
@@ -334,13 +329,8 @@ export const tourApi = {
   },
 
   /**
-   * 행사·축제 조회 — 전국 목록을 한 번에 받아옵니다.
-   *
-   * ⚠️ 이 엔드포인트는 지역·좌표로 좁힐 수 없습니다.
-   *  - areaCode 를 넣으면 결과가 0건으로 오고, 응답의 areacode 필드도 비어 있습니다.
-   *  - mapX/mapY/radius 를 넣으면 502(BAD_GATEWAY)가 납니다.
-   * 대신 항목마다 좌표(mapx/mapy)가 모두 들어 있어, 거리 필터는 화면 쪽에서
-   * 직접 겁니다(useNearbyFestivals 참고).
+   * 행사·축제 조회 — 법정동 시도 코드로 충북 행사만 가져옵니다.
+   * 항목 좌표를 이용한 현재 지도 화면 필터는 useNearbyFestivals 에서 수행합니다.
    *
    * eventStartDate 는 'YYYYMMDD' 이며 "그 날짜에 이미 진행 중이거나 이후에 시작하는
    * 행사"가 함께 옵니다. 오늘 날짜를 넣으면 진행 중 + 예정 축제를 모두 얻습니다.
@@ -361,11 +351,34 @@ export const tourApi = {
       const { data } = await apiClient.get(
         ENDPOINTS.tourSearchFestival({
           ...COMMON_PARAMS,
+          lDongRegnCd: '43',
           eventStartDate,
           eventEndDate,
           numOfRows: rows,
           pageNo: 1,
           arrange: 'A', // 제목순 — 어차피 화면에서 거리순으로 다시 정렬합니다.
+        }),
+        { signal },
+      );
+      return toPage(data);
+    } catch (error) {
+      throw toApiError(error);
+    }
+  },
+
+  /** 숙박 전용 목록 — 충북 전체를 받고 현재 지도 화면 필터는 기기에서 수행합니다. */
+  stays: async (
+    { rows = 100, pageNo = 1 }: { rows?: number; pageNo?: number } = {},
+    signal?: AbortSignal,
+  ): Promise<TourPlacePage> => {
+    try {
+      const { data } = await apiClient.get(
+        ENDPOINTS.tourSearchStay({
+          ...COMMON_PARAMS,
+          lDongRegnCd: '43',
+          numOfRows: rows,
+          pageNo,
+          arrange: 'A',
         }),
         { signal },
       );

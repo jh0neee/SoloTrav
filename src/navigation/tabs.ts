@@ -19,11 +19,16 @@ import HomeStack from './HomeStack';
 
 export type TabKey = 'home' | 'map' | 'assistant' | 'record' | 'my';
 
+export type TabScreenProps = {
+  /** 탭 안의 화면이 자체 상단 뒤로 버튼을 제공할 때 홈으로 돌아갑니다. */
+  onBack?: () => void;
+};
+
 export type TabItem = {
   key: TabKey;
   label: string;
   variant: 'default' | 'center';
-  component: ComponentType;
+  component: ComponentType<TabScreenProps>;
   Icon?: Icon; // center 탭은 마스코트를 쓰므로 아이콘이 없습니다.
 };
 

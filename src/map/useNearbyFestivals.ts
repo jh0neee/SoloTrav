@@ -1,14 +1,19 @@
 /**
  * 축제 레이어용 훅.
  *
- * 축제 API 는 지역·좌표로 좁힐 수 없어(areaCode 는 0건, 좌표는 502) 전국 목록을
- * 통째로 받아 옵니다. 대신 지도 중심이 바뀔 때마다 다시 부를 이유가 없으므로
- * 응답을 모듈 수준에 캐시해 두고, 거리·기간 필터만 화면에서 다시 겁니다.
+ * 축제 API 에 충북 법정동 시도 코드(43)를 보내 충북 목록만 받습니다.
+ * 지도 중심이 바뀔 때마다 다시 부를 이유가 없으므로 응답을 모듈 수준에 캐시하고,
+ * 화면에서는 지도 경계·기간 필터만 다시 적용합니다.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FESTIVAL_RADIUS, tourApi } from '../api/tourApi';
 import type { TourPlace } from '../types/tourPlace';
-import { roughDistance, type Coords } from './useNearbyPlaces';
+import {
+  isInsideBounds,
+  roughDistance,
+  type Coords,
+  type ViewportBounds,
+} from './useNearbyPlaces';
 
 /** 상단 날짜 칩 */
 export type FestivalRange = 'now' | 'weekend' | 'all';
@@ -54,7 +59,7 @@ function overlaps(
 }
 
 /**
- * 전국 축제 목록 캐시.
+ * 충북 축제 목록 캐시.
  * 키는 조회 기준일이라, 날짜가 바뀌면 자연스럽게 다시 받습니다.
  */
 let cache: { key: string; items: TourPlace[] } | null = null;
@@ -70,8 +75,12 @@ function loadFestivals(baseYmd: string): Promise<TourPlace[]> {
   const promise = tourApi
     .festivals({ eventStartDate: baseYmd })
     .then(page => {
-      cache = { key: baseYmd, items: page.items };
-      return page.items;
+      // 서버 응답이 같은 contentid 를 중복해서 주더라도 마커-상세 연결은 1:1로 유지합니다.
+      const items = [
+        ...new Map(page.items.map(item => [item.id, item])).values(),
+      ];
+      cache = { key: baseYmd, items };
+      return items;
     })
     .finally(() => {
       inFlight = null;
@@ -84,6 +93,7 @@ export function useNearbyFestivals(
   center: Coords,
   range: FestivalRange,
   radius: number = FESTIVAL_RADIUS,
+  bounds: ViewportBounds | null = null,
 ) {
   const [all, setAll] = useState<TourPlace[]>([]);
   const [loading, setLoading] = useState(false);
@@ -140,9 +150,13 @@ export function useNearbyFestivals(
         // 목록 응답에 dist 가 없어 직접 계산해 시트·카드에서 쓰게 합니다.
         distance: roughDistance({ lat, lng }, { lat: place.lat, lng: place.lng }),
       }))
-      .filter(place => (place.distance ?? Infinity) <= radius)
+      .filter(place =>
+        bounds
+          ? isInsideBounds(place, bounds)
+          : (place.distance ?? Infinity) <= radius,
+      )
       .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
-  }, [all, range, lat, lng, radius, baseYmd, today]);
+  }, [all, range, lat, lng, radius, bounds, baseYmd, today]);
 
   return { places, loading, error, retry };
 }
