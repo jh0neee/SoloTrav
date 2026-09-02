@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 샛별이 마스코트 — 앱 하단 가운데 탭과 같은 모양 -->
+  <circle cx="32" cy="32" r="30" fill="#e8b455" />
+  <ellipse cx="24" cy="29" rx="3.2" ry="4" fill="#4a3a1c" />
+  <ellipse cx="40" cy="29" rx="3.2" ry="4" fill="#4a3a1c" />
+  <path
+    d="M25 40 Q32 46 39 40"
+    fill="none"
+    stroke="#4a3a1c"
+    stroke-width="3"
+    stroke-linecap="round"
+  />
+  <path d="M46 14 v10 M41 19 h10" stroke="#fff" stroke-width="2.6" stroke-linecap="round" />
+</svg>

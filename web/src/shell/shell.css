@@ -1,0 +1,182 @@
+/*
+ * 웹 셸 — 앱 화면을 감싸는 바깥 틀만 담당합니다.
+ * 안쪽(#app-frame 내부)은 전부 앱 소스가 그리므로 여기서 건드리지 않습니다.
+ */
+
+:root {
+  /*
+   * 프레임 가로폭. 안드로이드 기본 폭(Pixel 계열 ≈ 411dp)보다 살짝 넓게 잡아
+   * 데스크톱에서 답답해 보이지 않게 합니다. 이 한 줄만 바꾸면 됩니다.
+   * (모바일에서는 max-width 라 화면 폭을 그대로 씁니다)
+   */
+  --app-width: 460px;
+  --backdrop: #14161c;
+  --backdrop-soft: #1e2230;
+  --app-font: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Malgun Gothic', 'Apple SD Gothic Neo', 'Noto Sans KR', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  /* 화면 밖으로 흐르는 가로 스크롤 방지 */
+  overflow: hidden;
+  background: var(--backdrop);
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+ * react-native-web 은 Text 마다 font-family 를 직접 박아 넣기 때문에
+ * body 에만 지정하면 상속되지 않습니다. 그래서 앱 안쪽 전체에 덮어씁니다.
+ * (한글이 Segoe UI 에 없어 기본값으로 두면 자간이 어색해집니다)
+ */
+#app-frame * {
+  font-family: var(--app-font);
+}
+
+/* ── 모바일 프레임 ── */
+.app-frame {
+  position: relative;
+  /*
+   * 앱의 최상위 View 는 flex:1 로 화면을 꽉 채우도록 쓰여 있습니다.
+   * 이 틀이 그냥 block 이면 그 flex:1 이 아무 일도 하지 않아서 내용 높이만큼
+   * 늘어나고, 하단 탭바가 화면 밖으로 밀려납니다. 그래서 세로 flex 로 둡니다.
+   */
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--app-width);
+  height: 100%;
+  /* 브라우저 주소창이 접혔다 펴져도 높이가 튀지 않게 */
+  height: 100dvh;
+  background: #fff;
+  overflow: hidden;
+  /* 앱 화면이 프레임 밖으로 새지 않도록 새 좌표계를 만듭니다 */
+  isolation: isolate;
+}
+
+/* 데스크톱에서는 배경 위에 떠 있는 기기처럼 보이게 */
+@media (min-width: 768px) {
+  body {
+    background:
+      radial-gradient(
+        120% 80% at 50% 0%,
+        var(--backdrop-soft) 0%,
+        var(--backdrop) 60%
+      );
+  }
+
+  .app-frame {
+    height: min(920px, 100dvh);
+    border-radius: 22px;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.06),
+      0 30px 80px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* ── 상단 바 (웹에만 있는 길) ── */
+/*
+ * 앱에는 없는 바입니다. 웹에서는 마이 화면을 거치지 않고도 탈퇴 페이지에
+ * 닿을 수 있어야 해서 얇게 한 줄 얹었습니다. 앱 화면 높이는 이 바를 뺀
+ * 나머지(.app-frame-body)가 전부 차지합니다.
+ */
+.shell-bar {
+  flex: 0 0 auto;
+  height: 42px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fff;
+  border-bottom: 1px solid #eef0f4; /* colors.border */
+}
+
+.shell-bar button {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: var(--app-font);
+  cursor: pointer;
+}
+
+.shell-bar-brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #16181d; /* colors.textPrimary */
+  letter-spacing: -0.2px;
+}
+
+/* 샛별이 마스코트를 아주 작게 — 파비콘과 같은 인상 */
+.shell-bar-mark {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f5c24b; /* colors.mascot */
+  box-shadow: 0 0 0 3px rgba(251, 224, 163, 0.5);
+}
+
+.shell-bar-link {
+  font-size: 13px;
+  color: #8b95a1; /* colors.textSecondary */
+}
+
+.shell-bar-link:hover {
+  color: #16181d;
+  text-decoration: underline;
+}
+
+/* 앱 화면이 실제로 그려지는 칸 — 남은 높이를 전부 씁니다. */
+.app-frame-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 좌측 상단 라벨 (화면이 넉넉할 때만) ── */
+.shell-label {
+  position: fixed;
+  top: 28px;
+  left: 32px;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: var(--app-font);
+  line-height: 1.5;
+  pointer-events: none;
+  user-select: none;
+}
+
+.shell-label strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: #fff;
+}
+
+.shell-label span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+@media (max-width: 1099px) {
+  .shell-label {
+    display: none;
+  }
+}

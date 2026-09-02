@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <title>카카오 로그인 처리 중…</title>
+    <style>
+      body {
+        margin: 0;
+        height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #f7f3ea;
+        color: #4a4437;
+        font:
+          14px/1.6 system-ui,
+          'Malgun Gothic',
+          sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <p>로그인 처리 중입니다. 잠시만 기다려주세요…</p>
+    <script>
+      /*
+       * ⚠️ 예비 복귀 지점입니다. 지금 프론트가 서버에 알려주는 복귀 주소는
+       * /redirect (src/web/KakaoRedirectPage.tsx) 이고, 이 정적 파일은 서버가
+       * 아직 이 주소로 보내고 있을 때를 위해 남겨둡니다. 두 페이지는 같은 채널
+       * 이름과 같은 메시지 모양을 씁니다 — 한쪽을 고치면 다른 쪽도 보세요.
+       *
+       * 서버가 카카오와 토큰 교환을 끝낸 뒤 이 페이지로 돌려보냅니다.
+       * (카카오가 직접 여기로 오지 않습니다 — 카카오의 redirect_uri 는 서버 콜백입니다)
+       *
+       * 여기서는 서버가 붙여준 1회용 ticket 을 부모 창에 넘기고 스스로 닫습니다.
+       * ticket → 세션 교환은 부모 창의 src/web/kakaoWebLogin.ts 가 합니다.
+       *
+       * ticket 은 해시(#)로 받는 것을 기본으로 합니다. 해시는 HTTP 요청에 실려
+       * 나가지 않아서 서버 접근 로그·Referer 에 남지 않습니다. 서버가 쿼리
+       * 스트링(?)으로 붙여 보내는 경우도 함께 받아둡니다.
+       */
+      (function () {
+        var hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        var query = new URLSearchParams(window.location.search);
+        var pick = function (name) {
+          return hash.get(name) || query.get(name);
+        };
+
+        var message = {
+          channel: '__solotrav_kakao__',
+          state: pick('state'),
+          error: pick('error_description') || pick('error'),
+          // 형식 1 — 1회용 티켓 (권장)
+          ticket: pick('ticket'),
+          // 형식 2 — 서비스 토큰을 그대로 실어 보내는 경우
+          accessToken: pick('accessToken') || pick('access_token'),
+          refreshToken: pick('refreshToken') || pick('refresh_token'),
+        };
+
+        // 주소창에 ticket 이 남지 않게 지웁니다(뒤로가기·기록 대비).
+        try {
+          window.history.replaceState(null, '', window.location.pathname);
+        } catch (e) {
+          // 지우지 못해도 로그인 흐름에는 영향이 없습니다.
+        }
+
+        if (window.opener) {
+          window.opener.postMessage(message, window.location.origin);
+          window.close();
+        } else {
+          // 팝업이 아니라 현재 창에서 열린 경우 — 안내만 남깁니다.
+          document.body.textContent =
+            message.ticket || message.accessToken
+              ? '로그인이 확인되었습니다. 이 창을 닫고 앱으로 돌아가주세요.'
+              : '로그인에 실패했습니다: ' + (message.error || '알 수 없는 오류');
+        }
+      })();
+    </script>
+  </body>
+</html>

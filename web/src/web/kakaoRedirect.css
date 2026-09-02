@@ -1,0 +1,173 @@
+/*
+ * 카카오 로그인 복귀 페이지(/redirect) 스타일.
+ *
+ * 앱 화면이 아니라 거쳐 가는 페이지라 react-native-web 을 쓰지 않고 평범한
+ * HTML/CSS 로 그립니다. 색은 앱(theme/colors.ts)과 같은 값을 씁니다.
+ *
+ * 이 화면은 폭 480px 짜리 팝업에서도, 데스크톱 탭 전체에서도 뜹니다. 그래서
+ * 모바일 프레임(.app-frame)에 기대지 않고 카드 하나를 가운데 두는 것으로
+ * 양쪽 모두를 감당합니다.
+ */
+
+.kr-page {
+  width: 100%;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  font-family: var(--app-font);
+}
+
+.kr-card {
+  width: 100%;
+  max-width: 360px;
+  background: #fff;
+  border-radius: 20px;
+  padding: 32px 28px 28px;
+  text-align: center;
+  color: #16181d; /* colors.textPrimary */
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+/* ── 머리 — 어느 서비스의 창인지 ── */
+.kr-brand {
+  margin: 0 0 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: #8b95a1; /* colors.textSecondary */
+}
+
+/* 샛별이 마스코트 — 셸 상단 바와 같은 인상 */
+.kr-mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f5c24b; /* colors.mascot */
+  box-shadow: 0 0 0 3px rgba(251, 224, 163, 0.5);
+}
+
+/* ── 상태 표시 ── */
+.kr-spinner {
+  display: block;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  border: 3px solid #eef0f4; /* colors.border */
+  border-top-color: #2e90fa; /* colors.primary */
+  animation: kr-spin 0.8s linear infinite;
+}
+
+@keyframes kr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 애니메이션을 줄여 달라는 설정이면 고리만 두고 돌리지 않습니다. */
+@media (prefers-reduced-motion: reduce) {
+  .kr-spinner {
+    animation: none;
+    border-top-color: #eef0f4;
+  }
+}
+
+.kr-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.kr-badge-ok {
+  background: #eaf4ff; /* colors.primarySoft */
+  color: #1570ef; /* colors.primaryStrong */
+}
+
+.kr-badge-warn {
+  background: #fdecec;
+  color: #d64545;
+}
+
+.kr-badge-info {
+  background: #f6f7f9; /* colors.surface */
+  color: #8b95a1;
+}
+
+/* ── 글 ── */
+.kr-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.kr-desc {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #8b95a1; /* colors.textSecondary */
+  /* 서버 메시지가 길게 와도 카드 밖으로 새지 않게 */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.kr-desc-error {
+  color: #d64545;
+}
+
+/* ── 버튼 ── */
+.kr-button {
+  margin-top: 22px;
+  width: 100%;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: #2e90fa; /* colors.primary */
+  color: #fff; /* colors.textOnPrimary */
+  font-family: var(--app-font);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kr-button:hover {
+  background: #1570ef; /* colors.primaryStrong */
+}
+
+.kr-button-quiet {
+  background: #f6f7f9; /* colors.surface */
+  color: #8b95a1;
+  font-weight: 600;
+}
+
+.kr-button-quiet:hover {
+  background: #eef0f4; /* colors.border */
+  color: #16181d;
+}
+
+/* 개발 중에만 보이는 단서 — 서버가 무엇을 붙여 보냈는지 */
+.kr-debug {
+  margin: 14px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f6f7f9; /* colors.surface */
+  color: #b4bcc6; /* colors.textTertiary */
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}

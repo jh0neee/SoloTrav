@@ -91,7 +91,8 @@ AGENTS.md
 .mcp.json
 
 # AI-generated docs (PDCA: plan / design / analysis / report)
-docs/
+# 루트에만 적용합니다. 앞의 / 가 없으면 web/docs/ 같은 하위 문서까지 함께 무시됩니다.
+/docs/
 
 # API 키
 src/config/kakao.ts

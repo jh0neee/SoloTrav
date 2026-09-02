@@ -1,0 +1,28 @@
+{
+  "name": "solotrav-web",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "description": "SoloTrav 안드로이드 앱을 react-native-web 으로 브라우저에 그대로 띄우는 웹 클라이언트",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
+    "axios": "^1.19.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native-web": "^0.21.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "typescript": "^5.8.3",
+    "vite": "^7.1.14"
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      /*
+       * 타입은 진짜 react-native 것을 씁니다.
+       * 앱 소스가 RN 타입(ViewStyle, LayoutChangeEvent ...)에 기대어 쓰여 있어서,
+       * 런타임만 react-native-web 으로 바꾸고 타입은 원본을 그대로 봅니다.
+       * (react-native 패키지는 저장소 루트(..) 에 이미 설치돼 있어 따로 받지 않습니다)
+       */
+      "react-native": ["../node_modules/react-native"],
+      "@app/*": ["../src/*"],
+      /* 앱이 '@env' 로 읽는 설정값 — 런타임과 같은 shim 을 타입에도 씁니다. */
+      "@env": ["src/shims/env.ts"],
+      /* 앱 루트 (App.tsx) */
+      "@solotrav/*": ["../*"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}
