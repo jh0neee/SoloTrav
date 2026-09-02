@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "web": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
