@@ -9,6 +9,7 @@ import {
   Alert,
   BackHandler,
   Image,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -34,6 +35,10 @@ import { favoriteStore } from '../favorites/favoriteStore';
 import { highlightPreferences } from '../data/preferences';
 import type { Badge, BadgeIcon } from '../types/badge';
 import type { BadgeState } from '../badges/badgeStore';
+import {
+  PRIVACY_POLICY_URL,
+  TERMS_OF_SERVICE_URL,
+} from '../config/legal';
 import {
   EMERGENCY_CONTACT,
   PROFILE,
@@ -169,6 +174,21 @@ function MyScreen() {
         },
       ],
     );
+
+  const openLegalDocument = async (label: string, url: string | null) => {
+    if (!url) {
+      Alert.alert(
+        `${label} 준비 중`,
+        '문서 URL은 백엔드 약관 API가 확정되면 연결할 예정입니다.',
+      );
+      return;
+    }
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('문서를 열 수 없어요', '잠시 후 다시 시도해주세요.');
+    }
+  };
 
   if (editingPreference) {
     return (
@@ -354,6 +374,23 @@ function MyScreen() {
         </View>
       </Section>
 
+      {/* ── 약관 및 정책 ── */}
+      <Section title="약관 및 정책">
+        <View style={styles.card}>
+          <PolicyRow
+            label="이용약관"
+            onPress={() => openLegalDocument('이용약관', TERMS_OF_SERVICE_URL)}
+          />
+          <View style={styles.divider} />
+          <PolicyRow
+            label="개인정보 처리방침"
+            onPress={() =>
+              openLegalDocument('개인정보 처리방침', PRIVACY_POLICY_URL)
+            }
+          />
+        </View>
+      </Section>
+
       {/* ── 계정 ── */}
       {/* 서버가 이메일을 안 주는 계정이 있어(카카오 동의 항목 미수집) 없으면 연결 상태만 알립니다. */}
       <Section title="계정" hint={profile.email ?? '카카오 계정 연결됨'}>
@@ -386,6 +423,23 @@ function MyScreen() {
         </Pressable>
       </Section>
     </ScrollView>
+  );
+}
+
+function PolicyRow({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel={`${label} 보기`}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.policyRow,
+        pressed && styles.policyRowPressed,
+      ]}
+    >
+      <Text style={styles.policyLabel}>{label}</Text>
+      <Chevron direction="right" color={colors.textSecondary} size={16} />
+    </Pressable>
   );
 }
 
@@ -827,6 +881,20 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border,
     marginVertical: 14,
+  },
+  policyRow: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  policyRowPressed: {
+    opacity: 0.55,
+  },
+  policyLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
 
   // 여행 취향

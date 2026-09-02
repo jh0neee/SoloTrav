@@ -30,6 +30,7 @@ import { commentStore } from '../records/commentStore';
 import { assistantStore } from '../assistant/assistantStore';
 import { favoriteStore } from '../favorites/favoriteStore';
 import type { AuthStatus } from '../types/auth';
+import { FORCE_TERMS_AGREEMENT_PREVIEW } from '../config/legal';
 
 type AuthContextValue = {
   status: AuthStatus;
@@ -39,11 +40,14 @@ type AuthContextValue = {
   isWithdrawalPending: boolean;
   /** 탈퇴 예약 취소 요청 진행 상태 */
   isCancellingWithdrawal: boolean;
+  /** 카카오 인증은 끝났지만 현재 이용약관 동의가 필요한지 */
+  requiresTermsAgreement: boolean;
   /** 마지막 로그인 실패 메시지. 취소는 에러로 보지 않아 null 입니다. */
   error: string | null;
   loginWithKakao: () => Promise<void>;
   cancelWithdrawal: () => Promise<void>;
   leaveWithdrawalRecovery: () => Promise<void>;
+  completeTermsAgreement: () => void;
   logout: () => Promise<void>;
   withdraw: () => Promise<void>;
   clearError: () => void;
@@ -56,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [isWithdrawalPending, setIsWithdrawalPending] = useState(false);
   const [isCancellingWithdrawal, setIsCancellingWithdrawal] = useState(false);
+  const [requiresTermsAgreement, setRequiresTermsAgreement] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 취소 API에만 쓸 카카오 토큰. 디스크나 렌더링 state에는 저장하지 않습니다.
   const pendingKakaoTokens = useRef<KakaoTokens | null>(null);
@@ -79,6 +84,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       setStatus(session ? 'authenticated' : 'unauthenticated');
+      // 백엔드 연동 전 UI 확인용. 프로덕션 빌드에서는 항상 false 입니다.
+      setRequiresTermsAgreement(
+        Boolean(session) && FORCE_TERMS_AGREEMENT_PREVIEW,
+      );
     })();
     return () => {
       cancelled = true;
@@ -108,6 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       assistantStore.reset();
       favoriteStore.reset();
       setStatus('unauthenticated');
+      setRequiresTermsAgreement(false);
       setError('로그인이 만료되었습니다. 다시 로그인해주세요.');
     });
     return () => authService.onSessionExpired(null);
@@ -123,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       setStatus('authenticated');
+      setRequiresTermsAgreement(FORCE_TERMS_AGREEMENT_PREVIEW);
     } catch (caught) {
       if (!mounted.current) {
         return;
@@ -154,6 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     setStatus('unauthenticated');
+    setRequiresTermsAgreement(false);
     setError(null);
   }, []);
 
@@ -173,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setIsWithdrawalPending(false);
       setStatus('authenticated');
+      setRequiresTermsAgreement(FORCE_TERMS_AGREEMENT_PREVIEW);
     } catch (caught) {
       if (mounted.current) {
         setError(toApiError(caught).message);
@@ -195,6 +208,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
   }, []);
 
+  const completeTermsAgreement = useCallback(() => {
+    // TODO: 백엔드 API 확정 후 agreementToken과 약관 버전을 전송하고,
+    // 응답으로 받은 정식 세션을 저장한 뒤 이 상태를 해제합니다.
+    setRequiresTermsAgreement(false);
+  }, []);
+
   const withdraw = useCallback(async () => {
     await authService.withdraw();
     preferenceStore.reset();
@@ -207,6 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     setStatus('unauthenticated');
+    setRequiresTermsAgreement(false);
     setError(null);
   }, []);
 
@@ -218,10 +238,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isSigningIn,
       isWithdrawalPending,
       isCancellingWithdrawal,
+      requiresTermsAgreement,
       error,
       loginWithKakao,
       cancelWithdrawal,
       leaveWithdrawalRecovery,
+      completeTermsAgreement,
       logout,
       withdraw,
       clearError,
@@ -231,10 +253,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isSigningIn,
       isWithdrawalPending,
       isCancellingWithdrawal,
+      requiresTermsAgreement,
       error,
       loginWithKakao,
       cancelWithdrawal,
       leaveWithdrawalRecovery,
+      completeTermsAgreement,
       logout,
       withdraw,
       clearError,
