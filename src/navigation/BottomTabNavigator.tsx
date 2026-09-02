@@ -4,15 +4,18 @@
  * - 가운데(샛별이) 탭은 볼록 튀어나온 금색 마스코트 버튼.
  * - 탭 목록은 ./tabs.ts 에서 관리합니다.
  */
-import React, { useState } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { Mascot } from '../components/icons/TabIcons';
-import { TABS, type TabItem, type TabKey } from './tabs';
+import { TABS, type TabItem } from './tabs';
+import { useActiveTab } from './useActiveTab';
 
 function BottomTabNavigator() {
-  const [activeKey, setActiveKey] = useState<TabKey>(TABS[0].key);
+  // 어느 탭이 켜져 있는지는 ./useActiveTab 이 정합니다.
+  // 앱은 지역 상태, 웹은 주소창(/record, /my …) 과 이어진 구현으로 교체됩니다.
+  const [activeKey, setActiveKey] = useActiveTab();
   const insets = useSafeAreaInsets();
 
   const activeTab = TABS.find(tab => tab.key === activeKey) ?? TABS[0];

@@ -1,7 +1,9 @@
 /**
- * 홈 탭 내부의 가벼운 스택 네비게이션.
- * 외부 라이브러리 없이 상태 배열로 화면 전환(push/pop)을 관리하고,
- * 안드로이드 하드웨어 back 으로도 pop 되게 처리합니다.
+ * 홈 탭 내부의 가벼운 스택 네비게이션 — 화면을 그리는 쪽입니다.
+ *
+ * "지금 어느 화면인지" 와 push/pop 은 ./useHomeStack 이 들고 있습니다.
+ * 앱에서는 지역 상태, 웹에서는 주소창(/search, /spot/... )과 이어진 구현으로
+ * 교체되기 때문에, 이 파일은 어느 쪽에서 도는지 몰라도 됩니다.
  *
  *   홈 → 검색 → 장소 상세
  *   홈 → 사진첩
@@ -9,57 +11,25 @@
  *   홈 → 취향 프롬프트 (홈 배너에서 바로 진입)
  *   홈 → 축제 카드 → 장소 상세
  */
-import React, { useCallback, useEffect, useState } from 'react';
-import { BackHandler } from 'react-native';
+import React from 'react';
 import HomeScreen from '../screens/home/HomeScreen';
 import SearchScreen from '../screens/home/SearchScreen';
 import GalleryScreen from '../screens/home/GalleryScreen';
 import SpotDetailScreen from '../screens/home/SpotDetailScreen';
 import CitySelectScreen from '../screens/home/CitySelectScreen';
 import PreferencePromptScreen from '../screens/home/PreferencePromptScreen';
-import type { City } from '../data/cities';
-import type { TourSpot } from '../types/travel';
 import { summarizePreferences } from '../data/preferences';
 import {
   preferenceStore,
   usePreferences,
 } from '../preferences/preferenceStore';
-
-type Route =
-  | { name: 'home' }
-  | { name: 'search' }
-  | { name: 'gallery' }
-  | { name: 'spot'; spot: TourSpot }
-  | { name: 'citySelect'; cityId?: string }
-  | { name: 'preference'; city?: City };
+import { useHomeStack } from './useHomeStack';
 
 function HomeStack() {
-  const [stack, setStack] = useState<Route[]>([{ name: 'home' }]);
+  const { current, push, pop } = useHomeStack();
   // 취향은 서버가 원본이라 화면 로컬 state 로 들고 있지 않습니다.
   // (탭을 옮기거나 앱을 껐다 켜도 유지되어야 합니다)
   const preferences = usePreferences();
-  const current = stack[stack.length - 1];
-
-  const push = useCallback(
-    (route: Route) => setStack(prev => [...prev, route]),
-    [],
-  );
-  const pop = useCallback(
-    () => setStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev)),
-    [],
-  );
-
-  // 안드로이드 뒤로가기: 루트가 아니면 pop 하고 이벤트 소비
-  useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (stack.length > 1) {
-        pop();
-        return true;
-      }
-      return false;
-    });
-    return () => sub.remove();
-  }, [stack.length, pop]);
 
   switch (current.name) {
     case 'search':

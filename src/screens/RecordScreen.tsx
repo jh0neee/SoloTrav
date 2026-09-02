@@ -7,11 +7,10 @@
  * 서버가 주는 기록은 안전등급·태그·내용·날짜뿐이라 목업에 있던 좋아요/댓글은
  * 화면에서 뺐습니다. 사진도 API 에 없어서 예전처럼 색 플레이스홀더를 씁니다.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  BackHandler,
   FlatList,
   Image,
   Pressable,
@@ -25,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Chip from '../components/Chip';
 import RecordFormScreen from './record/RecordFormScreen';
 import RecordDetailScreen from './record/RecordDetailScreen';
+import { useRecordRoute } from '../navigation/useRecordRoute';
 import {
   recordStore,
   useRecords,
@@ -46,40 +46,16 @@ const SCOPES: { key: RecordScope; label: string }[] = [
   { key: 'mine', label: '내 기록' },
 ];
 
-/**
- * 탭 안이라 홈 스택처럼 push 할 곳이 없어서, 화면 전환을 이 안에서 관리합니다.
- *   feed → detail → form(수정) / feed → form(작성)
- */
-type Route =
-  | { name: 'feed' }
-  | { name: 'detail'; recordId: string }
-  | { name: 'form'; record: TravelRecord | null };
-
 function RecordScreen() {
   const [scope, setScope] = useState<RecordScope>('all');
   const insets = useSafeAreaInsets();
   const [tagFilter, setTagFilter] = useState<string>(ALL_TAGS);
-  const [route, setRoute] = useState<Route>({ name: 'feed' });
+  // 화면 전환은 ../navigation/useRecordRoute 가 들고 있습니다.
+  // 앱은 지역 상태, 웹은 주소창(/record/:id …) 과 이어진 구현으로 교체됩니다.
+  const [route, setRoute] = useRecordRoute();
 
   const state = useRecords(scope);
   const list = state[scope];
-
-  // 안드로이드 뒤로가기: 피드가 아니면 앱을 닫지 않고 한 단계 되돌립니다.
-  useEffect(() => {
-    if (route.name === 'feed') {
-      return;
-    }
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      // 수정 화면에서 돌아갈 곳은 그 기록의 상세입니다.
-      setRoute(current =>
-        current.name === 'form' && current.record
-          ? { name: 'detail', recordId: current.record.id }
-          : { name: 'feed' },
-      );
-      return true;
-    });
-    return () => sub.remove();
-  }, [route.name]);
 
   // 필터 칩은 실제로 올라온 태그에서 만듭니다(서버에 카테고리 개념이 없습니다).
   const tagOptions = useMemo(() => {

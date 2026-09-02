@@ -7,7 +7,6 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  BackHandler,
   Image,
   Pressable,
   RefreshControl,
@@ -29,6 +28,7 @@ import {
 } from '../preferences/preferenceStore';
 import { badgeStore, countEarned, useBadges } from '../badges/badgeStore';
 import PreferencePromptScreen from './home/PreferencePromptScreen';
+import { useMyView } from '../navigation/useMyView';
 import FavoriteCoursesSection from './favorites/FavoriteCoursesSection';
 import { favoriteStore } from '../favorites/favoriteStore';
 import { highlightPreferences } from '../data/preferences';
@@ -95,10 +95,10 @@ function MyScreen() {
     ]);
     setRefreshing(false);
   };
-  // 취향 편집은 이 화면 위에 전체 화면으로 띄웁니다.
-  // (탭 안이라 홈 스택처럼 push 할 곳이 없습니다)
-  const [editingPreference, setEditingPreference] = useState(false);
-  const [viewingSavedCourses, setViewingSavedCourses] = useState(false);
+  // 취향 편집·저장한 코스는 이 화면 위에 전체 화면으로 띄웁니다.
+  // 어느 것이 열려 있는지는 useMyView 가 들고 있습니다 — 앱은 지역 상태,
+  // 웹은 주소창(/my/preference, /my/courses) 과 이어진 구현으로 교체됩니다.
+  const [view, setView] = useMyView();
   const [safety, setSafety] = useState<Record<string, boolean>>(() =>
     SAFETY_SETTINGS.reduce<Record<string, boolean>>((acc, setting) => {
       acc[setting.key] = setting.defaultOn;
@@ -108,29 +108,6 @@ function MyScreen() {
 
   const toggleSafety = (key: string) =>
     setSafety(prev => ({ ...prev, [key]: !prev[key] }));
-
-  // 편집 중 안드로이드 뒤로가기는 앱을 닫지 않고 편집만 닫습니다.
-  useEffect(() => {
-    if (!editingPreference) {
-      return;
-    }
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      setEditingPreference(false);
-      return true;
-    });
-    return () => sub.remove();
-  }, [editingPreference]);
-
-  useEffect(() => {
-    if (!viewingSavedCourses) {
-      return;
-    }
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      setViewingSavedCourses(false);
-      return true;
-    });
-    return () => sub.remove();
-  }, [viewingSavedCourses]);
 
   const confirmLogout = () =>
     Alert.alert('로그아웃', '로그아웃 하시겠어요?', [
@@ -170,17 +147,17 @@ function MyScreen() {
       ],
     );
 
-  if (editingPreference) {
+  if (view === 'preference') {
     return (
       <PreferencePromptScreen
         initialAnswers={preferences.answers}
         isSaving={preferences.isSaving}
         saveError={preferences.error}
-        onBack={() => setEditingPreference(false)}
+        onBack={() => setView('root')}
         onComplete={async answers => {
           try {
             await preferenceStore.save(answers);
-            setEditingPreference(false);
+            setView('root');
           } catch {
             // 실패 메시지는 위저드 하단에 뜹니다. 답변이 날아가지 않게 열어둡니다.
           }
@@ -189,9 +166,9 @@ function MyScreen() {
     );
   }
 
-  if (viewingSavedCourses) {
+  if (view === 'courses') {
     return (
-      <SavedCoursesListScreen onBack={() => setViewingSavedCourses(false)} />
+      <SavedCoursesListScreen onBack={() => setView('root')} />
     );
   }
 
@@ -249,11 +226,11 @@ function MyScreen() {
       <Section
         title="나의 여행 취향"
         actionLabel={preferences.answers ? '수정' : undefined}
-        onAction={() => setEditingPreference(true)}
+        onAction={() => setView('preference')}
       >
         <TravelPreferenceCard
           state={preferences}
-          onStart={() => setEditingPreference(true)}
+          onStart={() => setView('preference')}
           onRetry={() => preferenceStore.reload()}
         />
       </Section>
@@ -262,7 +239,7 @@ function MyScreen() {
       <Section
         title="관심 코스"
         actionLabel="전체"
-        onAction={() => setViewingSavedCourses(true)}
+        onAction={() => setView('courses')}
       >
         <FavoriteCoursesSection limit={2} />
       </Section>

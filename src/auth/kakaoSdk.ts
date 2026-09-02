@@ -51,6 +51,7 @@ export async function signInWithKakao(): Promise<KakaoTokens> {
     if (!token?.accessToken || !token?.refreshToken) {
       throw new Error('카카오 토큰을 받지 못했습니다.');
     }
+
     return {
       accessToken: token.accessToken,
       refreshToken: token.refreshToken,

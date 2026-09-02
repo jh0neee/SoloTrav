@@ -18,7 +18,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { authService, WithdrawalPendingError } from './authService';
+import { authService } from './authService';
+import { WithdrawalPendingError } from './withdrawalPendingError';
 import { KakaoLoginCancelled } from './kakaoSdk';
 import type { KakaoTokens } from './kakaoSdk';
 import { toApiError } from '../api/errors';

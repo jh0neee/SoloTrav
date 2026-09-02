@@ -26,7 +26,8 @@ export const authApi = {
     redirectUri?: string;
     state?: string;
   }): Promise<string> => {
-    const { data } = await apiClient.get(ENDPOINTS.kakaoAuthUrl(params));
+    const _params = Object.assign({}, params); // 개발용 카카오 앱은 redirectUri 가 localhost 여야 합니다.
+    const { data } = await apiClient.get(ENDPOINTS.kakaoAuthUrl(Object.assign(_params, { dev: 'ENABLED' })));
     return toKakaoAuthUrl(data);
   },
 
@@ -35,7 +36,8 @@ export const authApi = {
     code: string;
     state?: string;
   }): Promise<AuthSession> => {
-    const { data } = await apiClient.get(ENDPOINTS.kakaoCallback(params));
+    const _params = Object.assign({}, params); // 개발용 카카오 앱은 redirectUri 가 localhost 여야 합니다.
+    const { data } = await apiClient.get(ENDPOINTS.kakaoCallback(Object.assign(_params, { dev: 'ENABLED' })));
     return toAuthSession(data);
   },
 

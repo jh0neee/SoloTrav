@@ -17,21 +17,7 @@ import {
   type KakaoTokens,
 } from './kakaoSdk';
 import type { AuthSession, AuthTokens } from '../types/auth';
-
-/**
- * 카카오 본인 확인은 끝났지만 서버 계정이 탈퇴 예약 상태일 때의 별도 흐름.
- * 토큰은 취소 API에만 사용하며 디스크에는 저장하지 않습니다.
- */
-export class WithdrawalPendingError extends Error {
-  readonly kakaoTokens: KakaoTokens;
-
-  constructor(kakaoTokens: KakaoTokens) {
-    super('탈퇴 예약된 계정입니다.');
-    this.name = 'WithdrawalPendingError';
-    this.kakaoTokens = kakaoTokens;
-    Object.setPrototypeOf(this, WithdrawalPendingError.prototype);
-  }
-}
+import { WithdrawalPendingError } from './withdrawalPendingError';
 
 function isWithdrawalPending(error: ReturnType<typeof toApiError>): boolean {
   return (

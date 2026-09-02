@@ -39,7 +39,7 @@ export const ENDPOINTS = {
   /** Kakao Native 앱 설정 조회 */
   kakaoNativeConfig: () => `/auth/kakao/native/config`,
   /** Kakao 웹 OAuth 인가 URL 조회 */
-  kakaoAuthUrl: (params?: { redirectUri?: string; state?: string }) =>
+  kakaoAuthUrl: (params?: { redirectUri?: string; state?: string; dev? : string }) =>
     withQuery(`/auth/kakao/auth-url`, params),
   /** Kakao 웹 OAuth callback 로그인 */
   kakaoCallback: (params: { code: string; state?: string }) =>

@@ -24,7 +24,13 @@ import { useTravelQuery } from '../../travel/useTravelQuery';
 import type { TourSpot } from '../../types/travel';
 
 type Props = {
-  /** 목록에서 넘어온 요약 정보 — 상세를 기다리는 동안 먼저 보여줍니다 */
+  /**
+   * 목록에서 넘어온 요약 정보 — 상세를 기다리는 동안 먼저 보여줍니다.
+   *
+   * 웹에서 이 화면 주소(/spot/:타입/:콘텐츠ID)를 새 탭에 바로 붙여 넣으면
+   * 거쳐 온 목록이 없어서 제목·사진이 비어 있는 껍데기가 넘어옵니다.
+   * 그래서 아래에서 상세 응답이 오는 대로 그쪽 값을 우선해 씁니다.
+   */
   spot: TourSpot;
   onBack: () => void;
 };
@@ -38,13 +44,19 @@ function SpotDetailScreen({ spot, onBack }: Props) {
   );
   const detail = useTravelQuery(`spot:${spot.contentId}`, loader);
 
+  /**
+   * 화면에 그릴 값. 상세가 도착하면 상세를, 아직이면 목록 요약을 씁니다.
+   * (상세가 목록보다 항상 더 정확하고 채워져 있습니다)
+   */
+  const view = detail.data ?? spot;
+
   const openUrl = useCallback((url: string) => {
     Linking.openURL(url).catch(() => {
       // 열 수 있는 앱이 없을 때 앱이 죽지 않도록 삼킵니다.
     });
   }, []);
 
-  const heroUri = detail.data?.imageUrl ?? spot.imageUrl;
+  const heroUri = view.imageUrl;
 
   return (
     <View style={styles.container}>
@@ -62,7 +74,7 @@ function SpotDetailScreen({ spot, onBack }: Props) {
           ) : (
             <View style={[styles.heroImage, styles.heroPlaceholder]}>
               <Text style={styles.heroPlaceholderText}>
-                {spot.title.slice(0, 1)}
+                {view.title.slice(0, 1)}
               </Text>
             </View>
           )}
@@ -70,23 +82,23 @@ function SpotDetailScreen({ spot, onBack }: Props) {
 
         <View style={styles.body}>
           <View style={styles.typeBadge}>
-            <Text style={styles.typeBadgeText}>{spot.typeLabel}</Text>
+            <Text style={styles.typeBadgeText}>{view.typeLabel}</Text>
           </View>
-          <Text style={styles.title}>{spot.title}</Text>
+          <Text style={styles.title}>{view.title}</Text>
 
-          {spot.address ? (
+          {view.address ? (
             <View style={styles.addressRow}>
               <PinIcon color={colors.goldDeep} size={16} />
-              <Text style={styles.address}>{spot.address}</Text>
+              <Text style={styles.address}>{view.address}</Text>
             </View>
           ) : null}
 
           {/* 전화 · 홈페이지 */}
           <View style={styles.actionRow}>
-            {spot.tel ? (
+            {view.tel ? (
               <Pressable
                 style={styles.actionBtn}
-                onPress={() => openUrl(`tel:${spot.tel}`)}>
+                onPress={() => openUrl(`tel:${view.tel}`)}>
                 <Text style={styles.actionText}>전화하기</Text>
               </Pressable>
             ) : null}
