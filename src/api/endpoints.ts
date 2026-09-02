@@ -118,12 +118,9 @@ export const ENDPOINTS = {
     withQuery(`/foods/chungbuk`, params),
 
   // 관광정보 (한국관광공사 TourAPI 프록시)
-  /**
-   * 위치기반 관광정보 조회: /locationBasedList2
-   * 좌표(mapX/mapY)와 반경(radius, m)으로 주변 콘텐츠를 가져옵니다.
-   */
-  tourLocationBased: (params: Record<string, QueryValue>) =>
-    withQuery(`/travel/information/location-based-list`, params),
+  /** 지역 전체 관광정보 조회 — 정확한 사용자·지도 좌표는 보내지 않습니다. */
+  tourRegionBased: (params: Record<string, QueryValue>) =>
+    withQuery(`/travel/information/region-based-list`, params),
 
   // 관광사진갤러리
   /**
@@ -154,9 +151,9 @@ export const ENDPOINTS = {
   /** 지역기반 관광정보 조회 */
   tourAreaBasedList: (params?: TourInfoQuery) =>
     withQuery(`/travel/information/area-based-list`, params),
-  /** 위치기반 관광정보 조회 (좌표 + 반경) */
-  tourLocationBasedList: (params?: TourInfoQuery) =>
-    withQuery(`/travel/information/location-based-list`, params),
+  /** 지역명 기반 관광정보 조회 */
+  tourRegionBasedList: (params?: TourInfoQuery) =>
+    withQuery(`/travel/information/region-based-list`, params),
   /** 행사 정보 조회 */
   tourSearchFestival: (params?: TourInfoQuery) =>
     withQuery(`/travel/information/search-festival`, params),

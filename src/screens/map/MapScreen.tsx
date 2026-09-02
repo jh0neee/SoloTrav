@@ -42,7 +42,7 @@ import PoiCard from './PoiCard';
 import SosScreen from '../sos/SosScreen';
 import { useCurrentLocation } from '../../location/useCurrentLocation';
 import {
-  roughDistance,
+  hasViewportChanged,
   useNearbyPlaces,
   type Coords,
 } from '../../map/useNearbyPlaces';
@@ -63,6 +63,11 @@ import { type SafetyPlaceType } from '../../api/safetyPlaceApi';
 import { useSafetyPlaces, type MapBounds } from '../../map/useSafetyPlaces';
 import type { SafetyMapMarker } from './kakaoMapHtml';
 import SafetyFilterSheet, { SAFETY_FILTERS } from './SafetyFilterSheet';
+import MapDetailFilterSheet from './MapDetailFilterSheet';
+import type { TabScreenProps } from '../../navigation/tabs';
+
+/** 지도에서 제공하는 관광정보의 고정 서비스 범위 */
+const MAP_REGION_NAME = '충청북도';
 
 type IconComponent = React.ComponentType<{ color: string; size?: number }>;
 
@@ -94,13 +99,7 @@ const CATEGORY_ICON: Record<TourCategory, IconComponent> = {
   shopping: ShoppingIcon,
 };
 
-/**
- * 지도를 이 거리(m) 이상 끌고 가면 "이 지역에서 재검색" 을 띄웁니다.
- * 기본 검색 반경(5km)의 절반 — 반경이 겹치는 동안은 굳이 다시 부르지 않습니다.
- */
-const RESEARCH_THRESHOLD_M = 2500;
-
-function MapScreen() {
+function MapScreen({ onBack }: TabScreenProps) {
   const insets = useSafeAreaInsets();
   const mapRef = useRef<KakaoMapHandle>(null);
 
@@ -120,6 +119,7 @@ function MapScreen() {
     [],
   );
   const [safetyFilterOpen, setSafetyFilterOpen] = useState(false);
+  const [detailFilterOpen, setDetailFilterOpen] = useState(false);
   const [selectedSafetyId, setSelectedSafetyId] = useState<string | null>(null);
 
   /**
@@ -130,7 +130,8 @@ function MapScreen() {
   /** 지도가 지금 보고 있는 중심 (idle 마다 갱신) */
   const [mapCenter, setMapCenter] = useState<Coords>(myLocation);
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
-
+  /** 마지막으로 조회를 확정한 화면 영역. 지도 이동 중에는 바꾸지 않습니다. */
+  const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
   const safety = useSafetyPlaces(
     queryCenter,
     safetyTypes,
@@ -161,6 +162,7 @@ function MapScreen() {
     if (locationStatus !== 'granted') return;
     setQueryCenter(myLocation);
     setMapCenter(myLocation);
+    setQueryBounds(null);
   }, [locationStatus, myLocation]);
 
   /** 축제 레이어의 기간 필터 (축제 칩을 골랐을 때만 보입니다) */
@@ -170,21 +172,33 @@ function MapScreen() {
   /*
    * 축제는 다른 API 를 씁니다.
    * 관광정보 조회(locationBasedList)로는 contentTypeId=15 결과가 거의 0건이고,
-   * 축제 API 는 지역으로 좁힐 수 없어 전국을 받아 거리로 거릅니다.
+   * 행사 전용 API에 충북 코드를 보내고 현재 지도 화면으로 한 번 더 거릅니다.
    */
   const {
     places: tourPlaces,
     loading: tourLoading,
     error: tourError,
     retry: retryTour,
-  } = useNearbyPlaces(queryCenter, category, !isFestival);
+  } = useNearbyPlaces(
+    queryCenter,
+    MAP_REGION_NAME,
+    category,
+    !isFestival,
+    undefined,
+    queryBounds,
+  );
 
   const {
     places: festivalPlaces,
     loading: festivalLoading,
     error: festivalError,
     retry: retryFestivals,
-  } = useNearbyFestivals(queryCenter, festivalRange);
+  } = useNearbyFestivals(
+    queryCenter,
+    festivalRange,
+    undefined,
+    queryBounds,
+  );
 
   const places = isFestival ? festivalPlaces : tourPlaces;
   const placesLoading = isFestival ? festivalLoading : tourLoading;
@@ -193,8 +207,7 @@ function MapScreen() {
 
   /**
    * 상단 안전 배지 — 가장 가까운 마커의 주소에서 지역을 읽습니다.
-   * 축제 레이어는 반경이 50km 라 가장 가까운 축제가 옆 시군구일 수 있는데,
-   * 목록이 거리순이라 어차피 "지금 보고 있는 곳에서 가장 가까운 지역"이 나옵니다.
+   * 목록이 거리순이라 "지금 보고 있는 곳에서 가장 가까운 지역"이 나옵니다.
    */
   const safetyBadge = useRegionSafety(places);
 
@@ -212,9 +225,8 @@ function MapScreen() {
     [places, selectedId],
   );
 
-  /** 지도를 충분히 멀리 옮겼을 때만 재검색 버튼을 띄웁니다. */
-  const canResearch =
-    roughDistance(mapCenter, queryCenter) > RESEARCH_THRESHOLD_M;
+  /** 이동뿐 아니라 확대·축소로 마지막 조회 화면과 달라져도 재검색할 수 있습니다. */
+  const canResearch = hasViewportChanged(mapBounds, queryBounds);
 
   /**
    * 상단 UI 아래에서 시작하는 요소들(우측 버튼·재검색)의 y 좌표.
@@ -266,21 +278,28 @@ function MapScreen() {
     (next: TourCategory) => {
       setCategory(next);
       setQueryCenter(mapCenter);
+      setQueryBounds(mapBounds);
       setSelectedId(null); // 현재 보고 있는 지역을 기준으로 새 카테고리를 조회합니다.
+      setDetailFilterOpen(false);
     },
-    [mapCenter],
+    [mapCenter, mapBounds],
   );
 
   /** 지금 보고 있는 지역으로 마커를 다시 조회합니다. */
   const handleResearch = useCallback(() => {
     setSelectedId(null);
     setQueryCenter(mapCenter);
-  }, [mapCenter]);
+    setQueryBounds(mapBounds);
+  }, [mapCenter, mapBounds]);
 
   const handleViewportChanged = useCallback(
     (center: Coords, bounds?: MapBounds) => {
       setMapCenter(center);
-      if (bounds) setMapBounds(bounds);
+      if (bounds) {
+        setMapBounds(bounds);
+        // 최초 지도 로드나 현위치 이동 직후에는 현재 화면을 최초 조회 영역으로 씁니다.
+        setQueryBounds(current => current ?? bounds);
+      }
     },
     [],
   );
@@ -320,9 +339,10 @@ function MapScreen() {
   const applySafetyFilter = useCallback(() => {
     setSafetyTypes(draftSafetyTypes);
     setQueryCenter(mapCenter);
+    setQueryBounds(mapBounds);
     setSelectedSafetyId(null);
     setSafetyFilterOpen(false);
-  }, [draftSafetyTypes, mapCenter]);
+  }, [draftSafetyTypes, mapCenter, mapBounds]);
 
   const handleSafetyMarkerPress = useCallback((id: string) => {
     setSelectedId(null);
@@ -335,9 +355,18 @@ function MapScreen() {
   /* ── 검색 ── */
 
   const runSearch = useCallback(
-    (query: string) =>
-      mapRef.current?.search(query) ??
-      Promise.resolve({ items: [], status: 'ERROR' as const }),
+    async (query: string) => {
+      const result =
+        (await mapRef.current?.search(query)) ??
+        ({ items: [], status: 'ERROR' as const });
+      return {
+        ...result,
+        items: result.items.filter(item => {
+          const address = item.roadAddress || item.address;
+          return /^(충청북도|충북)(\s|$)/.test(address.trim());
+        }),
+      };
+    },
     [],
   );
 
@@ -369,7 +398,7 @@ function MapScreen() {
 
   /**
    * 관광정보 검색 결과를 고르면 그 좌표를 새 조회 기준점으로 삼습니다.
-   * (전국 어디든 검색될 수 있어서, 지도만 옮기면 마커가 하나도 없는 화면이 됩니다.)
+   * (충북 어디든 검색될 수 있어서, 지도만 옮기면 마커가 하나도 없는 화면이 됩니다.)
    */
   const handleSelectPlace = useCallback((place: TourPlace) => {
     const center = { lat: place.lat, lng: place.lng };
@@ -380,6 +409,7 @@ function MapScreen() {
     mapRef.current?.clearSearchMarkers();
     setCategory(place.category); // 다른 필터에 가려 마커가 안 보이는 일을 막습니다
     setQueryCenter(center);
+    setQueryBounds(null);
     setMapCenter(center);
     setSelectedId(place.id);
     mapRef.current?.moveTo(place.lat, place.lng);
@@ -437,6 +467,7 @@ function MapScreen() {
         <View style={styles.searchRow}>
           <Pressable
             style={styles.circleButton}
+            onPress={onBack}
             accessibilityRole="button"
             accessibilityLabel="뒤로"
           >
@@ -556,6 +587,13 @@ function MapScreen() {
       >
         <Pressable
           style={styles.floatButton}
+          onPress={() => {
+            setSelectedId(null);
+            setSelectedPoiId(null);
+            setSelectedSafetyId(null);
+            setSafetyFilterOpen(false);
+            setDetailFilterOpen(true);
+          }}
           accessibilityRole="button"
           accessibilityLabel="상세 필터"
         >
@@ -661,6 +699,24 @@ function MapScreen() {
         </Pressable>
       )}
 
+      {!placesLoading &&
+        !placesError &&
+        !places.length &&
+        !canResearch &&
+        !!queryBounds &&
+        !locationNotice &&
+        !selectedPoi &&
+        !selectedSafetyPlace && (
+          <View style={[styles.emptyNotice, { top: topLayerBottom }]}>
+            <Text style={styles.emptyNoticeTitle}>
+              현재 화면에 {TOUR_CATEGORY_LABEL[category]} 정보가 없어요
+            </Text>
+            <Text style={styles.emptyNoticeText}>
+              지도를 조금 축소하거나 다른 지역으로 이동해 보세요
+            </Text>
+          </View>
+        )}
+
       {/* 검색 결과가 있는데 아무것도 안 골랐을 때의 요약 배너 */}
       {searchResults.length > 0 && !selectedPoi && !selectedPlace && (
         <View
@@ -736,6 +792,13 @@ function MapScreen() {
         onClear={() => setDraftSafetyTypes([])}
         onApply={applySafetyFilter}
         onClose={() => setSafetyFilterOpen(false)}
+      />
+
+      <MapDetailFilterSheet
+        visible={detailFilterOpen}
+        selected={category}
+        onSelect={handleCategory}
+        onClose={() => setDetailFilterOpen(false)}
       />
 
       <SosScreen visible={sosOpen} onClose={() => setSosOpen(false)} />
@@ -1141,6 +1204,35 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  emptyNotice: {
+    position: 'absolute',
+    alignSelf: 'center',
+    maxWidth: '82%',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  emptyNoticeTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  emptyNoticeText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });
 

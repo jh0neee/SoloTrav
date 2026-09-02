@@ -3,12 +3,15 @@
  * 인증 로직은 전부 useAuth() 뒤에 있고, 이 화면은 표시와 입력만 담당합니다.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import KakaoLoginButton from '../../components/KakaoLoginButton';
 import { Mascot } from '../../components/icons/TabIcons';
 import { useAuth } from '../../auth/AuthContext';
 import { colors } from '../../theme/colors';
+
+const PRIVACY_POLICY_URL =
+  'https://narrow-currant-57e.notion.site/3ce4e03f580580c08babf260951894b6';
 
 function LoginScreen() {
   const { loginWithKakao, isSigningIn, error } = useAuth();
@@ -35,7 +38,16 @@ function LoginScreen() {
         <KakaoLoginButton onPress={loginWithKakao} loading={isSigningIn} />
 
         <Text style={styles.notice}>
-          로그인하면 서비스 이용약관과 개인정보 처리방침에 동의하게 됩니다.
+          로그인하면 서비스 이용약관과{' '}
+          <Text
+            accessibilityRole="link"
+            accessibilityLabel="개인정보 처리방침 열기"
+            onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+            style={styles.privacyLink}
+          >
+            개인정보 처리방침
+          </Text>
+          에 동의하게 됩니다.
         </Text>
       </View>
     </View>
@@ -88,6 +100,10 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: colors.danger,
     textAlign: 'center',
+  },
+  privacyLink: {
+    color: colors.textPrimary,
+    textDecorationLine: 'underline',
   },
   notice: {
     fontSize: 12,

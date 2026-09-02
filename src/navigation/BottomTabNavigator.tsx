@@ -23,7 +23,7 @@ function BottomTabNavigator() {
       {/* 현재 선택된 화면 — 모든 화면이 상태바 아래까지 그려집니다.
           상단 여백은 각 화면이 useSafeAreaInsets 로 직접 처리합니다. */}
       <View style={styles.screen}>
-        <ActiveScreen />
+        <ActiveScreen onBack={() => setActiveKey('home')} />
       </View>
 
       {/* 하단 탭바 */}
