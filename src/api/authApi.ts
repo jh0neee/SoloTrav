@@ -51,6 +51,18 @@ export const authApi = {
     return toAuthSession(data);
   },
 
+  /** POST /auth/withdrawal/cancel — 카카오 재인증 후 탈퇴 예약 취소 */
+  cancelWithdrawal: async (
+    kakaoTokens: KakaoNativeLoginRequest,
+  ): Promise<AuthSession> => {
+    const body: KakaoNativeLoginRequest = {
+      accessToken: kakaoTokens.accessToken,
+      refreshToken: kakaoTokens.refreshToken,
+    };
+    const { data } = await apiClient.post(ENDPOINTS.cancelWithdrawal(), body);
+    return toAuthSession(data);
+  },
+
   /**
    * POST /auth/refresh — 토큰 재발급.
    * 401 자동 재시도와 동일한 single-flight 경로를 씁니다.

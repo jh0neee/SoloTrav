@@ -7,11 +7,12 @@ import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import BottomTabNavigator from './BottomTabNavigator';
 import LoginScreen from '../screens/auth/LoginScreen';
+import WithdrawalPendingScreen from '../screens/auth/WithdrawalPendingScreen';
 import { useAuth } from '../auth/AuthContext';
 import { colors } from '../theme/colors';
 
 function RootNavigator() {
-  const { status } = useAuth();
+  const { status, isWithdrawalPending } = useAuth();
 
   if (status === 'restoring') {
     return (
@@ -19,6 +20,10 @@ function RootNavigator() {
         <ActivityIndicator color={colors.mascotDeep} size="large" />
       </View>
     );
+  }
+
+  if (isWithdrawalPending) {
+    return <WithdrawalPendingScreen />;
   }
 
   return status === 'authenticated' ? <BottomTabNavigator /> : <LoginScreen />;
