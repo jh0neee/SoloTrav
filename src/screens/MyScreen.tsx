@@ -1,7 +1,7 @@
 /**
  * 마이 화면 — 상단 다크 히어로(프로필 + 활동 통계) 아래로
  * 나의 여행 취향 / 관심 코스 / 나의 배지 / 안전 설정을 구성합니다.
- * 안전 설정은 SOS 단축 버튼을 포함한 토글(Switch) 목록입니다.
+ * 안전 설정에서는 휴대폰 긴급 SOS와 긴급 정보 카드를 관리합니다.
  */
 import React, { useEffect, useState } from 'react';
 import {
@@ -14,7 +14,6 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   View,
 } from 'react-native';
@@ -29,33 +28,39 @@ import {
   type PreferenceState,
 } from '../preferences/preferenceStore';
 import { badgeStore, countEarned, useBadges } from '../badges/badgeStore';
+import { recordStore, useRecords } from '../records/recordStore';
 import PreferencePromptScreen from './home/PreferencePromptScreen';
 import FavoriteCoursesSection from './favorites/FavoriteCoursesSection';
 import { favoriteStore } from '../favorites/favoriteStore';
-import { highlightPreferences } from '../data/preferences';
-import type { Badge, BadgeIcon } from '../types/badge';
+import {
+  highlightPreferences,
+  toProfilePreferenceAnswers,
+} from '../data/preferences';
+import type {
+  Badge,
+  BadgeCategory,
+  BadgeIcon,
+  BadgeImageKey,
+} from '../types/badge';
 import type { BadgeState } from '../badges/badgeStore';
+import { BADGE_IMAGES } from '../assets/badges';
+import { Grayscale } from 'react-native-color-matrix-image-filters';
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../config/legal';
+import { SAFETY_SETTINGS, type SafetyIcon } from '../data/profile';
 import {
-  PRIVACY_POLICY_URL,
-  TERMS_OF_SERVICE_URL,
-} from '../config/legal';
-import {
-  EMERGENCY_CONTACT,
-  PROFILE,
-  PROFILE_STATS,
-  SAFETY_SETTINGS,
-  type SafetyIcon,
-} from '../data/profile';
-import {
-  BellIcon,
   Chevron,
   HeartIcon,
-  LockIcon,
+  IdCardIcon,
+  MedalIcon,
   PinIcon,
   ShieldIcon,
   SirenIcon,
   SparkIcon,
 } from '../components/icons/UiIcons';
+import SafetyDetailScreen, {
+  type SafetyDetailKey,
+} from './safety/SafetyDetailScreen';
+import { TAB_CONTENT_BOTTOM_GAP } from '../navigation/layout';
 
 type IconComponent = React.ComponentType<{ color: string; size?: number }>;
 
@@ -68,9 +73,7 @@ const BADGE_ICONS: Record<BadgeIcon, IconComponent> = {
 
 const SAFETY_ICONS: Record<SafetyIcon, IconComponent> = {
   siren: SirenIcon,
-  pin: PinIcon,
-  bell: BellIcon,
-  shield: ShieldIcon,
+  idCard: IdCardIcon,
 };
 
 function MyScreen() {
@@ -79,7 +82,11 @@ function MyScreen() {
   const profile = useMyProfile();
   const preferences = usePreferences();
   const badges = useBadges();
-  const earnedBadgeCount = countEarned(badges.badges);
+  const records = useRecords('mine');
+  const visibleBadges = badges.badges.filter(
+    badge => badge.category !== 'streak',
+  );
+  const earnedBadgeCount = countEarned(visibleBadges);
   const [refreshing, setRefreshing] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
@@ -89,7 +96,7 @@ function MyScreen() {
     userStore.refresh();
   }, []);
 
-  /** 당겨서 새로고침 — 마이페이지가 보여주는 세 가지를 한 번에 다시 받습니다. */
+  /** 당겨서 새로고침 — 마이페이지에 쓰는 서버 데이터를 한 번에 다시 받습니다. */
   const refreshAll = async () => {
     setRefreshing(true);
     await Promise.all([
@@ -97,6 +104,7 @@ function MyScreen() {
       preferenceStore.reload(),
       badgeStore.reload(),
       favoriteStore.reload(),
+      recordStore.reload('mine'),
     ]);
     setRefreshing(false);
   };
@@ -104,15 +112,12 @@ function MyScreen() {
   // (탭 안이라 홈 스택처럼 push 할 곳이 없습니다)
   const [editingPreference, setEditingPreference] = useState(false);
   const [viewingSavedCourses, setViewingSavedCourses] = useState(false);
-  const [safety, setSafety] = useState<Record<string, boolean>>(() =>
-    SAFETY_SETTINGS.reduce<Record<string, boolean>>((acc, setting) => {
-      acc[setting.key] = setting.defaultOn;
-      return acc;
-    }, {}),
+  const [badgeView, setBadgeView] = useState<'main' | 'list' | 'detail'>(
+    'main',
   );
-
-  const toggleSafety = (key: string) =>
-    setSafety(prev => ({ ...prev, [key]: !prev[key] }));
+  const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
+  const [badgeListScrollOffset, setBadgeListScrollOffset] = useState(0);
+  const [safetyDetail, setSafetyDetail] = useState<SafetyDetailKey | null>(null);
 
   // 편집 중 안드로이드 뒤로가기는 앱을 닫지 않고 편집만 닫습니다.
   useEffect(() => {
@@ -136,6 +141,19 @@ function MyScreen() {
     });
     return () => sub.remove();
   }, [viewingSavedCourses]);
+
+  useEffect(() => {
+    if (badgeView === 'main') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (badgeView === 'detail') {
+        setBadgeView('list');
+      } else {
+        setBadgeView('main');
+      }
+      return true;
+    });
+    return () => sub.remove();
+  }, [badgeView]);
 
   const confirmLogout = () =>
     Alert.alert('로그아웃', '로그아웃 하시겠어요?', [
@@ -165,10 +183,7 @@ function MyScreen() {
               await withdraw();
             } catch (error) {
               setIsWithdrawing(false);
-              Alert.alert(
-                '탈퇴하지 못했어요',
-                toApiError(error).message,
-              );
+              Alert.alert('탈퇴하지 못했어요', toApiError(error).message);
             }
           },
         },
@@ -193,13 +208,14 @@ function MyScreen() {
   if (editingPreference) {
     return (
       <PreferencePromptScreen
+        mode="profile"
         initialAnswers={preferences.answers}
         isSaving={preferences.isSaving}
         saveError={preferences.error}
         onBack={() => setEditingPreference(false)}
         onComplete={async answers => {
           try {
-            await preferenceStore.save(answers);
+            await preferenceStore.save(toProfilePreferenceAnswers(answers));
             setEditingPreference(false);
           } catch {
             // 실패 메시지는 위저드 하단에 뜹니다. 답변이 날아가지 않게 열어둡니다.
@@ -211,8 +227,40 @@ function MyScreen() {
 
   if (viewingSavedCourses) {
     return (
-      <SavedCoursesListScreen
-        onBack={() => setViewingSavedCourses(false)}
+      <SavedCoursesListScreen onBack={() => setViewingSavedCourses(false)} />
+    );
+  }
+
+  if (badgeView === 'detail' && selectedBadge) {
+    return (
+      <BadgeDetailScreen
+        badge={selectedBadge}
+        onBack={() => setBadgeView('list')}
+      />
+    );
+  }
+
+  if (badgeView === 'list') {
+    return (
+      <BadgesListScreen
+        state={badges}
+        initialScrollOffset={badgeListScrollOffset}
+        onScrollOffset={setBadgeListScrollOffset}
+        onBack={() => setBadgeView('main')}
+        onSelect={badge => {
+          setSelectedBadge(badge);
+          setBadgeView('detail');
+        }}
+      />
+    );
+  }
+
+  if (safetyDetail) {
+    return (
+      <SafetyDetailScreen
+        type={safetyDetail}
+        userId={profile.user?.id ?? 'guest'}
+        onBack={() => setSafetyDetail(null)}
       />
     );
   }
@@ -230,7 +278,7 @@ function MyScreen() {
         />
       }
     >
-      {/* ── 다크 히어로: 프로필 + 활동 통계 ── */}
+      {/* ── 프로필 ── */}
       <View style={[styles.hero, { paddingTop: insets.top + 18 }]}>
         <View style={styles.heroTop}>
           <View style={styles.avatar}>
@@ -248,29 +296,16 @@ function MyScreen() {
           <View style={styles.heroTexts}>
             <Text style={styles.heroName} numberOfLines={1}>
               {profile.displayName}
-              <Text style={styles.heroTitle}> · {PROFILE.title}</Text>
             </Text>
-            <Text style={styles.heroMeta}>
-              혼행 {PROFILE.tripCount}회 · 후기 {PROFILE.reviewCount}개 · 배지{' '}
-              {earnedBadgeCount}개
+            <Text style={styles.heroMeta} numberOfLines={1}>
+              {profile.email ?? '카카오 계정 연결됨'}
             </Text>
+            {records.mine.status === 'ready' ? (
+              <Text style={styles.heroActivity}>
+                내가 쓴 후기 {records.mine.records.length}개
+              </Text>
+            ) : null}
           </View>
-          <Pressable
-            style={styles.bellBtn}
-            accessibilityRole="button"
-            accessibilityLabel="알림"
-          >
-            <BellIcon color={colors.textPrimary} size={20} />
-          </Pressable>
-        </View>
-
-        <View style={styles.statRow}>
-          {PROFILE_STATS.map(stat => (
-            <View key={stat.key} style={styles.statCard}>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-              <Text style={styles.statValue}>{stat.value}</Text>
-            </View>
-          ))}
         </View>
       </View>
 
@@ -297,77 +332,48 @@ function MyScreen() {
       </Section>
 
       {/* ── 나의 배지 ── */}
-      <Section
-        title="나의 배지"
-        hint={
-          badges.status === 'ready' && badges.badges.length > 0
-            ? `${earnedBadgeCount}/${badges.badges.length}`
-            : undefined
-        }
-        actionLabel={badges.badges.length > 0 ? '전체' : undefined}
-      >
-        <BadgeSection
-          state={badges}
-          onRetry={() => badgeStore.reload()}
+      <Section title="나의 혼행 배지">
+        <BadgeSummaryBar
+          earnedCount={earnedBadgeCount}
+          totalCount={visibleBadges.length}
+          isLoading={badges.status === 'idle' || badges.status === 'loading'}
+          onPress={() => {
+            setSelectedBadge(null);
+            setBadgeView('list');
+          }}
         />
       </Section>
 
-      {/* ── 안전 설정 (토글) ── */}
-      <Section title="안전 설정" hint="혼행 필수">
+      {/* ── 안전 설정 ── */}
+      <Section title="안전 설정">
         <View style={styles.card}>
           {SAFETY_SETTINGS.map((setting, index) => {
             const Icon = SAFETY_ICONS[setting.icon];
-            const isSos = setting.key === 'sos';
-            const on = safety[setting.key];
             return (
               <View key={setting.key}>
                 {index > 0 ? <View style={styles.divider} /> : null}
-                <View style={styles.safetyRow}>
-                  <View
-                    style={[
-                      styles.safetyIcon,
-                      isSos ? styles.safetyIconSos : null,
-                    ]}
-                  >
-                    <Icon
-                      color={isSos ? colors.danger : colors.goldDeep}
-                      size={18}
-                    />
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.safetyRow,
+                    pressed ? styles.safetyRowPressed : null,
+                  ]}
+                  onPress={() => setSafetyDetail(setting.key)}
+                  accessibilityRole="button"
+                  accessibilityLabel={setting.title}
+                >
+                  <View style={styles.safetyIcon}>
+                    <Icon color={colors.danger} size={18} />
                   </View>
                   <View style={styles.safetyTexts}>
                     <Text style={styles.safetyTitle}>{setting.title}</Text>
                     <Text style={styles.safetySub}>{setting.description}</Text>
                   </View>
-                  <Switch
-                    value={on}
-                    onValueChange={() => toggleSafety(setting.key)}
-                    trackColor={{
-                      false: colors.track,
-                      true: isSos ? colors.danger : colors.ink,
-                    }}
-                    thumbColor="#ffffff"
-                    accessibilityLabel={setting.title}
+                  <Chevron
+                    direction="right"
+                    color={colors.textTertiary}
+                    size={18}
                   />
-                </View>
-
-                {/* SOS 가 켜져 있을 때만 발송 대상 노출 */}
-                {isSos && on ? (
-                  <Pressable
-                    style={styles.contactRow}
-                    accessibilityRole="button"
-                    accessibilityLabel="긴급 연락처 변경"
-                  >
-                    <Text style={styles.contactLabel}>긴급 연락처</Text>
-                    <Text style={styles.contactValue}>
-                      {EMERGENCY_CONTACT.name} · {EMERGENCY_CONTACT.phone}
-                    </Text>
-                    <Chevron
-                      direction="right"
-                      color={colors.textSecondary}
-                      size={16}
-                    />
-                  </Pressable>
-                ) : null}
+                </Pressable>
               </View>
             );
           })}
@@ -393,7 +399,7 @@ function MyScreen() {
 
       {/* ── 계정 ── */}
       {/* 서버가 이메일을 안 주는 계정이 있어(카카오 동의 항목 미수집) 없으면 연결 상태만 알립니다. */}
-      <Section title="계정" hint={profile.email ?? '카카오 계정 연결됨'}>
+      <Section title="계정">
         <Pressable
           style={styles.logoutBtn}
           onPress={confirmLogout}
@@ -411,6 +417,7 @@ function MyScreen() {
           ]}
           onPress={confirmWithdrawal}
           disabled={isWithdrawing}
+          hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="회원탈퇴"
           accessibilityState={{ disabled: isWithdrawing }}
@@ -444,11 +451,7 @@ function PolicyRow({ label, onPress }: { label: string; onPress: () => void }) {
 }
 
 /** 섹션 헤더 + 본문 */
-function SavedCoursesListScreen({
-  onBack,
-}: {
-  onBack: () => void;
-}) {
+function SavedCoursesListScreen({ onBack }: { onBack: () => void }) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -457,12 +460,14 @@ function SavedCoursesListScreen({
         style={[
           styles.fullListHeader,
           { height: 60 + insets.top, paddingTop: insets.top },
-        ]}>
+        ]}
+      >
         <Pressable
           onPress={onBack}
           style={styles.fullListBackButton}
           accessibilityRole="button"
-          accessibilityLabel="뒤로 가기">
+          accessibilityLabel="뒤로 가기"
+        >
           <Chevron direction="left" color={colors.textPrimary} size={22} />
         </Pressable>
         <Text style={styles.fullListTitle}>관심 코스</Text>
@@ -471,8 +476,248 @@ function SavedCoursesListScreen({
 
       <ScrollView
         contentContainerStyle={styles.fullListContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         <FavoriteCoursesSection />
+      </ScrollView>
+    </View>
+  );
+}
+
+const BADGE_LIST_SECTIONS: {
+  key: string;
+  label: string;
+  categories: BadgeCategory[];
+}[] = [
+  { key: 'action', label: '액션', categories: ['exploration'] },
+  { key: 'region', label: '지역', categories: ['region'] },
+  {
+    key: 'safety-record',
+    label: '안전·기록',
+    categories: ['safety', 'record'],
+  },
+];
+
+const BADGE_PROGRESS_META: Partial<
+  Record<BadgeImageKey, { label: string; unit: string }>
+> = {
+  '00': { label: '혼행 시작', unit: '단계' },
+  '02': { label: 'AI 코스 생성', unit: '회' },
+  '03': { label: '여행 취향 등록', unit: '회' },
+  '04': { label: '장소 방문 인증', unit: '곳' },
+  '05': { label: '축제 방문 인증', unit: '곳' },
+  '06': { label: '음식점 방문 인증', unit: '곳' },
+  '07': { label: '안전 후기 작성', unit: '개' },
+  '08': { label: '안전 후기 작성', unit: '개' },
+  '09': { label: '여행 기록 작성', unit: '개' },
+  '10': { label: '계절별 여행 기록', unit: '계절' },
+  'cb_1': { label: '청주시 방문 인증', unit: '회' },
+  'cb_2': { label: '충주시 방문 인증', unit: '회' },
+  'cb_3': { label: '제천시 방문 인증', unit: '회' },
+  'cb_4': { label: '보은군 방문 인증', unit: '회' },
+  'cb_5': { label: '옥천군 방문 인증', unit: '회' },
+  'cb_6': { label: '영동군 방문 인증', unit: '회' },
+  'cb_7': { label: '증평군 방문 인증', unit: '회' },
+  'cb_8': { label: '진천군 방문 인증', unit: '회' },
+  'cb_9': { label: '괴산군 방문 인증', unit: '회' },
+  'cb_10': { label: '음성군 방문 인증', unit: '회' },
+  'cb_11': { label: '단양군 방문 인증', unit: '회' },
+};
+
+export function BadgesListScreen({
+  state,
+  onBack,
+  onSelect,
+  initialScrollOffset = 0,
+  onScrollOffset,
+}: {
+  state: BadgeState;
+  onBack: () => void;
+  onSelect: (badge: Badge) => void;
+  initialScrollOffset?: number;
+  onScrollOffset?: (offset: number) => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const sections = BADGE_LIST_SECTIONS.map(section => ({
+    ...section,
+    badges: state.badges.filter(badge =>
+      section.categories.includes(badge.category),
+    ),
+  })).filter(section => section.badges.length > 0);
+
+  return (
+    <View style={styles.fullListScreen}>
+      <View
+        style={[
+          styles.fullListHeader,
+          { height: 60 + insets.top, paddingTop: insets.top },
+        ]}
+      >
+        <Pressable
+          onPress={onBack}
+          style={styles.fullListBackButton}
+          accessibilityRole="button"
+          accessibilityLabel="뒤로 가기"
+        >
+          <Chevron direction="left" color={colors.textPrimary} size={22} />
+        </Pressable>
+        <Text style={styles.fullListTitle}>나의 혼행 배지</Text>
+        <View style={styles.fullListBackButton} />
+      </View>
+      <ScrollView
+        contentContainerStyle={styles.badgeListContent}
+        showsVerticalScrollIndicator={false}
+        contentOffset={{ x: 0, y: initialScrollOffset }}
+        onScroll={event =>
+          onScrollOffset?.(event.nativeEvent.contentOffset.y)
+        }
+        scrollEventThrottle={16}
+      >
+        {sections.length ? (
+          sections.map(section => (
+            <View key={section.key} style={styles.badgeListSection}>
+              <Text style={styles.badgeListSectionTitle}>
+                {section.label}
+              </Text>
+              <View style={styles.badgeListGrid}>
+                {section.badges.map(badge => (
+                  <BadgeCell
+                    key={badge.id}
+                    badge={badge}
+                    onPress={onSelect}
+                    variant="list"
+                  />
+                ))}
+              </View>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.emptySavedText}>표시할 배지가 아직 없어요.</Text>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+export function BadgeDetailScreen({
+  badge,
+  onBack,
+}: {
+  badge: Badge;
+  onBack: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const Icon = BADGE_ICONS[badge.icon];
+  const image = badge.imageKey ? BADGE_IMAGES[badge.imageKey] : null;
+  const progress = Math.min(badge.progress, badge.target);
+  const isInProgress = !badge.earned && progress > 0;
+  const progressMeta =
+    (badge.imageKey ? BADGE_PROGRESS_META[badge.imageKey] : undefined) ??
+    ({ label: badge.description, unit: '회' } as const);
+
+  return (
+    <View style={styles.fullListScreen}>
+      <View
+        style={[
+          styles.fullListHeader,
+          { height: 60 + insets.top, paddingTop: insets.top },
+        ]}
+      >
+        <Pressable
+          onPress={onBack}
+          style={styles.fullListBackButton}
+          accessibilityRole="button"
+          accessibilityLabel="배지 목록으로 돌아가기"
+        >
+          <Chevron direction="left" color={colors.textPrimary} size={22} />
+        </Pressable>
+        <Text style={styles.fullListTitle}>배지 상세</Text>
+        <View style={styles.fullListBackButton} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.badgeDetailContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.badgeDetailVisual}>
+          {image ? (
+            badge.earned ? (
+              <Image
+                source={image}
+                resizeMode="contain"
+                style={styles.badgeDetailImage}
+              />
+            ) : (
+              <Grayscale amount={1} style={styles.badgeDetailImageOff}>
+                <Image
+                  source={image}
+                  resizeMode="contain"
+                  style={styles.badgeDetailImage}
+                />
+              </Grayscale>
+            )
+          ) : (
+            <View
+              style={[
+                styles.badgeDetailFallback,
+                badge.earned
+                  ? styles.badgeCircleOn
+                  : styles.badgeCircleOff,
+              ]}
+            >
+              <Icon
+                color={badge.earned ? colors.goldDeep : colors.textTertiary}
+                size={72}
+              />
+            </View>
+          )}
+        </View>
+
+        <Text style={styles.badgeDetailTitle}>{badge.name}</Text>
+        <Text style={styles.badgeDetailDescription}>{badge.description}</Text>
+
+        {badge.earned ? (
+          <View style={[styles.badgeDetailResult, styles.badgeDetailResultOn]}>
+            {/* <Text
+              style={[
+                // styles.badgeDetailResultIcon,
+                // styles.badgeDetailResultIconOn,
+              ]}
+            >
+              ✓
+            </Text> */}
+            <Text
+              style={[
+                styles.badgeDetailResultText,
+                styles.badgeDetailResultTextOn,
+              ]}
+            >
+              획득한 배지입니다.
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.badgeDetailProgressCard}>
+            <View style={styles.badgeDetailProgressRow}>
+              <Text style={styles.badgeDetailProgressLabel}>
+                {progressMeta.label}
+              </Text>
+              <Text style={styles.badgeDetailProgressValue}>
+                <Text
+                  style={
+                    isInProgress
+                      ? styles.badgeDetailProgressCurrent
+                      : styles.badgeDetailProgressCurrentOff
+                  }
+                >
+                  {progress}
+                  {progressMeta.unit}
+                </Text>{' '}
+                / {badge.target}
+                {progressMeta.unit}
+              </Text>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -527,10 +772,13 @@ function TravelPreferenceCard({
   onStart: () => void;
   onRetry: () => void;
 }) {
+  const [showAllMoods, setShowAllMoods] = useState(false);
+
   if (state.status === 'loading' || state.status === 'idle') {
     return (
       <View style={[styles.card, styles.prefPlaceholder]}>
         <ActivityIndicator color={colors.goldDeep} />
+        <Text style={styles.prefLoadingText}>여행 취향을 불러오는 중이에요</Text>
       </View>
     );
   }
@@ -572,129 +820,202 @@ function TravelPreferenceCard({
   }
 
   const highlights = highlightPreferences(state.answers);
+  const moodPreviewLimit = 5;
+  const visibleMoods = showAllMoods
+    ? highlights.moods
+    : highlights.moods.slice(0, moodPreviewLimit);
+  const hasHiddenMoods = highlights.moods.length > moodPreviewLimit;
+  const avoidSummary = summarizePreferenceList(highlights.avoid);
+  const transport = highlights.transport.join(' · ');
+  const moveSummary =
+    [transport, highlights.moveLoad].filter(Boolean).join(' / ') || '미설정';
   return (
-    <View style={styles.card}>
-      <PreferenceRow label="여행 기간" value={highlights.duration ?? '미설정'} />
+    <View style={[styles.card, styles.preferenceListCard]}>
       <PreferenceRow label="여행 페이스" value={highlights.pace ?? '미설정'} />
-      <PreferenceRow
-        label="하루 예산"
-        value={
-          highlights.dailyBudget !== null
-            ? `${highlights.dailyBudget}만원`
-            : '미설정'
-        }
-      />
+      <PreferenceRow label="피하고 싶은 곳" value={avoidSummary} />
+      <PreferenceRow label="이동" value={moveSummary} />
+      <PreferenceRow label="계획 스타일" value={highlights.planStyle ?? '미설정'} />
       {highlights.moods.length > 0 ? (
-        <>
-          <View style={styles.divider} />
-          <Text style={styles.prefLabel}>좋아하는 무드</Text>
+        <View style={styles.moodSection}>
+          <View style={styles.moodHeader}>
+            <Text style={styles.prefLabel}>좋아하는 무드</Text>
+            {hasHiddenMoods ? (
+              <Pressable
+                style={styles.moodToggle}
+                onPress={() => setShowAllMoods(current => !current)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showAllMoods }}
+                accessibilityLabel={showAllMoods ? '좋아하는 무드 접기' : '좋아하는 무드 전체 펼쳐보기'}>
+                <Text style={styles.moodToggleText}>
+                  {showAllMoods
+                    ? '접기'
+                    : `전체 펼쳐보기 (${highlights.moods.length})`}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
           <View style={styles.moodWrap}>
-            {highlights.moods.map(mood => (
+            {visibleMoods.map(mood => (
               <View key={mood} style={styles.moodPill}>
                 <Text style={styles.moodText}>{mood}</Text>
               </View>
             ))}
           </View>
-        </>
+        </View>
       ) : null}
     </View>
   );
 }
 
-/** 취향 한 줄 (라벨 - 값) */
-function PreferenceRow({ label, value }: { label: string; value: string }) {
+function summarizePreferenceList(values: string[], limit = 2): string {
+  if (values.length === 0) {
+    return '미설정';
+  }
+  const visible = values.slice(0, limit).join(' · ');
+  return values.length > limit ? `${visible} 외 ${values.length - limit}` : visible;
+}
+
+function PreferenceRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
   return (
     <View style={styles.prefRow}>
       <Text style={styles.prefLabel}>{label}</Text>
-      <Text style={styles.prefValue}>{value}</Text>
+      <Text style={styles.prefValue} numberOfLines={2}>
+        {value}
+      </Text>
     </View>
   );
 }
 
-/** 관심 코스 카드 */
-/**
- * 나의 배지 목록.
- * 조회 중 / 실패 / 아직 배지 없음 / 목록 네 가지 상태를 다룹니다.
- */
-function BadgeSection({
-  state,
-  onRetry,
+/** 마이탭에서는 배지 이미지를 펼치지 않고 획득 개수만 요약합니다. */
+function BadgeSummaryBar({
+  earnedCount,
+  totalCount,
+  isLoading,
+  onPress,
 }: {
-  state: BadgeState;
-  onRetry: () => void;
+  earnedCount: number;
+  totalCount: number;
+  isLoading: boolean;
+  onPress: () => void;
 }) {
-  if (state.status === 'loading' || state.status === 'idle') {
-    return (
-      <View style={[styles.card, styles.prefPlaceholder]}>
-        <ActivityIndicator color={colors.goldDeep} />
-      </View>
-    );
-  }
-
-  if (state.status === 'error') {
-    return (
-      <View style={[styles.card, styles.prefPlaceholder]}>
-        <Text style={styles.prefEmptyText}>
-          {state.error ?? '배지를 불러오지 못했습니다.'}
-        </Text>
-        <Pressable
-          style={styles.prefCta}
-          onPress={onRetry}
-          accessibilityRole="button"
-        >
-          <Text style={styles.prefCtaText}>다시 시도</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  if (state.badges.length === 0) {
-    return (
-      <View style={[styles.card, styles.prefPlaceholder]}>
-        <Text style={styles.prefEmptyText}>
-          아직 받은 배지가 없어요.{'\n'}
-          여행을 기록하면 배지가 하나씩 열려요.
-        </Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.badgeGrid}>
-      {state.badges.map(badge => (
-        <BadgeCell key={badge.id} badge={badge} />
-      ))}
-    </View>
+    <Pressable
+      style={({ pressed }) => [
+        styles.badgeSummaryBar,
+        pressed ? styles.badgeSummaryBarPressed : null,
+      ]}
+      onPress={onPress}
+      disabled={isLoading}
+      accessibilityRole="button"
+      accessibilityLabel={`혼행 배지 ${totalCount}개 중 ${earnedCount}개 획득, 전체 보기`}
+    >
+      <View style={styles.badgeSummaryIcon}>
+        <MedalIcon color={colors.primaryStrong} size={22} />
+      </View>
+      <Text style={styles.badgeSummaryText}>
+        {isLoading ? (
+          '배지를 불러오는 중이에요'
+        ) : (
+          <>
+            {totalCount}개 중{' '}
+            <Text style={styles.badgeSummaryCount}>{earnedCount}개</Text>{' '}
+            모았어요
+          </>
+        )}
+      </Text>
+      <Chevron direction="right" color={colors.textSecondary} size={18} />
+    </Pressable>
   );
 }
 
-/** 배지 한 칸 (미획득은 자물쇠) */
-function BadgeCell({ badge }: { badge: Badge }) {
+/** 배지 한 칸 (미획득은 흑백, 진행 중이면 상태 칩 표시) */
+function BadgeCell({
+  badge,
+  onPress,
+  variant = 'card',
+}: {
+  badge: Badge;
+  onPress: (badge: Badge) => void;
+  variant?: 'card' | 'list';
+}) {
   const Icon = BADGE_ICONS[badge.icon];
+  const image = badge.imageKey ? BADGE_IMAGES[badge.imageKey] : null;
+  const isList = variant === 'list';
+  const isInProgress = !badge.earned && badge.progress > 0;
   return (
-    <View style={styles.badgeCell}>
+    <Pressable
+      style={({ pressed }) => [
+        styles.badgeCell,
+        isList ? styles.badgeListCell : null,
+        pressed ? styles.badgeCellPressed : null,
+      ]}
+      onPress={() => onPress(badge)}
+      accessibilityRole="button"
+      accessibilityLabel={`${badge.name} 배지 상세 보기`}
+    >
       <View
-        style={[
-          styles.badgeCircle,
-          badge.earned ? styles.badgeCircleOn : styles.badgeCircleOff,
-        ]}
+        style={[styles.badgeVisual, isList ? styles.badgeListVisual : null]}
       >
-        {badge.earned ? (
-          <Icon color={colors.goldDeep} size={22} />
+        {image ? (
+          badge.earned ? (
+            <Image
+              source={image}
+              resizeMode="contain"
+              style={[styles.badgeImage, isList ? styles.badgeListImage : null]}
+            />
+          ) : (
+            <Grayscale
+              amount={1}
+              style={[
+                styles.badgeImageOff,
+                isList ? styles.badgeListImageOff : null,
+              ]}
+            >
+              <Image
+                source={image}
+                resizeMode="contain"
+                style={[
+                  styles.badgeImage,
+                  isList ? styles.badgeListImage : null,
+                ]}
+              />
+            </Grayscale>
+          )
         ) : (
-          <LockIcon color={colors.textSecondary} size={18} />
+          <View
+            style={[
+              styles.badgeCircle,
+              badge.earned ? styles.badgeCircleOn : styles.badgeCircleOff,
+            ]}
+          >
+            {badge.earned ? <Icon color={colors.goldDeep} size={28} /> : null}
+          </View>
         )}
+        {isList && isInProgress ? (
+          <View style={styles.badgeListProgressPill}>
+            <Text style={styles.badgeListProgressText}>진행 중</Text>
+          </View>
+        ) : null}
       </View>
       <Text
-        style={[styles.badgeName, badge.earned ? null : styles.badgeNameOff]}
+        style={[
+          styles.badgeName,
+          isList ? styles.badgeListName : null,
+          badge.earned ? null : styles.badgeNameOff,
+        ]}
         numberOfLines={1}
+        adjustsFontSizeToFit={isList}
+        minimumFontScale={0.75}
       >
         {badge.name}
       </Text>
-      <Text style={styles.badgeDesc} numberOfLines={2}>
-        {badge.description}
-      </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -730,7 +1051,7 @@ const styles = StyleSheet.create({
   },
   fullListContent: {
     padding: 20,
-    paddingBottom: 32,
+    paddingBottom: TAB_CONTENT_BOTTOM_GAP,
   },
   fullListSectionTitle: {
     marginBottom: 12,
@@ -744,7 +1065,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   content: {
-    paddingBottom: 28,
+    paddingBottom: TAB_CONTENT_BOTTOM_GAP,
   },
 
   // 히어로
@@ -789,51 +1110,17 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     letterSpacing: -0.4,
   },
-  heroTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.primary,
-  },
   heroMeta: {
     marginTop: 6,
     fontSize: 13,
     color: colors.heroTextMuted,
   },
-  bellBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // 히어로 통계
-  statRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 20,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: colors.heroCard,
-    borderWidth: 1,
-    borderColor: colors.heroCardBorder,
-    borderRadius: 14,
-    paddingVertical: 12,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: colors.heroTextMuted,
-  },
-  statValue: {
+  heroActivity: {
     marginTop: 4,
-    fontSize: 20,
+    fontSize: 13,
     fontWeight: '700',
-    color: colors.textPrimary,
+    color: colors.primaryStrong,
   },
-
   // 섹션 공통
   section: {
     paddingHorizontal: 20,
@@ -898,6 +1185,9 @@ const styles = StyleSheet.create({
   },
 
   // 여행 취향
+  preferenceListCard: {
+    paddingVertical: 8,
+  },
   prefPlaceholder: {
     alignItems: 'center',
     gap: 14,
@@ -908,6 +1198,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  prefLoadingText: {
+    fontSize: 13,
+    color: colors.textSecondary,
   },
   prefCta: {
     paddingHorizontal: 18,
@@ -924,16 +1218,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    gap: 16,
+    minHeight: 38,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   prefLabel: {
     fontSize: 14,
     color: colors.textSecondary,
+    flexShrink: 0,
   },
   prefValue: {
+    flex: 1,
     fontSize: 14,
     fontWeight: '600',
+    lineHeight: 20,
     color: colors.textPrimary,
+    textAlign: 'right',
+  },
+  moodSection: {
+    paddingTop: 12,
+    paddingBottom: 6,
+  },
+  moodHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
   },
   moodWrap: {
     flexDirection: 'row',
@@ -950,9 +1261,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   moodText: {
+    color: colors.textPrimary,
     fontSize: 13,
     fontWeight: '600',
-    color: colors.textPrimary,
   },
 
   // 관심 코스
@@ -1033,11 +1344,39 @@ const styles = StyleSheet.create({
   },
 
   // 배지
-  badgeGrid: {
+  badgeSummaryBar: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 14,
+    alignItems: 'center',
+    minHeight: 72,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: '#ffffff',
+  },
+  badgeSummaryBarPressed: {
+    backgroundColor: colors.surface,
+  },
+  badgeSummaryIcon: {
+    width: 42,
+    height: 42,
+    marginRight: 13,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primarySoft,
+  },
+  badgeSummaryText: {
+    flex: 1,
+    fontSize: 16,
+    lineHeight: 23,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  badgeSummaryCount: {
+    color: colors.primaryStrong,
+    fontWeight: '900',
   },
   badgeCell: {
     width: '31%',
@@ -1049,14 +1388,25 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 8,
   },
+  badgeCellPressed: {
+    opacity: 0.65,
+  },
   badgeCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
   },
+  badgeVisual: {
+    width: 82,
+    height: 82,
+    marginBottom: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeImage: { width: 82, height: 82 },
+  badgeImageOff: { width: 82, height: 82, opacity: 0.48 },
   badgeCircleOn: {
     backgroundColor: colors.goldSoft,
   },
@@ -1073,12 +1423,190 @@ const styles = StyleSheet.create({
   badgeNameOff: {
     color: colors.textSecondary,
   },
-  badgeDesc: {
-    marginTop: 3,
+  badgeListContent: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: TAB_CONTENT_BOTTOM_GAP,
+  },
+  badgeListSection: {
+    marginTop: 28,
+  },
+  badgeListSectionTitle: {
+    marginBottom: 20,
+    fontSize: 22,
+    lineHeight: 30,
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    color: colors.textPrimary,
+  },
+  badgeListGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -4,
+    rowGap: 28,
+  },
+  badgeListCell: {
+    width: '33.333%',
+    minHeight: 136,
+    paddingHorizontal: 4,
+    paddingVertical: 0,
+    borderWidth: 0,
+    borderRadius: 0,
+    backgroundColor: 'transparent',
+  },
+  badgeListVisual: {
+    width: 104,
+    height: 104,
+    marginBottom: 12,
+  },
+  badgeListImage: {
+    width: 104,
+    height: 104,
+  },
+  badgeListImageOff: {
+    width: 104,
+    height: 104,
+  },
+  badgeListName: {
+    width: '100%',
+    fontSize: 14,
+    lineHeight: 20,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  badgeListProgressPill: {
+    position: 'absolute',
+    bottom: -3,
+    alignSelf: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    backgroundColor: colors.primaryStrong,
+    borderWidth: 2,
+    borderColor: colors.background,
+  },
+  badgeListProgressText: {
     fontSize: 11,
     lineHeight: 15,
+    fontWeight: '800',
+    color: colors.textOnPrimary,
+  },
+  badgeDetailContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: TAB_CONTENT_BOTTOM_GAP,
+  },
+  badgeDetailVisual: {
+    height: 280,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeDetailImage: {
+    width: 260,
+    height: 260,
+  },
+  badgeDetailImageOff: {
+    width: 260,
+    height: 260,
+    opacity: 0.48,
+  },
+  badgeDetailFallback: {
+    width: 230,
+    height: 230,
+    borderRadius: 115,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeDetailTitle: {
+    marginTop: 28,
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: '900',
+    letterSpacing: -0.8,
+    color: colors.textPrimary,
+  },
+  badgeDetailDescription: {
+    marginTop: 10,
+    fontSize: 16,
+    lineHeight: 24,
     color: colors.textSecondary,
+  },
+  badgeDetailResult: {
+    marginTop: 28,
+    minHeight: 64,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    padding: 24,
+    borderWidth: 1,
+  },
+  badgeDetailResultOn: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primaryBorder,
+  },
+  badgeDetailResultIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 2,
+    borderColor: colors.textTertiary,
+    color: colors.textTertiary,
+    fontSize: 24,
+    lineHeight: 32,
+    fontWeight: '700',
     textAlign: 'center',
+  },
+  badgeDetailResultIconOn: {
+    borderColor: colors.primaryStrong,
+    color: colors.primaryStrong,
+  },
+  badgeDetailResultText: {
+    fontSize: 17,
+    lineHeight: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+    color: colors.textSecondary,
+  },
+  badgeDetailResultTextOn: {
+    color: colors.primaryStrong,
+  },
+  badgeDetailProgressCard: {
+    marginTop: 28,
+    borderRadius: 18,
+    padding: 22,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  badgeDetailProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  badgeDetailProgressLabel: {
+    flex: 1,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  badgeDetailProgressValue: {
+    flexShrink: 0,
+    fontSize: 18,
+    lineHeight: 24,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  badgeDetailProgressCurrent: {
+    color: colors.primaryStrong,
+    fontWeight: '900',
+  },
+  badgeDetailProgressCurrentOff: {
+    color: colors.textSecondary,
+    fontWeight: '900',
   },
 
   // 안전 설정
@@ -1086,17 +1614,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    marginHorizontal: -4,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  safetyRowPressed: {
+    backgroundColor: colors.surface,
   },
   safetyIcon: {
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: colors.goldSoft,
+    backgroundColor: colors.dangerSoft,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  safetyIconSos: {
-    backgroundColor: colors.dangerSoft,
   },
   safetyTexts: {
     flex: 1,
@@ -1112,25 +1644,14 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: colors.textSecondary,
   },
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
+  moodToggle: {
+    paddingVertical: 4,
   },
-  contactLabel: {
-    flex: 1,
+  moodToggleText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  contactValue: {
-    fontSize: 13,
-    color: colors.textSecondary,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: colors.primaryStrong,
   },
 
   // 계정
@@ -1151,9 +1672,9 @@ const styles = StyleSheet.create({
   withdrawalBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 48,
-    marginTop: 8,
-    borderRadius: 16,
+    minHeight: 32,
+    marginTop: 4,
+    borderRadius: 10,
   },
   withdrawalText: {
     fontSize: 13,
