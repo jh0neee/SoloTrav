@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Image,
   Linking,
   Pressable,
@@ -29,7 +30,6 @@ import {
 import { badgeStore, countEarned, useBadges } from '../badges/badgeStore';
 import { recordStore, useRecords } from '../records/recordStore';
 import PreferencePromptScreen from './home/PreferencePromptScreen';
-import { useMyView } from '../navigation/useMyView';
 import FavoriteCoursesSection from './favorites/FavoriteCoursesSection';
 import { favoriteStore } from '../favorites/favoriteStore';
 import {
@@ -60,6 +60,7 @@ import {
 import SafetyDetailScreen, {
   type SafetyDetailKey,
 } from './safety/SafetyDetailScreen';
+import { useMyView } from '../navigation/useMyView';
 import { TAB_CONTENT_BOTTOM_GAP } from '../navigation/layout';
 
 type IconComponent = React.ComponentType<{ color: string; size?: number }>;
@@ -112,15 +113,25 @@ function MyScreen() {
   // 어느 것이 열려 있는지는 useMyView 가 들고 있습니다 — 앱은 지역 상태,
   // 웹은 주소창(/my/preference, /my/courses) 과 이어진 구현으로 교체됩니다.
   const [view, setView] = useMyView();
-  const [safety, setSafety] = useState<Record<string, boolean>>(() =>
-    SAFETY_SETTINGS.reduce<Record<string, boolean>>((acc, setting) => {
-      acc[setting.key] = setting.defaultOn;
-      return acc;
-    }, {}),
+  const [badgeView, setBadgeView] = useState<'main' | 'list' | 'detail'>(
+    'main',
   );
   const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
   const [badgeListScrollOffset, setBadgeListScrollOffset] = useState(0);
   const [safetyDetail, setSafetyDetail] = useState<SafetyDetailKey | null>(null);
+
+  useEffect(() => {
+    if (badgeView === 'main') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (badgeView === 'detail') {
+        setBadgeView('list');
+      } else {
+        setBadgeView('main');
+      }
+      return true;
+    });
+    return () => sub.remove();
+  }, [badgeView]);
 
   const confirmLogout = () =>
     Alert.alert('로그아웃', '로그아웃 하시겠어요?', [
@@ -157,6 +168,21 @@ function MyScreen() {
       ],
     );
 
+  const openLegalDocument = async (label: string, url: string | null) => {
+    if (!url) {
+      Alert.alert(
+        `${label} 준비 중`,
+        '문서 URL은 백엔드 약관 API가 확정되면 연결할 예정입니다.',
+      );
+      return;
+    }
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('문서를 열 수 없어요', '잠시 후 다시 시도해주세요.');
+    }
+  };
+
   if (view === 'preference') {
     return (
       <PreferencePromptScreen
@@ -167,7 +193,7 @@ function MyScreen() {
         onBack={() => setView('root')}
         onComplete={async answers => {
           try {
-            await preferenceStore.save(answers);
+            await preferenceStore.save(toProfilePreferenceAnswers(answers));
             setView('root');
           } catch {
             // 실패 메시지는 위저드 하단에 뜹니다. 답변이 날아가지 않게 열어둡니다.
@@ -178,9 +204,7 @@ function MyScreen() {
   }
 
   if (view === 'courses') {
-    return (
-      <SavedCoursesListScreen onBack={() => setViewingSavedCourses(false)} />
-    );
+    return <SavedCoursesListScreen onBack={() => setView('root')} />;
   }
 
   if (badgeView === 'detail' && selectedBadge) {
@@ -259,15 +283,6 @@ function MyScreen() {
             ) : null}
           </View>
         </View>
-
-        <View style={styles.statRow}>
-          {PROFILE_STATS.map(stat => (
-            <View key={stat.key} style={styles.statCard}>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-              <Text style={styles.statValue}>{stat.value}</Text>
-            </View>
-          ))}
-        </View>
       </View>
 
       {/* ── 나의 여행 취향 ── */}
@@ -293,16 +308,16 @@ function MyScreen() {
       </Section>
 
       {/* ── 나의 배지 ── */}
-      <Section
-        title="나의 배지"
-        hint={
-          badges.status === 'ready' && badges.badges.length > 0
-            ? `${earnedBadgeCount}/${badges.badges.length}`
-            : undefined
-        }
-        actionLabel={badges.badges.length > 0 ? '전체' : undefined}
-      >
-        <BadgeSection state={badges} onRetry={() => badgeStore.reload()} />
+      <Section title="나의 혼행 배지">
+        <BadgeSummaryBar
+          earnedCount={earnedBadgeCount}
+          totalCount={visibleBadges.length}
+          isLoading={badges.status === 'idle' || badges.status === 'loading'}
+          onPress={() => {
+            setSelectedBadge(null);
+            setBadgeView('list');
+          }}
+        />
       </Section>
 
       {/* ── 안전 설정 ── */}
@@ -791,11 +806,7 @@ function TravelPreferenceCard({
   const moveSummary =
     [transport, highlights.moveLoad].filter(Boolean).join(' / ') || '미설정';
   return (
-    <View style={styles.card}>
-      <PreferenceRow
-        label="여행 기간"
-        value={highlights.duration ?? '미설정'}
-      />
+    <View style={[styles.card, styles.preferenceListCard]}>
       <PreferenceRow label="여행 페이스" value={highlights.pace ?? '미설정'} />
       <PreferenceRow label="피하고 싶은 곳" value={avoidSummary} />
       <PreferenceRow label="이동" value={moveSummary} />
@@ -1080,27 +1091,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.heroTextMuted,
   },
-
-  // 히어로 통계
-  statRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 20,
-  },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: colors.heroCard,
-    borderWidth: 1,
-    borderColor: colors.heroCardBorder,
-    borderRadius: 14,
-    paddingVertical: 12,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: colors.heroTextMuted,
-  },
-  statValue: {
+  heroActivity: {
     marginTop: 4,
     fontSize: 13,
     fontWeight: '700',

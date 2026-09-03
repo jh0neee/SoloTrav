@@ -18,14 +18,8 @@ import type { TourContent } from '../../types/travel';
 import PhotoViewer, { type ViewerPhoto } from '../map/PhotoViewer';
 
 type Props = {
-  /**
-   * 목록에서 넘어온 요약 정보 — 상세를 기다리는 동안 먼저 보여줍니다.
-   *
-   * 웹에서 이 화면 주소(/spot/:타입/:콘텐츠ID)를 새 탭에 바로 붙여 넣으면
-   * 거쳐 온 목록이 없어서 제목·사진이 비어 있는 껍데기가 넘어옵니다.
-   * 그래서 아래에서 상세 응답이 오는 대로 그쪽 값을 우선해 씁니다.
-   */
-  spot: TourSpot;
+  /** 목록에서 넘어온 요약 정보 — 상세를 기다리는 동안 먼저 보여줍니다 */
+  spot: TourContent;
   onBack: () => void;
 };
 
@@ -38,19 +32,18 @@ function SpotDetailScreen({ spot, onBack }: Props) {
   );
   const detail = useTravelQuery(`spot:${spot.contentId}`, loader);
 
-  /**
-   * 화면에 그릴 값. 상세가 도착하면 상세를, 아직이면 목록 요약을 씁니다.
-   * (상세가 목록보다 항상 더 정확하고 채워져 있습니다)
-   */
-  const view = detail.data ?? spot;
-
-  const openUrl = useCallback((url: string) => {
-    Linking.openURL(url).catch(() => {
-      // 열 수 있는 앱이 없을 때 앱이 죽지 않도록 삼킵니다.
-    });
+  const heroUri = detail.data?.imageUrl ?? spot.imageUrl;
+  const phone =
+    spot.tel ??
+    detail.data?.facts.find(fact => fact.label === '문의')?.value ??
+    null;
+  const [viewer, setViewer] = useState<{
+    photos: ViewerPhoto[];
+    index: number;
+  } | null>(null);
+  const openViewer = useCallback((urls: string[], index: number) => {
+    setViewer({ photos: urls.map(uri => ({ uri })), index });
   }, []);
-
-  const heroUri = view.imageUrl;
 
   return (
     <View style={styles.container}>

@@ -11,7 +11,7 @@
  *   홈 → 취향 프롬프트 (홈 배너에서 바로 진입)
  *   홈 → 축제 카드 → 장소 상세
  */
-import React, { useState } from 'react';
+import React from 'react';
 import HomeScreen from '../screens/home/HomeScreen';
 import SearchScreen from '../screens/home/SearchScreen';
 import GalleryScreen from '../screens/home/GalleryScreen';
@@ -19,29 +19,19 @@ import SpotDetailScreen from '../screens/home/SpotDetailScreen';
 import CitySelectScreen from '../screens/home/CitySelectScreen';
 import CityDetailScreen from '../screens/home/CityDetailScreen';
 import PreferencePromptScreen from '../screens/home/PreferencePromptScreen';
-import { preferenceTagLabels, summarizePreferences, toProfilePreferenceAnswers } from '../data/preferences';
+import {
+  preferenceTagLabels,
+  summarizePreferences,
+  toProfilePreferenceAnswers,
+} from '../data/preferences';
 import {
   preferenceStore,
   usePreferences,
 } from '../preferences/preferenceStore';
 import { useHomeStack } from './useHomeStack';
-import { RankingKind, TourContent } from '../types/travel';
-import { City } from '../data/cities';
-
-function HomeStack() {
-  const { current, push, pop } = useHomeStack();
-
-type Route =
-  | { name: 'home' }
-  | { name: 'search' }
-  | { name: 'gallery'; albumTitle?: string }
-  | { name: 'spot'; spot: TourContent }
-  | { name: 'citySelect'; rankingKind: RankingKind }
-  | { name: 'cityDetail'; city: City }
-  | { name: 'preference'; city?: City };
 
 function HomeStack({ onOpenMy }: { onOpenMy?: () => void }) {
-  const [stack, setStack] = useState<Route[]>([{ name: 'home' }]);
+  const { current, push, pop } = useHomeStack();
   // 취향은 서버가 원본이라 화면 로컬 state 로 들고 있지 않습니다.
   // (탭을 옮기거나 앱을 껐다 켜도 유지되어야 합니다)
   const preferences = usePreferences();

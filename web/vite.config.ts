@@ -126,6 +126,12 @@ export default defineConfig(({ mode }) => {
           here,
           'src/overrides/useMyView.ts',
         ),
+        // 배지 이미지: Metro 전용 정적 require → Vite ES import.
+        // (브라우저에는 require 가 없어 그대로 쓰면 그 자리에서 죽습니다)
+        'SoloTrav/src/assets/badges/index.ts': path.resolve(
+          here,
+          'src/overrides/badgeImages.ts',
+        ),
       }),
     ],
 
@@ -142,6 +148,11 @@ export default defineConfig(({ mode }) => {
           find: 'react-native-image-picker',
           replacement: shim('image-picker.ts'),
         },
+        {
+          find: 'react-native-color-matrix-image-filters',
+          replacement: shim('color-matrix.tsx'),
+        },
+        { find: 'react-native-svg', replacement: shim('svg.tsx') },
         {
           find: '@react-native-async-storage/async-storage',
           replacement: shim('async-storage.ts'),

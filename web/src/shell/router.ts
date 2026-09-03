@@ -7,7 +7,8 @@
  *   /search                    홈 > 검색
  *   /gallery                   홈 > 사진첩
  *   /spot/:타입/:콘텐츠ID       홈 > 장소 상세
- *   /city[/:도시ID]            홈 > 도시 선택
+ *   /city/:랭킹기준             홈 > 도시 랭킹(도시 선택)
+ *   /city-detail/:도시ID        홈 > 도시 상세
  *   /preference[/:도시ID]      홈 > 취향 프롬프트
  *   /map                       지도
  *   /assistant                 샛별이

@@ -16,21 +16,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BackHandler } from 'react-native';
 import type { City } from '../data/cities';
-import type { TourSpot } from '../types/travel';
+import type { RankingKind, TourContent } from '../types/travel';
 
 /**
  *   홈 → 검색 → 장소 상세
  *   홈 → 사진첩
- *   홈 → 도시 선택 → 취향 프롬프트
- *   홈 → 취향 프롬프트 (홈 배너에서 바로 진입)
+ *   홈 → 도시 랭킹 → 도시 상세 → 취향 프롬프트(코스)
+ *   홈 → 취향 프롬프트 (홈 배너에서 바로 진입, 프로필)
  *   홈 → 축제 카드 → 장소 상세
  */
 export type HomeRoute =
   | { name: 'home' }
   | { name: 'search' }
-  | { name: 'gallery' }
-  | { name: 'spot'; spot: TourSpot }
-  | { name: 'citySelect'; cityId?: string }
+  | { name: 'gallery'; albumTitle?: string }
+  | { name: 'spot'; spot: TourContent }
+  | { name: 'citySelect'; rankingKind: RankingKind }
+  | { name: 'cityDetail'; city: City }
   | { name: 'preference'; city?: City };
 
 export type HomeStackState = {
