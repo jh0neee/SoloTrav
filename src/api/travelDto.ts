@@ -57,9 +57,11 @@ export type TourInfoQuery = {
   cat2?: string;
   cat3?: string;
 
-  /** 위치기반 조회 — 경도 */
+  /** 위치기반 조회 — 서버에 등록된 대표 좌표를 선택할 지역명 */
+  regionName?: string;
+  /** @deprecated 개인 위치 보호를 위해 클라이언트에서는 전송하지 않습니다. */
   mapX?: number;
-  /** 위치기반 조회 — 위도 */
+  /** @deprecated 개인 위치 보호를 위해 클라이언트에서는 전송하지 않습니다. */
   mapY?: number;
   /** 위치기반 조회 — 반경(m). 최대 20000 */
   radius?: number;
@@ -137,7 +139,7 @@ export type TourListDto<T> = {
  * 목록 항목 1건 (searchKeyword2 / areaBasedList2 / locationBasedList2 공통).
  * 값이 비어 있으면 `''` 로 내려오지 undefined 가 아닙니다.
  */
-export type TourSpotDto = {
+export type TourContentDto = {
   contentid?: string;
   contenttypeid?: string;
   title?: string;
@@ -168,18 +170,18 @@ export type TourSpotDto = {
 
   /** 위치기반 조회에서만 내려오는 중심점 기준 거리(m). 문자열 실수입니다. */
   dist?: string;
+  eventstartdate?: string;
+  eventenddate?: string;
 };
 
 /** 축제 1건 — 목록 항목에 행사 기간이 붙습니다 */
-export type TourFestivalDto = TourSpotDto & {
-  eventstartdate?: string;
-  eventenddate?: string;
+export type TourFestivalDto = TourContentDto & {
   progresstype?: string;
   festivaltype?: string;
 };
 
 /** detailCommon2 1건 — 목록 항목 + 개요/홈페이지 */
-export type TourDetailCommonDto = TourSpotDto & {
+export type TourDetailCommonDto = TourContentDto & {
   overview?: string;
   homepage?: string;
   telname?: string;

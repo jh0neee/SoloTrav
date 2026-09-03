@@ -66,28 +66,6 @@ export const TOUR_CATEGORY_COLOR: Record<TourCategory, string> = {
   food: '#d0603f',
 };
 
-/** 지도에 올리는 관광 콘텐츠 한 건 */
-export type TourPlace = {
-  /** TourAPI contentid — 상세 조회·후기 연결의 키가 됩니다. */
-  id: string;
-  title: string;
-  category: TourCategory;
-  contentTypeId: string;
-  lat: number;
-  lng: number;
-  /** 지번 주소 */
-  address: string;
-  /** 대표 이미지 URL. 없으면 null */
-  imageUrl: string | null;
-  /** 조회 기준점에서의 거리(m). areaBased 조회에는 없어서 null 일 수 있습니다. */
-  distance: number | null;
-  /** 하이픈 포함 표시용 번호. 없으면 null */
-  tel: string | null;
-  /** 축제만 채워집니다. 'YYYYMMDD' */
-  eventStartDate?: string | null;
-  eventEndDate?: string | null;
-};
-
 /** '20260822' → '8.22' */
 export function formatEventDate(yyyymmdd: string): string {
   if (yyyymmdd.length !== 8) {
@@ -97,7 +75,10 @@ export function formatEventDate(yyyymmdd: string): string {
 }
 
 /** 축제 기간 표기 — 하루짜리면 날짜 하나만 보여 줍니다. */
-export function formatEventPeriod(place: TourPlace): string {
+export function formatEventPeriod(place: {
+  eventStartDate: string | null;
+  eventEndDate: string | null;
+}): string {
   const start = place.eventStartDate;
   const end = place.eventEndDate;
   if (!start) {
@@ -108,38 +89,6 @@ export function formatEventPeriod(place: TourPlace): string {
   }
   return `${formatEventDate(start)} – ${formatEventDate(end)}`;
 }
-
-/**
- * 장소 상세 — detailCommon2 + detailIntro2 를 합친 결과.
- *
- * detailIntro2 는 콘텐츠 타입마다 필드명이 다릅니다(usetime / opentimefood /
- * usetimeculture …). 여기서는 타입과 무관한 공통 의미로만 추려 담습니다.
- */
-export type TourPlaceDetail = {
-  id: string;
-  /** 소개 글. 없을 수 있습니다. */
-  overview: string | null;
-  /** 홈페이지 URL (원본은 <a> 태그라 주소만 뽑아 냅니다) */
-  homepage: string | null;
-  /** 이용 시간 / 영업 시간 */
-  useTime: string | null;
-  /** 휴무일 */
-  restDate: string | null;
-  /** 주차 안내 */
-  parking: string | null;
-  /** 문의 및 안내 전화 */
-  infoCenter: string | null;
-  /** 추가 이미지 URL */
-  imageUrls: string[];
-};
-
-/** 목록 조회 결과 (페이지 정보 포함) */
-export type TourPlacePage = {
-  items: TourPlace[];
-  pageNo: number;
-  numOfRows: number;
-  totalCount: number;
-};
 
 /** 210 → '210m', 1240 → '1.2km' */
 export function formatTourDistance(meters: number | null): string {

@@ -15,7 +15,7 @@ import type {
   RankingKind,
   RegionSafety,
   TourFestival,
-  TourSpot,
+  TourContent,
   VisitorStat,
 } from '../types/travel';
 
@@ -25,6 +25,19 @@ const REGION_CODE = '43';
 
 /** 시군구명 → 지역안전지수 */
 export type SafetyMap = Record<string, RegionSafety>;
+
+export type SafetyStatus = '안심' | '보통' | '확인 필요';
+
+/** 혼행 안전점수를 빠르게 이해할 수 있는 세 단계 상태로 바꿉니다. */
+export function safetyStatusOf(score: number): SafetyStatus {
+  if (score >= 70) {
+    return '안심';
+  }
+  if (score >= 50) {
+    return '보통';
+  }
+  return '확인 필요';
+}
 
 /**
  * 충북 전체 시군의 지역안전지수를 한 번에 받아옵니다.
@@ -53,14 +66,17 @@ export function useRegionSafety(): QueryResult<SafetyMap> {
  */
 export function safetyOf(city: City, map: SafetyMap | null) {
   const safety = map?.[city.sigungu] ?? null;
+  const score = safety?.soloScore ?? city.stats.safety;
   return {
-    grade: safety?.soloGrade ?? city.safetyGrade,
-    score: safety?.soloScore ?? city.stats.safety,
+    score,
+    status: safetyStatusOf(score),
     /** 행정안전부 6개 부문 단순 평균 기준 */
     overallGrade: safety?.grade ?? city.safetyGrade,
     overallScore: safety?.score ?? city.stats.safety,
     /** 치안(범죄) 등급 1~5 — 혼행객이 가장 먼저 보는 값 */
     crimeGrade: safety?.grades.crime ?? null,
+    trafficGrade: safety?.grades.traffic ?? null,
+    lifeSafetyGrade: safety?.grades.lifeSafety ?? null,
     /** API 로 확인된 값인지 — 화면에서 '기준 연도' 표기 여부를 정합니다 */
     isLive: safety !== null,
     baseYear: safety?.baseYear ?? null,
@@ -99,7 +115,9 @@ export function useVisitorStats(): QueryResult<VisitorSnapshot> {
     const [current, previous] = await Promise.all([
       travelApi.getVisitorTotals(latest, codes),
       // 4주 전 같은 요일 — 요일이 다르면 방문자 수가 통째로 달라 비교가 무의미합니다.
-      travelApi.getVisitorTotals(shiftYmd(latest, -28), codes).catch(() => null),
+      travelApi
+        .getVisitorTotals(shiftYmd(latest, -28), codes)
+        .catch(() => null),
     ]);
 
     const stats: VisitorMap = {};
@@ -146,7 +164,7 @@ export type RankedCity = {
   value: string;
   /** 그 아래 작은 설명 (예: '치안 2등급', '4주 전 -17%') */
   caption: string;
-  safetyGrade: string;
+  safetyStatus: SafetyStatus;
   crimeGrade: number | null;
 };
 
@@ -181,14 +199,18 @@ export function useCityRankings(): {
         rank: index + 1,
         value: `${item.safety.score}점`,
         caption: item.safety.crimeGrade
-          ? `치안 ${item.safety.crimeGrade}등급 · 종합 ${item.safety.overallGrade}`
-          : '지역안전지수 기준',
-        safetyGrade: item.safety.grade,
+          ? `치안 ${item.safety.crimeGrade}등급 · 교통 ${item.safety.trafficGrade}등급 · 생활안전 ${item.safety.lifeSafetyGrade}등급`
+          : '혼행 안전지수 기준',
+        safetyStatus: item.safety.status,
         crimeGrade: item.safety.crimeGrade,
       }));
 
     // 방문자 데이터가 없으면 핫·한적 랭킹은 만들 수 없습니다(임의로 꾸미지 않습니다).
     const visited = withSafety.filter(item => item.visitor !== null);
+    const totalVisitorCount = visited.reduce(
+      (sum, item) => sum + (item.visitor?.visitor ?? 0),
+      0,
+    );
 
     const hot = [...visited]
       .sort((a, b) => (b.visitor?.visitor ?? 0) - (a.visitor?.visitor ?? 0))
@@ -196,11 +218,12 @@ export function useCityRankings(): {
         city: item.city,
         rank: index + 1,
         value: formatCount(item.visitor?.visitor ?? 0),
-        caption:
-          item.visitor?.changeRate !== null && item.visitor
-            ? `4주 전 대비 ${formatSigned(item.visitor.changeRate ?? 0)}`
-            : `외지인 비율 ${item.visitor?.visitorRatio ?? 0}%`,
-        safetyGrade: item.safety.grade,
+        caption: totalVisitorCount
+          ? `주말 여행객 중 ${Math.round(
+              ((item.visitor?.visitor ?? 0) / totalVisitorCount) * 100,
+            )}%`
+          : '주말 여행객 집계',
+        safetyStatus: item.safety.status,
         crimeGrade: item.safety.crimeGrade,
       }));
 
@@ -210,8 +233,8 @@ export function useCityRankings(): {
         city: item.city,
         rank: index + 1,
         value: formatCount(item.visitor?.visitor ?? 0),
-        caption: `주민 대비 외지인 ${item.visitor?.visitorRatio ?? 0}%`,
-        safetyGrade: item.safety.grade,
+        caption: `주민 대비 여행객 ${item.visitor?.visitorRatio ?? 0}%`,
+        safetyStatus: item.safety.status,
         crimeGrade: item.safety.crimeGrade,
       }));
 
@@ -230,7 +253,7 @@ export function useCityRankings(): {
     },
     visitorBaseLabel:
       snapshot && snapshot.baseYmd
-        ? `${formatYmdLabel(snapshot.baseYmd)} ${snapshot.dayLabel} 기준`
+        ? `최근 집계일 ${formatYmdLabel(snapshot.baseYmd)}`
         : null,
   };
 }
@@ -296,8 +319,10 @@ export function useUpcomingFestivals(size = 12): QueryResult<TourFestival[]> {
     const todayValue = Number(daysAgoYmd(0));
 
     return festivals
-      .filter(festival => Number(festival.endDate ?? '0') >= todayValue)
-      .sort((a, b) => Number(a.startDate ?? 0) - Number(b.startDate ?? 0))
+      .filter(festival => Number(festival.eventEndDate ?? '0') >= todayValue)
+      .sort(
+        (a, b) => Number(a.eventStartDate ?? 0) - Number(b.eventStartDate ?? 0),
+      )
       .slice(0, size);
   }, [size]);
 
@@ -305,7 +330,9 @@ export function useUpcomingFestivals(size = 12): QueryResult<TourFestival[]> {
 }
 
 /** 도시 한 곳의 축제 — 도시 상세에서 씁니다 */
-export function useCityFestivals(city: City | null): QueryResult<TourFestival[]> {
+export function useCityFestivals(
+  city: City | null,
+): QueryResult<TourFestival[]> {
   const loader = useCallback(async () => {
     if (!city) {
       return [];
@@ -318,8 +345,10 @@ export function useCityFestivals(city: City | null): QueryResult<TourFestival[]>
     });
     const todayValue = Number(daysAgoYmd(0));
     return festivals
-      .filter(festival => Number(festival.endDate ?? '0') >= todayValue)
-      .sort((a, b) => Number(a.startDate ?? 0) - Number(b.startDate ?? 0));
+      .filter(festival => Number(festival.eventEndDate ?? '0') >= todayValue)
+      .sort(
+        (a, b) => Number(a.eventStartDate ?? 0) - Number(b.eventStartDate ?? 0),
+      );
   }, [city]);
 
   return useTravelQuery(city ? `cityFestival:${city.id}` : null, loader);
@@ -332,7 +361,8 @@ export function useGalleryPhotos(
   page = 1,
 ): QueryResult<GalleryPhoto[]> {
   const loader = useCallback(
-    async () => (await travelApi.listGalleryPhotos({ keyword, size, page })).items,
+    async () =>
+      (await travelApi.listGalleryPhotos({ keyword, size, page })).items,
     [keyword, size, page],
   );
 
@@ -386,7 +416,7 @@ export type CityIntro = {
   /** 방문 상위 관광지 랭킹 (기초지자체 중심 관광지) */
   attractions: HubAttraction[];
   /** 사진이 있는 관광정보 — 카드 목록용 */
-  spots: TourSpot[];
+  spots: TourContent[];
 };
 
 /**
@@ -464,6 +494,3 @@ export function formatCount(value: number): string {
 }
 
 /** -17.3 → '-17.3%' / 0.9 → '+0.9%' */
-export function formatSigned(value: number): string {
-  return `${value > 0 ? '+' : ''}${value}%`;
-}
