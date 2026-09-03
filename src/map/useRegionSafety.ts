@@ -9,9 +9,9 @@
  */
 import { useEffect, useState } from 'react';
 import { parseRegion, safetyApi, type SafetyBadge } from '../api/safetyApi';
-import type { TourPlace } from '../types/tourPlace';
+import type { MappableTourContent } from '../types/travel';
 
-export function useRegionSafety(places: TourPlace[]) {
+export function useRegionSafety(places: MappableTourContent[]) {
   const [badge, setBadge] = useState<SafetyBadge | null>(null);
 
   // 가장 가까운(=목록 첫 번째) 장소의 주소를 지역 판단 기준으로 삼습니다.

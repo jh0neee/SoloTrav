@@ -6,8 +6,12 @@
  * 화면이 따로 들고 있다가 "이 지역에서 재검색" 을 누를 때 center 로 넘겨 줍니다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DEFAULT_RADIUS, REGION_PAGE_SIZE, tourApi } from '../api/tourApi';
-import type { TourCategory, TourPlace } from '../types/tourPlace';
+import { DEFAULT_RADIUS, REGION_PAGE_SIZE, travelApi } from '../api/travelApi';
+import type { TourCategory } from '../types/tourPlace';
+import {
+  isMappableTourContent,
+  type MappableTourContent,
+} from '../types/travel';
 
 export type Coords = { lat: number; lng: number };
 export type ViewportBounds = {
@@ -18,7 +22,7 @@ export type ViewportBounds = {
 };
 
 type State = {
-  places: TourPlace[];
+  places: MappableTourContent[];
   loading: boolean;
   error: string | null;
   /** 서버가 알려 준 반경 안 전체 건수 (가져온 건수보다 클 수 있습니다) */
@@ -26,7 +30,7 @@ type State = {
 };
 
 type RegionCacheEntry = {
-  items: TourPlace[];
+  items: MappableTourContent[];
   expiresAt: number;
 };
 
@@ -84,17 +88,17 @@ export function useNearbyPlaces(
       }
 
       const loadAllTourism = async () => {
-        const items: TourPlace[] = [];
+        const items: MappableTourContent[] = [];
         let pageNo = 1;
         let totalCount = 0;
         let totalPages = 1;
 
         do {
-          const page = await tourApi.nearby(
-            { regionName, pageNo, rows: REGION_PAGE_SIZE },
+          const page = await travelApi.listNearbySpots(
+            { regionName, page: pageNo, size: REGION_PAGE_SIZE },
             controller.signal,
           );
-          items.push(...page.items);
+          items.push(...page.items.filter(isMappableTourContent));
           totalCount = page.totalCount;
           totalPages = Math.max(1, Math.ceil(totalCount / REGION_PAGE_SIZE));
           pageNo += 1;
@@ -104,16 +108,21 @@ export function useNearbyPlaces(
       };
 
       const loadAllStays = async () => {
-        const items: TourPlace[] = [];
+        const items: MappableTourContent[] = [];
         let pageNo = 1;
         let totalPages = 1;
 
         do {
-          const page = await tourApi.stays(
-            { pageNo, rows: REGION_PAGE_SIZE },
+          const page = await travelApi.listStays(
+            {
+              page: pageNo,
+              size: REGION_PAGE_SIZE,
+              regionCode: '43',
+              arrange: 'A',
+            },
             controller.signal,
           );
-          items.push(...page.items);
+          items.push(...page.items.filter(isMappableTourContent));
           totalPages = Math.max(
             1,
             Math.ceil(page.totalCount / REGION_PAGE_SIZE),
@@ -129,9 +138,9 @@ export function useNearbyPlaces(
         loadAllTourism(),
         loadAllStays(),
       ]);
-      const merged = new Map<string, TourPlace>();
-      tourism.forEach(place => merged.set(place.id, place));
-      stays.forEach(place => merged.set(place.id, place));
+      const merged = new Map<string, MappableTourContent>();
+      tourism.forEach(place => merged.set(place.contentId, place));
+      stays.forEach(place => merged.set(place.contentId, place));
       const items = [...merged.values()];
       regionCache.set(regionName, {
         items,
@@ -188,12 +197,8 @@ export function useNearbyPlaces(
 }
 
 /** 날짜변경선을 걸친 화면까지 고려한 지도 경계 포함 여부입니다. */
-export function isInsideBounds(
-  point: Coords,
-  bounds: ViewportBounds,
-): boolean {
-  const insideLatitude =
-    point.lat >= bounds.south && point.lat <= bounds.north;
+export function isInsideBounds(point: Coords, bounds: ViewportBounds): boolean {
+  const insideLatitude = point.lat >= bounds.south && point.lat <= bounds.north;
   const insideLongitude =
     bounds.west <= bounds.east
       ? point.lng >= bounds.west && point.lng <= bounds.east
