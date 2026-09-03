@@ -87,12 +87,12 @@ function TermsAgreementScreen() {
 
         <Pressable
           accessibilityRole="link"
-          accessibilityLabel="개인정보 처리방침 보기"
+          accessibilityLabel="개인정보 처리방침"
           hitSlop={8}
           onPress={() => openDocument('개인정보 처리방침', PRIVACY_POLICY_URL)}
           style={styles.privacyLink}
         >
-          <Text style={styles.privacyLinkText}>개인정보 처리방침 보기</Text>
+          <Text style={styles.privacyLinkText}>개인정보 처리방침</Text>
         </Pressable>
       </View>
 
