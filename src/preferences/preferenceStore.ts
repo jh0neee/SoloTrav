@@ -12,6 +12,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { userApi } from '../api/userApi';
 import { toApiError } from '../api/errors';
+import { badgeStore } from '../badges/badgeStore';
 import type { PreferenceAnswers } from '../data/preferences';
 
 export type PreferenceState = {
@@ -69,6 +70,9 @@ export const preferenceStore = {
       try {
         const answers = await userApi.getTravelPreferences();
         setState({ status: 'ready', answers });
+        if (answers) {
+          await badgeStore.earnLocal('03');
+        }
       } catch (caught) {
         setState({ status: 'error', error: toApiError(caught).message });
       } finally {
@@ -87,6 +91,7 @@ export const preferenceStore = {
     try {
       const saved = await userApi.saveTravelPreferences(answers);
       setState({ status: 'ready', answers: saved, isSaving: false });
+      await badgeStore.earnLocal('03');
       return saved;
     } catch (caught) {
       const error = toApiError(caught);

@@ -64,6 +64,8 @@ export const ENDPOINTS = {
   travelPreferences: () => `/users/me/travel-preferences`,
   /** 내 여행 배지 조회 */
   travelBadges: () => `/users/me/travel-badges`,
+  /** 현장 방문 인증 — 좌표는 보내지 않고 기기에서 계산한 거리만 보냅니다. */
+  placeCheckIns: () => `/users/me/place-check-ins`,
 
   // 여행 기록
   /** 여행 기록 조회(GET) / 등록(POST) */

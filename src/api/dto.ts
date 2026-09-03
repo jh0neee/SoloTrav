@@ -148,6 +148,16 @@ export type TravelBadgeDto = {
 
   /** 서버가 아이콘 키를 준다면 사용하고, 없으면 앱이 정합니다. */
   icon?: string;
+  /** 앱에 번들된 배지 이미지 키(00~10, cb_1~cb_11). */
+  imageKey?: string;
+  imageNumber?: string | number;
+
+  category?: string;
+  type?: string;
+  progress?: number;
+  current?: number;
+  target?: number;
+  goal?: number;
 
   earned?: boolean;
   isEarned?: boolean;
@@ -155,6 +165,15 @@ export type TravelBadgeDto = {
   /** 획득 일시. 값이 있으면 획득한 것으로 봅니다. */
   earnedAt?: string | null;
   acquiredAt?: string | null;
+};
+
+export type VisitCheckInResponseDto = {
+  checkedIn?: boolean;
+  verified?: boolean;
+  alreadyCheckedIn?: boolean;
+  duplicate?: boolean;
+  newlyEarnedBadges?: TravelBadgeDto[];
+  earnedBadges?: TravelBadgeDto[];
 };
 
 /**

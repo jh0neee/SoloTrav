@@ -98,7 +98,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // (로그인 응답보다 GET /users/me 가 더 최신·정확합니다. 실패는 무시됩니다)
   useEffect(() => {
     if (status === 'authenticated') {
-      userStore.refresh();
+      badgeStore.activateLocalUser();
+      userStore.refresh().then(() => badgeStore.activateLocalUser());
     }
   }, [status]);
 

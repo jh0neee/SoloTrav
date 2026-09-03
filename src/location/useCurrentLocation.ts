@@ -11,7 +11,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PermissionsAndroid, Platform } from 'react-native';
 import Geolocation, {
-  type GeolocationError,
   type GeolocationOptions,
   type GeolocationResponse,
 } from '@react-native-community/geolocation';
@@ -79,7 +78,7 @@ async function requestPermission(): Promise<PermissionResult> {
       {
         title: '위치 권한이 필요해요',
         message:
-          '주변 안전 시설을 찾고 지도에 현위치를 표시하려면 위치 권한이 필요합니다.',
+          '방문을 인증하고 주변 안전 시설과 현위치를 확인하려면 위치 권한이 필요합니다.',
         buttonPositive: '허용',
         buttonNegative: '나중에',
       },
@@ -111,6 +110,48 @@ function getPosition(
   });
 }
 
+export type CurrentPositionResult = {
+  coords: Coords | null;
+  status: Exclude<LocationStatus, 'locating'>;
+  accuracy: number | null;
+};
+
+/**
+ * 버튼 동작처럼 필요할 때 한 번만 현위치를 읽습니다.
+ * 반환 좌표는 호출부 메모리에서만 사용하며 이 함수는 저장·전송하지 않습니다.
+ */
+export async function getCurrentPositionOnce(): Promise<CurrentPositionResult> {
+  const dev = getDevLocation();
+  if (dev) {
+    return { coords: dev.coords, status: 'granted', accuracy: 0 };
+  }
+
+  const permission = await requestPermission();
+  if (permission !== 'granted') {
+    return { coords: null, status: permission, accuracy: null };
+  }
+
+  let position: GeolocationResponse;
+  try {
+    position = await getPosition(PRECISE_OPTIONS);
+  } catch {
+    try {
+      position = await getPosition(COARSE_OPTIONS);
+    } catch {
+      return { coords: null, status: 'unavailable', accuracy: null };
+    }
+  }
+
+  return {
+    coords: {
+      lat: position.coords.latitude,
+      lng: position.coords.longitude,
+    },
+    status: 'granted',
+    accuracy: position.coords.accuracy,
+  };
+}
+
 export function useCurrentLocation() {
   const [coords, setCoords] = useState<Coords>(FALLBACK_COORDS);
   const [status, setStatus] = useState<LocationStatus>('locating');
@@ -119,74 +160,15 @@ export function useCurrentLocation() {
 
   const locate = useCallback(async () => {
     setStatus('locating');
-
-    // 개발용 좌표 오버라이드가 켜져 있으면 권한 요청도 측위도 건너뜁니다.
-    // (릴리즈 빌드에서는 getDevLocation 이 항상 null 입니다)
-    const dev = getDevLocation();
-    if (dev) {
-      setCoords(dev.coords);
-      setStatus('granted');
-      console.log(
-        `[location] ⚠️ 개발용 오버라이드 '${dev.name}' 사용 — ` +
-          `${dev.coords.lat}, ${dev.coords.lng}`,
-      );
-      return;
-    }
-
-    const permission = await requestPermission();
-    if (!aliveRef.current) {
-      return;
-    }
-    if (permission !== 'granted') {
-      setStatus(permission);
-      return;
-    }
-
-    // GPS 로 먼저 시도하고, 실패하면 대략적인 위치라도 받아옵니다.
-    // 좌표는 성공한 쪽에서 한 번만 갱신되므로 화면이 두 번 튀지 않습니다.
-    let position: GeolocationResponse;
-    try {
-      position = await getPosition(PRECISE_OPTIONS);
-    } catch (preciseError) {
-      if (!aliveRef.current) {
-        return;
-      }
-      if (__DEV__) {
-        const { code, message } = preciseError as GeolocationError;
-        console.log(`[location] 정밀 측위 실패 (code ${code}): ${message}`);
-      }
-      try {
-        position = await getPosition(COARSE_OPTIONS);
-      } catch (coarseError) {
-        if (!aliveRef.current) {
-          return;
-        }
-        if (__DEV__) {
-          const { code, message } = coarseError as GeolocationError;
-          console.log(`[location] 대략 측위도 실패 (code ${code}): ${message}`);
-        }
-        // 좌표는 폴백을 그대로 두고 상태만 바꿔, 화면이 계속 동작하게 합니다.
-        setStatus('unavailable');
-        return;
-      }
-    }
+    const result = await getCurrentPositionOnce();
 
     if (!aliveRef.current) {
       return;
     }
-    setCoords({
-      lat: position.coords.latitude,
-      lng: position.coords.longitude,
-    });
-    setStatus('granted');
-    if (__DEV__) {
-      console.log(
-        `[location] 측위 성공 ${position.coords.latitude.toFixed(4)}, ` +
-          `${position.coords.longitude.toFixed(4)} (오차 ${Math.round(
-            position.coords.accuracy,
-          )}m)`,
-      );
+    if (result.coords) {
+      setCoords(result.coords);
     }
+    setStatus(result.status);
   }, []);
 
   useEffect(() => {

@@ -9,10 +9,16 @@ import {
   toPreferenceAnswers,
   toTravelPreferenceRequest,
 } from './preferenceMappers';
-import { toTravelBadges } from './badgeMappers';
+import { toBadge, toTravelBadges } from './badgeMappers';
+import { unwrap } from './mappers';
+import type { Envelope, VisitCheckInResponseDto } from './dto';
 import type { PreferenceAnswers } from '../data/preferences';
 import type { AuthUser } from '../types/auth';
-import type { Badge } from '../types/badge';
+import type {
+  Badge,
+  VisitCheckInInput,
+  VisitCheckInResult,
+} from '../types/badge';
 
 export const userApi = {
   /** GET /users/me — 내 정보 조회 */
@@ -45,6 +51,25 @@ export const userApi = {
   },
 
   /**
+   * 현장 방문 인증. 사용자/장소 좌표는 요청에도 넣지 않습니다.
+   * distanceMeters 는 기기 메모리에서 계산한 뒤 정수값만 보냅니다.
+   */
+  checkInPlace: async (
+    input: VisitCheckInInput,
+  ): Promise<VisitCheckInResult> => {
+    const { data } = await apiClient.post(ENDPOINTS.placeCheckIns(), input);
+    const body = unwrap(data as Envelope<VisitCheckInResponseDto>);
+    const rawBadges = body.newlyEarnedBadges ?? body.earnedBadges ?? [];
+    return {
+      checkedIn: body.checkedIn ?? body.verified ?? true,
+      alreadyCheckedIn: body.alreadyCheckedIn ?? body.duplicate ?? false,
+      newlyEarnedBadges: rawBadges
+        .map(toBadge)
+        .filter((badge): badge is Badge => badge !== null),
+    };
+  },
+
+  /**
    * POST /users/me/travel-preferences — 등록/편집.
    *
    * 서버가 저장 결과를 그대로 돌려주면 그 값을 쓰고(서버가 정규화했을 수 있으니),
@@ -54,10 +79,7 @@ export const userApi = {
     answers: PreferenceAnswers,
   ): Promise<PreferenceAnswers> => {
     const body = toTravelPreferenceRequest(answers);
-    const { data } = await apiClient.post(
-      ENDPOINTS.travelPreferences(),
-      body,
-    );
+    const { data } = await apiClient.post(ENDPOINTS.travelPreferences(), body);
     return toPreferenceAnswers(data) ?? answers;
   },
 };
