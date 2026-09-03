@@ -4,14 +4,15 @@
  * 피드에서 카드를 누르면 들어옵니다.
  *   - 기록 본문 + 좋아요(POST/DELETE .../likes)
  *   - 내 글이면 수정·삭제
- *   - 댓글 목록/등록/수정/삭제 + 댓글 좋아요
+ *   - 댓글 목록/등록/수정/삭제
  */
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -22,6 +23,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ModerationSheet, {
+  type ReportReason,
+} from '../../components/ModerationSheet';
 import { colors, photoTones } from '../../theme/colors';
 import {
   Chevron,
@@ -47,7 +51,17 @@ type Props = {
 
 const COMMENT_MAX = 300;
 
+type ModerationTarget = {
+  targetType: 'TRAVEL_RECORD' | 'COMMENT';
+  targetId: string;
+  contentLabel: string;
+  authorId: string | null;
+};
+
 function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
+  const commentsListRef = useRef<FlatList<RecordComment>>(null);
+  const composerFocusedRef = useRef(false);
+  const scrollRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const record = useRecord(recordId);
   const comments = useComments(recordId);
   const profile = useMyProfile();
@@ -59,6 +73,38 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
   const [draft, setDraft] = useState('');
   /** 수정 중인 댓글 id. null 이면 새 댓글 작성 중입니다. */
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [moderationTarget, setModerationTarget] =
+    useState<ModerationTarget | null>(null);
+  const [isModerating, setIsModerating] = useState(false);
+
+  const scrollCommentsToEnd = useCallback(() => {
+    requestAnimationFrame(() => {
+      commentsListRef.current?.scrollToEnd({ animated: true });
+    });
+    if (scrollRetryRef.current) {
+      clearTimeout(scrollRetryRef.current);
+    }
+    // adjustResize와 KeyboardAvoidingView의 높이 변경이 끝난 뒤 최종 위치를 맞춥니다.
+    scrollRetryRef.current = setTimeout(() => {
+      commentsListRef.current?.scrollToEnd({ animated: true });
+      scrollRetryRef.current = null;
+    }, 300);
+  }, []);
+
+  // 키보드로 줄어든 실제 목록 높이가 반영된 뒤 맨 아래를 다시 맞춥니다.
+  useEffect(() => {
+    const subscription = Keyboard.addListener('keyboardDidShow', () => {
+      if (composerFocusedRef.current) {
+        scrollCommentsToEnd();
+      }
+    });
+    return () => {
+      subscription.remove();
+      if (scrollRetryRef.current) {
+        clearTimeout(scrollRetryRef.current);
+      }
+    };
+  }, [scrollCommentsToEnd]);
 
   // 목록에서 지워졌거나(삭제) 아직 안 받은 경우
   if (!record) {
@@ -78,6 +124,76 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
    * 작성자가 안 실려 오면 authorId 가 null 이라 id 비교만으로는 영영 안 열립니다.
    */
   const isMine = isMineByList || (!!myId && record.authorId === myId);
+
+  const submitReport = async (
+    targetType: 'TRAVEL_RECORD' | 'COMMENT',
+    targetId: string,
+    reason: ReportReason,
+    authorId?: string,
+  ) => {
+    setIsModerating(true);
+    try {
+      // TODO: 신고 API가 확정되면 이 모의 지연을 실제 요청으로 교체합니다.
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 500));
+      if (__DEV__) {
+        console.log('[moderation mock] report', {
+          targetType,
+          targetId,
+          authorId,
+          reason,
+        });
+      }
+      setModerationTarget(null);
+      Alert.alert('신고가 접수됐어요', '확인 후 필요한 조치를 취하겠습니다.');
+    } finally {
+      setIsModerating(false);
+    }
+  };
+
+  const confirmBlockAuthor = () => {
+    const target = moderationTarget;
+    if (!target) {
+      return;
+    }
+    // UI 확인 단계에서는 작성자 id가 없는 응답도 차단 흐름을 끝까지 보여줍니다.
+    // TODO: 차단 API 연결 전 서버가 기록·댓글에 authorId를 내려주도록 확정합니다.
+    const authorId =
+      target.authorId ?? `mock:${target.targetType}:${target.targetId}`;
+    setModerationTarget(null);
+    Alert.alert(
+      '이 사용자를 차단할까요?',
+      '이 사용자의 여행 기록과 댓글이 더 이상 표시되지 않습니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '차단',
+          style: 'destructive',
+          onPress: async () => {
+            setIsModerating(true);
+            try {
+              // TODO: 차단 API가 확정되면 성공 후 아래 로컬 숨김을 실행합니다.
+              await new Promise<void>(resolve =>
+                setTimeout(() => resolve(), 500),
+              );
+              if (__DEV__) {
+                console.log('[moderation mock] block user', authorId);
+              }
+              if (target.authorId) {
+                recordStore.hideAuthor(target.authorId);
+                commentStore.hideAuthor(target.authorId);
+              }
+              if (target.targetType === 'TRAVEL_RECORD') {
+                onBack();
+              }
+              Alert.alert('차단했어요', '이 사용자의 콘텐츠를 숨겼습니다.');
+            } finally {
+              setIsModerating(false);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   /**
    * 내 댓글인지.
@@ -148,7 +264,7 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <TopBar
         onBack={onBack}
@@ -172,15 +288,41 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
                 </Text>
               </Pressable>
             </View>
-          ) : null
+          ) : (
+            <Pressable
+              onPress={() =>
+                setModerationTarget({
+                  targetType: 'TRAVEL_RECORD',
+                  targetId: record.id,
+                  contentLabel: '여행 기록',
+                  authorId: record.authorId,
+                })
+              }
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="여행 기록 신고 및 작성자 차단">
+              <Text style={styles.moderationAction}>신고</Text>
+            </Pressable>
+          )
         }
       />
 
       <FlatList
+        ref={commentsListRef}
         data={comments.comments}
         keyExtractor={comment => comment.id}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        onLayout={() => {
+          if (composerFocusedRef.current) {
+            scrollCommentsToEnd();
+          }
+        }}
+        onContentSizeChange={() => {
+          if (composerFocusedRef.current) {
+            scrollCommentsToEnd();
+          }
+        }}
         refreshControl={
           <RefreshControl
             refreshing={
@@ -232,16 +374,40 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
             comment={item}
             isMine={isMyComment(item)}
             isEditing={editingId === item.id}
-            onToggleLike={() => {
-              commentStore.toggleLike(recordId, item.id).catch(() => {});
-            }}
             onEdit={() => {
               setEditingId(item.id);
               setDraft(item.content);
             }}
             onDelete={() => confirmDeleteComment(item.id)}
+            onModerate={() =>
+              setModerationTarget({
+                targetType: 'COMMENT',
+                targetId: item.id,
+                contentLabel: '댓글',
+                authorId: item.authorId,
+              })
+            }
           />
         )}
+      />
+
+      <ModerationSheet
+        visible={moderationTarget !== null}
+        contentLabel={moderationTarget?.contentLabel ?? '콘텐츠'}
+        canBlockUser={moderationTarget !== null}
+        submitting={isModerating}
+        onClose={() => setModerationTarget(null)}
+        onReportContent={reason => {
+          if (moderationTarget) {
+            submitReport(
+              moderationTarget.targetType,
+              moderationTarget.targetId,
+              reason,
+              moderationTarget.authorId ?? undefined,
+            );
+          }
+        }}
+        onBlockUser={confirmBlockAuthor}
       />
 
       {/* 댓글 입력 */}
@@ -273,6 +439,13 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
             placeholderTextColor={colors.textSecondary}
             multiline
             editable={!comments.isSubmitting}
+            onFocus={() => {
+              composerFocusedRef.current = true;
+              scrollCommentsToEnd();
+            }}
+            onBlur={() => {
+              composerFocusedRef.current = false;
+            }}
           />
           <Pressable
             style={[
@@ -411,16 +584,16 @@ function CommentRow({
   comment,
   isMine,
   isEditing,
-  onToggleLike,
   onEdit,
   onDelete,
+  onModerate,
 }: {
   comment: RecordComment;
   isMine: boolean;
   isEditing: boolean;
-  onToggleLike: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onModerate: () => void;
 }) {
   const author = comment.authorName ?? '혼행러';
   return (
@@ -453,22 +626,19 @@ function CommentRow({
           </View>
         ) : null}
       </View>
-      <Pressable
-        style={styles.commentLike}
-        onPress={onToggleLike}
-        hitSlop={6}
-        accessibilityRole="button"
-        accessibilityState={{ selected: comment.likedByMe }}
-        accessibilityLabel={comment.likedByMe ? '좋아요 취소' : '좋아요'}
-      >
-        <HeartIcon
-          color={comment.likedByMe ? colors.danger : colors.border}
-          size={16}
-        />
-        {comment.likeCount > 0 ? (
-          <Text style={styles.commentLikeText}>{comment.likeCount}</Text>
-        ) : null}
-      </Pressable>
+      {!isMine ? (
+        <View style={styles.commentSide}>
+          <Pressable
+            onPress={onModerate}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="댓글 신고 및 작성자 차단">
+            <Text style={[styles.commentAction, styles.ownerDanger]}>
+              신고
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -512,6 +682,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
   ownerDanger: {
+    color: colors.danger,
+  },
+  moderationAction: {
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.danger,
   },
 
@@ -692,13 +867,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     marginHorizontal: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-    borderRadius: 12,
+    marginBottom: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    backgroundColor: colors.background,
   },
   commentRowEditing: {
     backgroundColor: colors.goldSoft,
-    paddingHorizontal: 10,
+    borderColor: colors.primaryBorder,
   },
   commentAvatar: {
     width: 32,
@@ -748,15 +927,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
-  commentLike: {
+  commentSide: {
     alignItems: 'center',
-    gap: 2,
-    paddingTop: 2,
-  },
-  commentLikeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
+    paddingTop: 1,
   },
 
   // 입력창

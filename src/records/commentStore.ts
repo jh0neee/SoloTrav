@@ -140,39 +140,17 @@ export const commentStore = {
     }
   },
 
-  /** 댓글 좋아요 토글 (낙관적 갱신) */
-  async toggleLike(recordId: string, commentId: string): Promise<void> {
-    const current = commentStore
-      .getFor(recordId)
-      .comments.find(comment => comment.id === commentId);
-    if (!current) {
-      return;
-    }
-    const nextLiked = !current.likedByMe;
-
-    const apply = (liked: boolean, count: number) =>
-      setFor(recordId, {
-        comments: commentStore
-          .getFor(recordId)
-          .comments.map(comment =>
-            comment.id === commentId
-              ? { ...comment, likedByMe: liked, likeCount: count }
-              : comment,
-          ),
-      });
-
-    apply(nextLiked, Math.max(0, current.likeCount + (nextLiked ? 1 : -1)));
-
-    try {
-      if (nextLiked) {
-        await recordApi.likeComment(commentId);
-      } else {
-        await recordApi.unlikeComment(commentId);
+  /** 차단 직후 불러와 둔 모든 기록에서 해당 사용자의 댓글을 숨깁니다. */
+  hideAuthor(authorId: string): void {
+    Object.entries(byRecord).forEach(([recordId, list]) => {
+      const comments = list.comments.filter(
+        comment => comment.authorId !== authorId,
+      );
+      if (comments.length !== list.comments.length) {
+        setFor(recordId, { comments });
+        syncCount(recordId);
       }
-    } catch (caught) {
-      apply(current.likedByMe, current.likeCount);
-      throw toApiError(caught);
-    }
+    });
   },
 
   /** 로그아웃 시 초기화 */

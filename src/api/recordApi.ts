@@ -127,13 +127,4 @@ export const recordApi = {
     await apiClient.delete(ENDPOINTS.comment(commentId));
   },
 
-  /** POST /travel-records/comments/{commentId}/likes — 댓글 좋아요 */
-  likeComment: async (commentId: string): Promise<void> => {
-    await apiClient.post(ENDPOINTS.commentLikes(commentId));
-  },
-
-  /** DELETE /travel-records/comments/{commentId}/likes — 댓글 좋아요 취소 */
-  unlikeComment: async (commentId: string): Promise<void> => {
-    await apiClient.delete(ENDPOINTS.commentLikes(commentId));
-  },
 };

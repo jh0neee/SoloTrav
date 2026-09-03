@@ -312,6 +312,15 @@ export const recordStore = {
     }));
   },
 
+  /** 차단 직후 서버 재조회 전에도 해당 사용자의 기록을 화면에서 숨깁니다. */
+  hideAuthor(authorId: string): void {
+    const hide = (list: RecordListState): RecordListState => ({
+      ...list,
+      records: list.records.filter(record => record.authorId !== authorId),
+    });
+    setState({ all: hide(state.all), mine: hide(state.mine) });
+  },
+
   /** 작성 화면을 새로 열 때 이전 실패 메시지를 지웁니다. */
   clearSubmitError(): void {
     setState({ submitError: null });
