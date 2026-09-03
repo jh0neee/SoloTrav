@@ -16,7 +16,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { MicIcon, PlusIcon, SendIcon } from '../../components/icons/UiIcons';
+import { SendIcon } from '../../components/icons/UiIcons';
 import { QUICK_PROMPTS } from '../../assistant/suggestions';
 import { colors } from '../../theme/colors';
 
@@ -60,15 +60,6 @@ function ChatComposer({ disabled, onSend }: Props) {
 
       {/* 입력창 */}
       <View style={styles.inputBar}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="첨부"
-          // 사진·위치 첨부는 아직 서버 스펙이 없어 자리만 잡아둡니다.
-          disabled
-          style={styles.plusButton}>
-          <PlusIcon color={colors.textSecondary} size={20} />
-        </Pressable>
-
         <TextInput
           style={styles.input}
           value={draft}
@@ -83,22 +74,13 @@ function ChatComposer({ disabled, onSend }: Props) {
           onSubmitEditing={submit}
         />
 
-        {canSend ? (
+        {canSend && (
           <Pressable
             onPress={submit}
             accessibilityRole="button"
             accessibilityLabel="보내기"
             style={styles.sendButton}>
             <SendIcon color={colors.textOnPrimary} size={18} />
-          </Pressable>
-        ) : (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="음성 입력"
-            // 음성 입력은 다음 단계 — 지금은 시안의 자리만 지킵니다.
-            disabled
-            style={styles.micButton}>
-            <MicIcon color={colors.textSecondary} size={18} />
           </Pressable>
         )}
       </View>
@@ -135,18 +117,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    paddingLeft: 6,
+    paddingLeft: 12,
     paddingRight: 6,
     paddingVertical: 6,
     borderRadius: 28,
     backgroundColor: colors.chatInputBg,
-  },
-  plusButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   input: {
     flex: 1,
@@ -156,13 +131,6 @@ const styles = StyleSheet.create({
     maxHeight: 96,
     fontSize: 14,
     color: colors.chatBotText,
-  },
-  micButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   sendButton: {
     width: 36,

@@ -8,7 +8,7 @@
  * 밤하늘 배경 · 흰 말풍선 · 골드 칩으로 다른 탭(밝은 크림 톤)과 구분되는
  * '샛별이만의 공간' 을 만듭니다.
  */
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   AppState,
@@ -24,6 +24,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ChatBubble from './ChatBubble';
 import ChatComposer from './ChatComposer';
 import StarField from './StarField';
+import ModerationSheet, {
+  type ReportReason,
+} from '../../components/ModerationSheet';
 import { Mascot } from '../../components/icons/TabIcons';
 import { DotsIcon } from '../../components/icons/UiIcons';
 import { assistantStore, useAssistant } from '../../assistant/assistantStore';
@@ -63,6 +66,8 @@ function AssistantScreen() {
   const { messages, isSending, pending } = useAssistant();
   const preferences = usePreferences();
   const scrollRef = useRef<ScrollView>(null);
+  const [reportRequestId, setReportRequestId] = useState<string | null>(null);
+  const [isReporting, setIsReporting] = useState(false);
 
   // 답을 기다리는 동안에는 새 질문을 받지 않습니다.
   const isBusy = isSending || pending !== null;
@@ -109,10 +114,32 @@ function AssistantScreen() {
     ? summarizePreferences(preferences.answers)
     : null;
 
+  const reportAiResponse = async (reason: ReportReason) => {
+    if (!reportRequestId) {
+      return;
+    }
+    setIsReporting(true);
+    try {
+      // TODO: AI 응답 신고 API가 확정되면 이 모의 지연을 실제 요청으로 교체합니다.
+      await new Promise<void>(resolve => setTimeout(() => resolve(), 500));
+      if (__DEV__) {
+        console.log('[moderation mock] report', {
+          targetType: 'AI_RESPONSE',
+          targetId: reportRequestId,
+          reason,
+        });
+      }
+      setReportRequestId(null);
+      Alert.alert('신고가 접수됐어요', '더 안전한 답변을 만드는 데 반영하겠습니다.');
+    } finally {
+      setIsReporting(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <StarField />
 
       {/* 헤더 */}
@@ -187,9 +214,22 @@ function AssistantScreen() {
             key={message.id}
             message={message}
             onRetry={() => assistantStore.retry()}
+            onReport={
+              message.role === 'assistant' && message.requestId
+                ? () => setReportRequestId(message.requestId)
+                : undefined
+            }
           />
         ))}
       </ScrollView>
+
+      <ModerationSheet
+        visible={reportRequestId !== null}
+        contentLabel="AI 답변"
+        submitting={isReporting}
+        onClose={() => setReportRequestId(null)}
+        onReportContent={reportAiResponse}
+      />
 
       <ChatComposer disabled={isBusy} onSend={handleSend} />
     </KeyboardAvoidingView>
