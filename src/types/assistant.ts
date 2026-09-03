@@ -84,15 +84,28 @@ export type ChatRole = 'user' | 'assistant';
  */
 export type ChatMessageState = 'pending' | 'done' | 'failed';
 
+
+
+export type SuggestedPrompt = {
+  /** 칩에 보이는 짧은 문구 */
+  label: string;
+  /** 실제로 전송되는 문장 */
+  prompt: string;
+};
+
 export type ChatMessage = {
   id: string;
   role: ChatRole;
-  /** pending 일 때는 '코스를 짜는 중이에요' 같은 진행 문구가 들어갑니다 */
+  /** pending 일 때는 진행 문구가 들어가며, thinking UI 단계별로 전환될 수 있습니다 */
   text: string;
   /** 코스가 딸려 온 답변이면 말풍선 아래에 타임라인 카드를 붙입니다 */
   course: TravelCourse | null;
   requestId: string | null;
   state: ChatMessageState;
+  /** 답변 불가 시 바로 질문을 바꿀 수 있는 추천 칩 목록 */
+  suggestedPrompts?: SuggestedPrompt[];
+  /** 답변 불가/폴백 안내 메시지 여부 */
+  isFallback?: boolean;
   /** 표시용 시각 (epoch ms) */
   createdAt: number;
 };

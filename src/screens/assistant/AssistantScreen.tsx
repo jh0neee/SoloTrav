@@ -213,6 +213,8 @@ function AssistantScreen() {
           <ChatBubble
             key={message.id}
             message={message}
+            onSelectPrompt={handleSend}
+            disabledPrompt={isBusy}
             onRetry={() => assistantStore.retry()}
             onReport={
               message.role === 'assistant' && message.requestId

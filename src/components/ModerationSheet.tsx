@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -60,7 +60,7 @@ function ModerationSheet({
     }
   }, [translateY, visible]);
 
-  const dismiss = () => {
+  const dismiss = useCallback(() => {
     if (submitting) {
       return;
     }
@@ -72,20 +72,20 @@ function ModerationSheet({
       translateY.setValue(0);
       onClose();
     });
-  };
+  }, [onClose, submitting, translateY]);
 
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_, gesture) =>
-          !submitting &&
-          gesture.dy > 6 &&
-          Math.abs(gesture.dy) > Math.abs(gesture.dx),
+          !submitting && gesture.dy > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
         onPanResponderMove: (_, gesture) => {
-          translateY.setValue(Math.max(0, gesture.dy));
+          if (gesture.dy > 0) {
+            translateY.setValue(gesture.dy);
+          }
         },
         onPanResponderRelease: (_, gesture) => {
-          if (gesture.dy > 90 || gesture.vy > 0.8) {
+          if (gesture.dy > 120 || gesture.vy > 0.8) {
             dismiss();
             return;
           }
@@ -101,7 +101,7 @@ function ModerationSheet({
           }).start();
         },
       }),
-    [submitting, translateY],
+    [dismiss, submitting, translateY],
   );
 
   return (

@@ -19,6 +19,11 @@ import { assistantApi } from '../api/assistantApi';
 import { toApiError } from '../api/errors';
 import type { SseConnection } from '../api/sse';
 import type { ChatMessage, ChatResult, TravelCourse } from '../types/assistant';
+import {
+  FALLBACK_GUIDE_TEXT,
+  THINKING_PHASES,
+  getFallbackPrompts,
+} from './suggestions';
 
 /** 진행 중인 요청 — 결과가 어느 말풍선에 들어가야 하는지 함께 기억합니다 */
 export type PendingRequest = {
@@ -38,16 +43,13 @@ export type AssistantState = {
 };
 
 /** 결과를 기다리는 동안 말풍선에 띄우는 기본 문구 */
-const THINKING_TEXT = '샛별이가 코스를 살펴보고 있어요';
+const THINKING_TEXT = THINKING_PHASES[0].text;
 
 /**
- * 결과를 기다리는 최대 시간.
- *
- * 서버가 heartbeat 만 계속 보내고 결과를 영영 안 주는 경우(브로커에 작업이
- * 안 실렸는데 스트림은 살아있는 경우)가 있어, 무한정 기다리지 않도록
- * 절대 상한을 둡니다. heartbeat 로는 연장되지 않습니다.
+ * 결과를 기다리는 최대 시간 (초과 시 답변 불가 및 추천 칩 안내로 전환).
+ * 모바일 사용자 경험을 위해 기존 180초에서 35초로 최적화했습니다.
  */
-const RESULT_TIMEOUT_MS = 180000;
+const RESULT_TIMEOUT_MS = 35000;
 
 const INITIAL: AssistantState = {
   messages: [],
@@ -106,6 +108,10 @@ function closeStream(): void {
 /** 결과가 도착했을 때 말풍선을 완성합니다. */
 function applyResult(messageId: string, result: ChatResult): void {
   const course: TravelCourse | null = result.course;
+  if (!result.answer && !course) {
+    applyFailure(messageId, FALLBACK_GUIDE_TEXT);
+    return;
+  }
   const text =
     result.answer ??
     (course ? '요청하신 코스를 준비했어요.' : '답변을 준비하지 못했어요.');
@@ -114,9 +120,18 @@ function applyResult(messageId: string, result: ChatResult): void {
   closeStream();
 }
 
-/** 실패했을 때 말풍선을 오류 상태로 바꿉니다. */
-function applyFailure(messageId: string, message: string): void {
-  patchMessage(messageId, { text: message, course: null, requestId: null, state: 'failed' });
+/** 실패했거나 답변이 불가할 때 말풍선을 친절한 안내 문구와 추천 칩으로 전환합니다. */
+function applyFailure(messageId: string, customMessage?: string): void {
+  const prompts = getFallbackPrompts(lastRequest?.regionName);
+  const text = customMessage ?? FALLBACK_GUIDE_TEXT;
+  patchMessage(messageId, {
+    text,
+    course: null,
+    requestId: null,
+    state: 'failed',
+    suggestedPrompts: prompts,
+    isFallback: true,
+  });
   setState({ pending: null });
   closeStream();
 }
@@ -132,15 +147,12 @@ function openStream(requestId: string, messageId: string): void {
       }
     },
     onComplete: result => applyResult(messageId, result),
-    onError: error => applyFailure(messageId, error.message),
+    onError: _error => applyFailure(messageId, FALLBACK_GUIDE_TEXT),
   });
 
   watchdog = setTimeout(() => {
     watchdog = null;
-    applyFailure(
-      messageId,
-      '응답이 너무 오래 걸려요. 잠시 후 다시 시도해주세요.',
-    );
+    applyFailure(messageId, FALLBACK_GUIDE_TEXT);
   }, RESULT_TIMEOUT_MS);
 }
 
@@ -174,10 +186,7 @@ export const assistantStore = {
         return;
       }
       if (result.status === 'FAILED') {
-        applyFailure(
-          pending.messageId,
-          result.errorMessage ?? '코스를 만들지 못했어요. 다시 시도해주세요.',
-        );
+        applyFailure(pending.messageId, FALLBACK_GUIDE_TEXT);
         return;
       }
     } catch {
@@ -245,18 +254,12 @@ export const assistantStore = {
       });
 
       // 브로커에 작업이 안 실렸다는 뜻이라 결과가 오지 않습니다.
-      // (서버의 RabbitMQ 연결을 확인해야 하는 상황입니다)
       if (ticket.status === 'WAITING_BROKER') {
         setState({ isSending: false });
-        applyFailure(
-          replyMessage.id,
-          '지금은 요청을 처리할 수 없어요. 잠시 후 다시 시도해주세요.',
-        );
+        applyFailure(replyMessage.id, FALLBACK_GUIDE_TEXT);
         return;
       }
 
-      // brokerPublished 가 false 여도 status 가 진행 중이면 곧 실릴 수 있으므로
-      // 구독은 해봅니다. 끝내 결과가 없으면 위 watchdog 이 정리합니다.
       if (__DEV__ && !ticket.brokerPublished) {
         console.warn(
           `[saetbyeol] brokerPublished=false 인데 status=${ticket.status} 라 일단 구독합니다.`,
@@ -274,8 +277,11 @@ export const assistantStore = {
       }
     } catch (caught) {
       const error = toApiError(caught);
+      if (__DEV__) {
+        console.warn('[saetbyeol] request failed:', error.message);
+      }
       setState({ isSending: false });
-      applyFailure(replyMessage.id, error.message);
+      applyFailure(replyMessage.id, FALLBACK_GUIDE_TEXT);
     }
   },
 

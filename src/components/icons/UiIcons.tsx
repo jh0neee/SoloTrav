@@ -159,14 +159,21 @@ export function FilterIcon({ color, size = 18 }: IconProps) {
   return <PhSlidersHorizontal color={color} size={size} weight={WEIGHT} />;
 }
 
+
 /** 사람 */
 export function PersonIcon({ color, size = 18 }: IconProps) {
   return <PhUser color={color} size={size} weight={WEIGHT} />;
 }
 
 /** 반짝임 — AI·추천 표시 */
-export function SparkIcon({ color, size = 18 }: IconProps) {
-  return <PhSparkle color={color} size={size} weight={WEIGHT} />;
+export function SparkIcon({
+  color,
+  size = 18,
+  filled = false,
+}: IconProps & { filled?: boolean }) {
+  return (
+    <PhSparkle color={color} size={size} weight={filled ? 'fill' : WEIGHT} />
+  );
 }
 
 /** 메달 — 배지 수집과 성취 표시 */
