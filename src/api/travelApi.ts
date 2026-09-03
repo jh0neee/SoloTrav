@@ -16,8 +16,8 @@ import {
   toRegionSafetyList,
   toTotalCount,
   toTourFestivals,
-  toTourSpotDetail,
-  toTourSpots,
+  toTourContentDetail,
+  toTourContents,
   toVisitorTotals,
   todayYmd,
   type VisitorTotals,
@@ -28,8 +28,8 @@ import type {
   HubAttraction,
   RegionSafety,
   TourFestival,
-  TourSpot,
-  TourSpotDetail,
+  TourContent,
+  TourContentDetail,
 } from '../types/travel';
 
 /** TourAPI 가 요구하는 호출 주체 정보 — 모든 요청에 공통으로 실립니다. */
@@ -47,6 +47,10 @@ export type TourPage<T> = {
   /** 다음 페이지가 있으면 그 번호, 없으면 null */
   nextPage: number | null;
 };
+
+export const REGION_PAGE_SIZE = 100;
+export const DEFAULT_RADIUS = 5000;
+export const FESTIVAL_RADIUS = 50000;
 
 function toPage<T>(
   items: T[],
@@ -77,13 +81,16 @@ export const travelApi = {
    * 사진이 없는 항목이 섞이면 카드 목록이 들쭉날쭉해지지만, 검색은 "찾는 게
    * 나오는 것"이 우선이라 대표이미지 필수 정렬(O/Q/R)을 쓰지 않습니다.
    */
-  searchSpots: async (params: {
-    keyword: string;
-    contentTypeId?: string;
-    page?: number;
-    size?: number;
-    arrange?: TourArrange;
-  } & RegionFilter): Promise<TourPage<TourSpot>> => {
+  searchSpots: async (
+    params: {
+      keyword: string;
+      contentTypeId?: string;
+      page?: number;
+      size?: number;
+      arrange?: TourArrange;
+    } & RegionFilter,
+    signal?: AbortSignal,
+  ): Promise<TourPage<TourContent>> => {
     const pageNo = params.page ?? 1;
     const size = params.size ?? 20;
     const { data } = await apiClient.get(
@@ -98,20 +105,23 @@ export const travelApi = {
           numOfRows: size,
         }),
       ),
+      { signal },
     );
-    return toPage(toTourSpots(data), data, pageNo, size);
+    return toPage(toTourContents(data), data, pageNo, size);
   },
 
   /**
    * 지역 기반 관광정보 — '이 동네에 뭐가 있는지' 카드로 보여줄 때.
    * 기본 정렬은 대표이미지가 있는 것만(Q) 입니다.
    */
-  listSpotsByRegion: async (params: {
-    contentTypeId?: string;
-    page?: number;
-    size?: number;
-    arrange?: TourArrange;
-  } & RegionFilter): Promise<TourPage<TourSpot>> => {
+  listSpotsByRegion: async (
+    params: {
+      contentTypeId?: string;
+      page?: number;
+      size?: number;
+      arrange?: TourArrange;
+    } & RegionFilter,
+  ): Promise<TourPage<TourContent>> => {
     const pageNo = params.page ?? 1;
     const size = params.size ?? 20;
     const { data } = await apiClient.get(
@@ -126,34 +136,27 @@ export const travelApi = {
         }),
       ),
     );
-    return toPage(toTourSpots(data), data, pageNo, size);
+    return toPage(toTourContents(data), data, pageNo, size);
   },
 
   /**
-   * 좌표 반경 안의 관광정보 — 거리순(E)으로 옵니다.
-   * radius 는 미터이고 TourAPI 상한이 20km 라 그 위로는 잘라 보냅니다.
+   * 지역 전체 관광정보. 정확한 사용자·지도 좌표는 보내지 않습니다.
    */
-  listNearbySpots: async (params: {
-    lat: number;
-    lng: number;
-    radius?: number;
-    contentTypeId?: string;
-    size?: number;
-  }): Promise<TourSpot[]> => {
+  listNearbySpots: async (
+    params: { regionName: string; page?: number; size?: number },
+    signal?: AbortSignal,
+  ): Promise<TourPage<TourContent>> => {
+    const pageNo = params.page ?? 1;
+    const size = params.size ?? REGION_PAGE_SIZE;
     const { data } = await apiClient.get(
-      ENDPOINTS.tourLocationBasedList(
-        withDefaults({
-          mapY: params.lat,
-          mapX: params.lng,
-          radius: Math.min(params.radius ?? 5000, 20000),
-          contentTypeId: params.contentTypeId,
-          arrange: 'E',
-          pageNo: 1,
-          numOfRows: params.size ?? 20,
-        }),
-      ),
+      ENDPOINTS.tourRegionBasedList({
+        regionName: params.regionName,
+        pageNo,
+        numOfRows: size,
+      }),
+      { signal },
     );
-    return toTourSpots(data);
+    return toPage(toTourContents(data), data, pageNo, size);
   },
 
   /**
@@ -161,11 +164,10 @@ export const travelApi = {
    * from(YYYYMMDD) 이후 시작하는 행사가 오므로 기본값은 오늘입니다.
    * 오늘 이전에 시작해 지금도 하는 축제까지 담고 싶으면 from 을 앞당겨 주세요.
    */
-  listFestivals: async (params: {
-    from?: string;
-    to?: string;
-    size?: number;
-  } & RegionFilter = {}): Promise<TourFestival[]> => {
+  listFestivals: async (
+    params: { from?: string; to?: string; size?: number } & RegionFilter = {},
+    signal?: AbortSignal,
+  ): Promise<TourFestival[]> => {
     const { data } = await apiClient.get(
       ENDPOINTS.tourSearchFestival(
         withDefaults({
@@ -178,15 +180,20 @@ export const travelApi = {
           numOfRows: params.size ?? 20,
         }),
       ),
+      { signal },
     );
     return toTourFestivals(data);
   },
 
   /** 숙박 정보 조회 */
-  listStays: async (params: {
-    page?: number;
-    size?: number;
-  } & RegionFilter = {}): Promise<TourPage<TourSpot>> => {
+  listStays: async (
+    params: {
+      page?: number;
+      size?: number;
+      arrange?: TourArrange;
+    } & RegionFilter = {},
+    signal?: AbortSignal,
+  ): Promise<TourPage<TourContent>> => {
     const pageNo = params.page ?? 1;
     const size = params.size ?? 20;
     const { data } = await apiClient.get(
@@ -194,13 +201,14 @@ export const travelApi = {
         withDefaults({
           lDongRegnCd: params.regionCode,
           lDongSignguCd: params.districtCode,
-          arrange: 'Q',
+          arrange: params.arrange ?? 'Q',
           pageNo,
           numOfRows: size,
         }),
       ),
+      { signal },
     );
-    return toPage(toTourSpots(data), data, pageNo, size);
+    return toPage(toTourContents(data), data, pageNo, size);
   },
 
   /**
@@ -213,36 +221,42 @@ export const travelApi = {
   getSpotDetail: async (
     contentId: string,
     contentTypeId?: string,
-  ): Promise<TourSpotDetail | null> => {
+    signal?: AbortSignal,
+  ): Promise<TourContentDetail | null> => {
     const [common, intro, images] = await Promise.all([
       apiClient.get(
         ENDPOINTS.tourDetailCommon(withDefaults({ contentId, numOfRows: 1 })),
+        { signal },
       ),
       apiClient
         .get(
           ENDPOINTS.tourDetailIntro(
             withDefaults({ contentId, contentTypeId, numOfRows: 1 }),
           ),
+          { signal },
         )
         .catch(() => null),
       apiClient
         .get(
           ENDPOINTS.tourDetailImage(withDefaults({ contentId, numOfRows: 10 })),
+          { signal },
         )
         .catch(() => null),
     ]);
-    return toTourSpotDetail(common.data, intro?.data, images?.data);
+    return toTourContentDetail(common.data, intro?.data, images?.data);
   },
 
   /**
    * 관광사진 갤러리.
    * keyword 를 주면 검색 엔드포인트로, 없으면 최신 목록으로 갑니다.
    */
-  listGalleryPhotos: async (params: {
-    keyword?: string;
-    page?: number;
-    size?: number;
-  } = {}): Promise<TourPage<GalleryPhoto>> => {
+  listGalleryPhotos: async (
+    params: {
+      keyword?: string;
+      page?: number;
+      size?: number;
+    } = {},
+  ): Promise<TourPage<GalleryPhoto>> => {
     const pageNo = params.page ?? 1;
     const size = params.size ?? 20;
     const query = {

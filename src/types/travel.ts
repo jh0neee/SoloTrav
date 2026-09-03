@@ -4,6 +4,8 @@
  * 이 타입만 봅니다. 변환은 api/travelMappers.ts 에서 한 번만 일어납니다.
  */
 
+import type { TourCategory } from './tourPlace';
+
 /** 콘텐츠 타입 코드 → 사람이 읽는 이름 */
 export const CONTENT_TYPE_LABEL: Record<string, string> = {
   '12': '관광지',
@@ -29,11 +31,13 @@ export const SEARCH_FILTERS = [
 export type SearchFilterId = (typeof SEARCH_FILTERS)[number]['id'];
 
 /** 관광 콘텐츠 1건 (검색·주변·지역 목록 공통) */
-export type TourSpot = {
+export type TourContent = {
   contentId: string;
   contentTypeId: string;
   /** CONTENT_TYPE_LABEL 로 변환한 값. 모르는 코드면 '관광정보' */
   typeLabel: string;
+  /** 지도 필터에서 쓰는 공통 카테고리. 알 수 없는 콘텐츠 타입이면 null */
+  category: TourCategory | null;
   title: string;
   /** addr1 + addr2 를 합친 전체 주소. 없으면 빈 문자열 */
   address: string;
@@ -50,13 +54,13 @@ export type TourSpot = {
   districtCode: string | null;
   /** 위치기반 조회 결과에만 있는 중심점 기준 거리(m) */
   distance: number | null;
+  /** 축제 콘텐츠에서만 채워지는 YYYYMMDD */
+  eventStartDate: string | null;
+  eventEndDate: string | null;
 };
 
 /** 축제·행사 */
-export type TourFestival = TourSpot & {
-  /** YYYYMMDD */
-  startDate: string | null;
-  endDate: string | null;
+export type TourFestival = TourContent & {
   /** '8.14 ~ 8.23' 처럼 화면에 바로 쓰는 문자열 */
   periodLabel: string;
   /** 오늘 기준 진행 중 */
@@ -72,7 +76,7 @@ export type TourIntroFact = {
 };
 
 /** 관광 콘텐츠 상세 */
-export type TourSpotDetail = TourSpot & {
+export type TourContentDetail = TourContent & {
   overview: string | null;
   homepageUrl: string | null;
   /** 콘텐츠 타입마다 항목이 달라 있는 것만 담깁니다 */
@@ -80,6 +84,21 @@ export type TourSpotDetail = TourSpot & {
   /** 추가 이미지 (대표 이미지 제외) */
   images: string[];
 };
+
+/** 지도에 표시할 수 있음이 확인된 공통 관광 콘텐츠 */
+export type MappableTourContent = TourContent & {
+  category: TourCategory;
+  lat: number;
+  lng: number;
+};
+
+export function isMappableTourContent(
+  content: TourContent,
+): content is MappableTourContent {
+  return (
+    content.category !== null && content.lat !== null && content.lng !== null
+  );
+}
 
 /** 관광사진 갤러리 1장 */
 export type GalleryPhoto = {
@@ -121,11 +140,12 @@ export type RegionSafety = {
   score: number;
 
   /**
-   * 혼행 안전 점수 (0~100, 높을수록 안전).
+   * 혼행 안전 점수 (40~100, 높을수록 안전).
    *
    * 6개 부문을 그냥 평균 내면 자살·감염병처럼 여행자와 관계가 옅은 지표가
    * 절반을 차지해, 치안이 나쁜 지역이 '안전한 곳' 1위가 되는 일이 생깁니다.
    * 그래서 혼자 다닐 때 실제로 위험을 만드는 세 부문에만 가중치를 둡니다.
+   * 공식 등급은 상대평가이므로 5등급도 0점이 아닌 40점으로 환산합니다.
    * (가중치는 travelMappers 의 SOLO_SAFETY_WEIGHTS 참고)
    */
   soloScore: number;
@@ -134,10 +154,10 @@ export type RegionSafety = {
 };
 
 /**
- * 지역안전지수 6개 부문의 표시 정보.
+ * 혼행 안전지수에 사용하는 부문의 표시 정보.
  *
  * 혼자 여행하는 사람이 실제로 신경 쓰는 순서로 배열해둡니다 — 치안(범죄)이
- * 맨 앞이고, 야간 이동과 직결되는 생활안전·교통이 뒤따릅니다. 화면은 이 순서
+ * 맨 앞이고, 낯선 길의 교통과 일상 사고를 다루는 생활안전이 뒤따릅니다. 화면은 이 순서
  * 그대로 그리면 됩니다.
  */
 export const SAFETY_CATEGORIES: {
@@ -147,11 +167,8 @@ export const SAFETY_CATEGORIES: {
   note: string;
 }[] = [
   { key: 'crime', label: '치안', note: '범죄 발생·검거 지표' },
-  { key: 'lifeSafety', label: '생활안전', note: '추락·중독 등 일상 사고' },
   { key: 'traffic', label: '교통', note: '보행자 사고 포함' },
-  { key: 'fire', label: '화재', note: '숙소 선택에 영향' },
-  { key: 'infectiousDisease', label: '감염병', note: '' },
-  { key: 'suicide', label: '자살', note: '' },
+  { key: 'lifeSafety', label: '생활안전', note: '추락·중독 등 일상 사고' },
 ];
 
 /** 등급(1~5) → 사람이 읽는 말. 1이 가장 안전합니다. */
@@ -187,10 +204,14 @@ export const RANKING_KINDS = [
     id: 'safe',
     label: '안전한 곳',
     /** 카드 아래 붙는 설명 */
-    caption: '혼행 안전 점수 순 (치안 50 · 생활안전 30 · 교통 20)',
+    caption: '혼행 안전 점수 순 (치안 40 · 교통 35 · 생활안전 25)',
   },
-  { id: 'hot', label: '핫한 곳', caption: '주말 외지인 방문이 많은 순' },
-  { id: 'quiet', label: '한적한 곳', caption: '사람이 적어 혼자 걷기 좋은 순' },
+  { id: 'hot', label: '많이 찾는 곳', caption: '주말 여행객 방문이 많은 순' },
+  {
+    id: 'quiet',
+    label: '여유로운 곳',
+    caption: '사람이 적어 혼자 걷기 좋은 순',
+  },
 ] as const;
 
 export type RankingKind = (typeof RANKING_KINDS)[number]['id'];

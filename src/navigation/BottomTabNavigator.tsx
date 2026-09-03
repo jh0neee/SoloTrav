@@ -4,8 +4,8 @@
  * - 가운데(샛별이) 탭은 볼록 튀어나온 금색 마스코트 버튼.
  * - 탭 목록은 ./tabs.ts 에서 관리합니다.
  */
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../theme/colors';
 import { Mascot } from '../components/icons/TabIcons';
@@ -26,7 +26,10 @@ function BottomTabNavigator() {
       {/* 현재 선택된 화면 — 모든 화면이 상태바 아래까지 그려집니다.
           상단 여백은 각 화면이 useSafeAreaInsets 로 직접 처리합니다. */}
       <View style={styles.screen}>
-        <ActiveScreen onBack={() => setActiveKey('home')} />
+        <ActiveScreen
+          onBack={() => setActiveKey('home')}
+          onOpenMy={() => setActiveKey('my')}
+        />
       </View>
 
       {/* 하단 탭바 */}
@@ -84,6 +87,17 @@ function DefaultTab({ tab, focused, onPress }: TabProps) {
 
 /** 가운데 탭 — 볼록 튀어나온 샛별이 마스코트 */
 function CenterTab({ tab, focused, onPress }: TabProps) {
+  const focusProgress = useRef(new Animated.Value(focused ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(focusProgress, {
+      toValue: focused ? 1 : 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [focusProgress, focused]);
+
   return (
     <Pressable
       style={styles.centerItem}
@@ -91,13 +105,43 @@ function CenterTab({ tab, focused, onPress }: TabProps) {
       accessibilityRole="button"
       accessibilityState={{ selected: focused }}
       accessibilityLabel={tab.label}>
-      <View style={styles.mascotWrap}>
+      <Animated.View
+        style={[
+          styles.mascotWrap,
+          {
+            transform: [
+              {
+                translateY: focusProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 30],
+                }),
+              },
+              {
+                scale: focusProgress.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 48 / 54],
+                }),
+              },
+            ],
+          },
+        ]}>
         <View style={styles.mascotGlow} />
         <Mascot size={54} />
-      </View>
-      <Text style={[styles.tabLabel, styles.centerLabel]} numberOfLines={1}>
+      </Animated.View>
+      <Animated.Text
+        style={[
+          styles.tabLabel,
+          styles.centerLabel,
+          {
+            opacity: focusProgress.interpolate({
+              inputRange: [0, 0.7, 1],
+              outputRange: [1, 0, 0],
+            }),
+          },
+        ]}
+        numberOfLines={1}>
         {tab.label}
-      </Text>
+      </Animated.Text>
     </Pressable>
   );
 }

@@ -11,22 +11,37 @@
  *   홈 → 취향 프롬프트 (홈 배너에서 바로 진입)
  *   홈 → 축제 카드 → 장소 상세
  */
-import React from 'react';
+import React, { useState } from 'react';
 import HomeScreen from '../screens/home/HomeScreen';
 import SearchScreen from '../screens/home/SearchScreen';
 import GalleryScreen from '../screens/home/GalleryScreen';
 import SpotDetailScreen from '../screens/home/SpotDetailScreen';
 import CitySelectScreen from '../screens/home/CitySelectScreen';
+import CityDetailScreen from '../screens/home/CityDetailScreen';
 import PreferencePromptScreen from '../screens/home/PreferencePromptScreen';
-import { summarizePreferences } from '../data/preferences';
+import { preferenceTagLabels, summarizePreferences, toProfilePreferenceAnswers } from '../data/preferences';
 import {
   preferenceStore,
   usePreferences,
 } from '../preferences/preferenceStore';
 import { useHomeStack } from './useHomeStack';
+import { RankingKind, TourContent } from '../types/travel';
+import { City } from '../data/cities';
 
 function HomeStack() {
   const { current, push, pop } = useHomeStack();
+
+type Route =
+  | { name: 'home' }
+  | { name: 'search' }
+  | { name: 'gallery'; albumTitle?: string }
+  | { name: 'spot'; spot: TourContent }
+  | { name: 'citySelect'; rankingKind: RankingKind }
+  | { name: 'cityDetail'; city: City }
+  | { name: 'preference'; city?: City };
+
+function HomeStack({ onOpenMy }: { onOpenMy?: () => void }) {
+  const [stack, setStack] = useState<Route[]>([{ name: 'home' }]);
   // 취향은 서버가 원본이라 화면 로컬 state 로 들고 있지 않습니다.
   // (탭을 옮기거나 앱을 껐다 켜도 유지되어야 합니다)
   const preferences = usePreferences();
@@ -40,13 +55,23 @@ function HomeStack() {
         />
       );
     case 'gallery':
-      return <GalleryScreen onBack={pop} />;
+      return (
+        <GalleryScreen onBack={pop} initialAlbumTitle={current.albumTitle} />
+      );
     case 'spot':
       return <SpotDetailScreen spot={current.spot} onBack={pop} />;
     case 'citySelect':
       return (
         <CitySelectScreen
-          initialCityId={current.cityId}
+          initialRankingKind={current.rankingKind}
+          onBack={pop}
+          onOpenDetail={city => push({ name: 'cityDetail', city })}
+        />
+      );
+    case 'cityDetail':
+      return (
+        <CityDetailScreen
+          city={current.city}
           onBack={pop}
           onCreateCourse={city => push({ name: 'preference', city })}
           onSelectSpot={spot => push({ name: 'spot', spot })}
@@ -56,15 +81,16 @@ function HomeStack() {
       return (
         <PreferencePromptScreen
           city={current.city}
+          mode={current.city ? 'course' : 'profile'}
           initialAnswers={preferences.answers}
           isSaving={preferences.isSaving}
           saveError={preferences.error}
           onBack={pop}
           onComplete={async answers => {
             try {
-              await preferenceStore.save(answers);
+              await preferenceStore.save(toProfilePreferenceAnswers(answers));
               pop();
-              // TODO: AI 코스 생성 결과 화면 연결
+              // TODO: course 모드에서는 city + answers 로 AI 코스 생성 결과 연결
             } catch {
               // 저장 실패 메시지는 스토어에 담겨 화면 하단에 뜹니다.
               // 여기서 pop() 하면 입력한 답변이 통째로 날아가므로 남겨둡니다.
@@ -81,11 +107,21 @@ function HomeStack() {
               ? summarizePreferences(preferences.answers)
               : null
           }
+          preferenceTags={
+            preferences.answers
+              ? preferenceTagLabels(preferences.answers)
+              : undefined
+          }
+          preferenceStatus={preferences.status}
+          onRetryPreference={() => preferenceStore.reload()}
           onOpenPreference={() => push({ name: 'preference' })}
+          onOpenPreferenceDetail={() => onOpenMy?.()}
           onOpenSearch={() => push({ name: 'search' })}
-          onOpenCitySelect={() => push({ name: 'citySelect' })}
-          onOpenGallery={() => push({ name: 'gallery' })}
-          onSelectCity={city => push({ name: 'citySelect', cityId: city.id })}
+          onOpenCityRanking={rankingKind =>
+            push({ name: 'citySelect', rankingKind })
+          }
+          onOpenGallery={albumTitle => push({ name: 'gallery', albumTitle })}
+          onSelectCity={city => push({ name: 'cityDetail', city })}
           onSelectSpot={spot => push({ name: 'spot', spot })}
         />
       );

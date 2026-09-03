@@ -77,6 +77,14 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    // React Native codegen can exceed Windows' path limit when the project lives
+    // under a long OneDrive path. Keep CMake's generated files in a short temp path.
+    externalNativeBuild {
+        cmake {
+            buildStagingDirectory file("${System.getProperty('java.io.tmpdir')}/solotrav-cxx")
+        }
+    }
+
     namespace "com.solotravelmatemobile"
     defaultConfig {
         applicationId "com.solotravelmatemobile"

@@ -49,10 +49,10 @@ export type SafetyMapMarker = {
   glyph: string;
 };
 
-/** TourPlace 배열을 웹뷰가 쓰는 마커 데이터로 줄입니다. */
+/** 공통 관광 콘텐츠 배열을 웹뷰가 쓰는 마커 데이터로 줄입니다. */
 export function toMapMarkers(
   places: {
-    id: string;
+    contentId: string;
     title: string;
     lat: number;
     lng: number;
@@ -60,7 +60,7 @@ export function toMapMarkers(
   }[],
 ): MapMarker[] {
   return places.map(p => ({
-    id: p.id,
+    id: p.contentId,
     title: p.title,
     lat: p.lat,
     lng: p.lng,

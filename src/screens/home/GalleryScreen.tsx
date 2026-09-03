@@ -1,12 +1,5 @@
-/**
- * 관광사진 갤러리 — 홈의 '사진으로 먼저 만나는 충북' 에서 더 보기로 들어옵니다.
- *
- * 한국관광공사 관광사진갤러리(galleryList1 / gallerySearchList1)를 씁니다.
- * 상단 칩으로 시군을 좁히고, 사진을 누르면 촬영지·촬영자·태그를 큰 사진과 함께
- * 봅니다. 이 API 는 관광지 콘텐츠와 이어지는 id 가 없어서 상세 화면으로는
- * 넘어가지 않고, 태그를 눌러 그 키워드로 다시 찾는 흐름으로 대신합니다.
- */
-import React, { useCallback, useState } from 'react';
+/** 관광사진을 제목별 앨범으로 묶고, 앨범 안 사진을 스와이프로 보는 화면입니다. */
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -20,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_CONTENT_BOTTOM_GAP } from '../../navigation/layout';
 import { colors } from '../../theme/colors';
 import { Chevron } from '../../components/icons/UiIcons';
 import { SectionState } from '../../components/travel/TravelCards';
@@ -27,12 +21,12 @@ import { useGallerySearch } from '../../travel/useGallerySearch';
 import { CITIES } from '../../data/cities';
 import type { GalleryPhoto } from '../../types/travel';
 
-/** 2열 그리드 — 좌우 여백 16 × 2, 카드 사이 간격 10 */
 const GAP = 10;
 const SIDE = 16;
-const CARD_WIDTH = (Dimensions.get('window').width - SIDE * 2 - GAP) / 2;
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const CARD_WIDTH = (SCREEN_WIDTH - SIDE * 2 - GAP) / 2;
+const VIEWER_WIDTH = SCREEN_WIDTH - SIDE * 2;
 
-/** 전체 + 시군 11개. 갤러리 keyword 는 촬영지 문자열을 훑기 때문에 지역명이 그대로 먹습니다 */
 const FILTERS = [
   { id: 'all', label: '충북 전체', keyword: '충청북도' },
   ...CITIES.map(city => ({
@@ -42,27 +36,67 @@ const FILTERS = [
   })),
 ];
 
-type Props = {
-  onBack: () => void;
+type PhotoAlbum = {
+  title: string;
+  cover: GalleryPhoto;
+  photos: GalleryPhoto[];
 };
 
-function GalleryScreen({ onBack }: Props) {
+type Preview = {
+  title: string;
+  index: number;
+};
+
+type Props = {
+  onBack: () => void;
+  /** 홈 앨범을 눌러 들어오면 같은 제목의 앨범을 바로 엽니다. */
+  initialAlbumTitle?: string;
+};
+
+function groupPhotosByTitle(photos: GalleryPhoto[]): PhotoAlbum[] {
+  const grouped = new Map<string, GalleryPhoto[]>();
+  photos.forEach(photo => {
+    const title = photo.title.trim() || '이름 없는 여행 사진';
+    grouped.set(title, [...(grouped.get(title) ?? []), photo]);
+  });
+  return Array.from(grouped, ([title, albumPhotos]) => ({
+    title,
+    cover: albumPhotos[0],
+    photos: albumPhotos,
+  }));
+}
+
+function GalleryScreen({ onBack, initialAlbumTitle }: Props) {
   const insets = useSafeAreaInsets();
   const [filterId, setFilterId] = useState('all');
-  const [preview, setPreview] = useState<GalleryPhoto | null>(null);
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const initialAlbumHandled = useRef(false);
 
   const keyword =
     FILTERS.find(filter => filter.id === filterId)?.keyword ?? '충청북도';
   const gallery = useGallerySearch(keyword);
+  const albums = useMemo(() => groupPhotosByTitle(gallery.items), [gallery.items]);
+  const selectedAlbum = preview
+    ? albums.find(album => album.title === preview.title) ?? null
+    : null;
+  const selectedPhoto = selectedAlbum?.photos[preview?.index ?? 0] ?? null;
 
-  /** 태그를 누르면 그 키워드에 해당하는 시군 칩으로 옮겨갑니다(없으면 무시) */
-  const jumpToRegion = useCallback((tag: string) => {
-    const match = FILTERS.find(filter => tag.includes(filter.label));
-    if (match) {
-      setFilterId(match.id);
-      setPreview(null);
+  useEffect(() => {
+    if (
+      initialAlbumHandled.current ||
+      !initialAlbumTitle ||
+      !albums.some(album => album.title === initialAlbumTitle)
+    ) {
+      return;
     }
-  }, []);
+    initialAlbumHandled.current = true;
+    setPreview({ title: initialAlbumTitle, index: 0 });
+  }, [albums, initialAlbumTitle]);
+
+  const selectFilter = (id: string) => {
+    setPreview(null);
+    setFilterId(id);
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -78,8 +112,8 @@ function GalleryScreen({ onBack }: Props) {
           <Text style={styles.headerTitle}>충북 사진첩</Text>
           <Text style={styles.headerSub}>
             {gallery.status === 'ready'
-              ? `${gallery.totalCount.toLocaleString()}장`
-              : '한국관광공사 관광사진갤러리'}
+              ? `${albums.length}개 이야기 · ${gallery.totalCount.toLocaleString()}장`
+              : '제목별로 만나는 충북 여행'}
           </Text>
         </View>
       </View>
@@ -96,7 +130,9 @@ function GalleryScreen({ onBack }: Props) {
           return (
             <Pressable
               style={[styles.chip, active && styles.chipActive]}
-              onPress={() => setFilterId(item.id)}>
+              onPress={() => selectFilter(item.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}>
               <Text style={[styles.chipText, active && styles.chipTextActive]}>
                 {item.label}
               </Text>
@@ -106,8 +142,8 @@ function GalleryScreen({ onBack }: Props) {
       />
 
       <FlatList
-        data={gallery.items}
-        keyExtractor={photo => photo.id}
+        data={albums}
+        keyExtractor={album => album.title}
         numColumns={2}
         columnWrapperStyle={styles.column}
         contentContainerStyle={styles.grid}
@@ -117,8 +153,8 @@ function GalleryScreen({ onBack }: Props) {
           <SectionState
             status={gallery.status}
             error={gallery.error}
-            isEmpty={gallery.status === 'ready' && gallery.items.length === 0}
-            emptyText="이 지역 사진이 아직 없어요"
+            isEmpty={gallery.status === 'ready' && albums.length === 0}
+            emptyText="이 지역의 사진 이야기가 아직 없어요"
             onRetry={gallery.retry}
             height={260}
           />
@@ -131,25 +167,31 @@ function GalleryScreen({ onBack }: Props) {
           ) : null
         }
         renderItem={({ item }) => (
-          <Pressable style={styles.cell} onPress={() => setPreview(item)}>
+          <Pressable
+            style={styles.cell}
+            onPress={() => setPreview({ title: item.title, index: 0 })}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.title} 사진 ${item.photos.length}장 보기`}>
             <Image
-              source={{ uri: item.imageUrl }}
+              source={{ uri: item.cover.imageUrl }}
               style={styles.cellImage}
               resizeMode="cover"
             />
-            <Text style={styles.cellTitle} numberOfLines={1}>
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{item.photos.length}장</Text>
+            </View>
+            <Text style={styles.cellTitle} numberOfLines={2}>
               {item.title}
             </Text>
             <Text style={styles.cellLocation} numberOfLines={1}>
-              {item.location}
+              {item.cover.location}
             </Text>
           </Pressable>
         )}
       />
 
-      {/* 큰 사진 보기 */}
       <Modal
-        visible={preview !== null}
+        visible={selectedAlbum !== null}
         transparent
         animationType="fade"
         onRequestClose={() => setPreview(null)}>
@@ -160,43 +202,76 @@ function GalleryScreen({ onBack }: Props) {
             accessibilityRole="button"
             accessibilityLabel="사진 닫기"
           />
-          {preview ? (
-            <View style={[styles.modalCard, { marginTop: insets.top + 40 }]}>
-              <Image
-                source={{ uri: preview.imageUrl }}
-                style={styles.modalImage}
-                resizeMode="cover"
+          {selectedAlbum && selectedPhoto ? (
+            <View style={[styles.modalCard, { marginTop: insets.top + 28 }]}>
+              <View style={styles.viewerHeader}>
+                <Pressable
+                  style={styles.viewerClose}
+                  onPress={() => setPreview(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="사진 닫기">
+                  <Chevron direction="left" color={colors.textPrimary} size={22} />
+                </Pressable>
+                <Text style={styles.viewerCount}>
+                  {(preview?.index ?? 0) + 1} / {selectedAlbum.photos.length}
+                </Text>
+              </View>
+
+              <FlatList
+                key={selectedAlbum.title}
+                horizontal
+                pagingEnabled
+                data={selectedAlbum.photos}
+                keyExtractor={photo => photo.id}
+                showsHorizontalScrollIndicator={false}
+                initialScrollIndex={preview?.index ?? 0}
+                getItemLayout={(_, index) => ({
+                  length: VIEWER_WIDTH,
+                  offset: VIEWER_WIDTH * index,
+                  index,
+                })}
+                onMomentumScrollEnd={event => {
+                  const nextIndex = Math.round(
+                    event.nativeEvent.contentOffset.x / VIEWER_WIDTH,
+                  );
+                  setPreview(current =>
+                    current ? { ...current, index: nextIndex } : null,
+                  );
+                }}
+                renderItem={({ item }) => (
+                  <View style={styles.viewerPage}>
+                    <Image
+                      source={{ uri: item.imageUrl }}
+                      style={styles.modalImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+                )}
               />
+
               <ScrollView style={styles.modalBody}>
-                <Text style={styles.modalTitle}>{preview.title}</Text>
+                <Text style={styles.modalTitle}>{selectedAlbum.title}</Text>
                 <Text style={styles.modalMeta}>
-                  {[preview.location, preview.monthLabel]
+                  {[selectedPhoto.location, selectedPhoto.monthLabel]
                     .filter(Boolean)
                     .join(' · ')}
                 </Text>
-                {preview.photographer ? (
+                {selectedPhoto.photographer ? (
                   <Text style={styles.modalPhotographer}>
-                    ⓒ {preview.photographer}
+                    ⓒ {selectedPhoto.photographer}
                   </Text>
                 ) : null}
-
                 <View style={styles.tagWrap}>
-                  {preview.keywords.slice(0, 12).map(tag => (
-                    <Pressable
-                      key={tag}
-                      style={styles.tag}
-                      onPress={() => jumpToRegion(tag)}>
+                  {selectedPhoto.keywords.slice(0, 8).map(tag => (
+                    <View key={tag} style={styles.tag}>
                       <Text style={styles.tagText}>{tag}</Text>
-                    </Pressable>
+                    </View>
                   ))}
                 </View>
               </ScrollView>
-
-              <Pressable
-                style={styles.modalClose}
-                onPress={() => setPreview(null)}>
-                <Text style={styles.modalCloseText}>닫기</Text>
-              </Pressable>
+              {selectedAlbum.photos.length > 1 ? (
+                <Text style={styles.swipeHint}>좌우로 넘겨 사진을 둘러보세요</Text>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -206,10 +281,7 @@ function GalleryScreen({ onBack }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.cream,
-  },
+  container: { flex: 1, backgroundColor: colors.cream },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -223,27 +295,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTexts: {
-    gap: 2,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  headerSub: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-
-  chipStrip: {
-    flexGrow: 0,
-  },
-  chipRow: {
-    gap: 8,
-    paddingHorizontal: SIDE,
-    paddingVertical: 10,
-  },
+  headerTexts: { gap: 2 },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.textPrimary },
+  headerSub: { fontSize: 12, color: colors.textSecondary },
+  chipStrip: { flexGrow: 0 },
+  chipRow: { gap: 8, paddingHorizontal: SIDE, paddingVertical: 10 },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -252,60 +308,47 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  chipActive: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
-  },
+  chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   chipText: {
     fontSize: 13,
     fontWeight: '600',
     color: colors.textSecondary,
-    // 한글 받침이 잘리지 않도록 줄 높이를 넉넉히 잡습니다.
-    // (안드로이드는 includeFontPadding 을 끄면 '충'이 '초'처럼 보입니다)
     lineHeight: 18,
     includeFontPadding: true,
   },
-  chipTextActive: {
-    color: '#ffffff',
-  },
-
+  chipTextActive: { color: '#ffffff' },
   grid: {
     paddingHorizontal: SIDE,
-    paddingBottom: 32,
+    paddingBottom: TAB_CONTENT_BOTTOM_GAP,
     flexGrow: 1,
   },
-  column: {
-    gap: GAP,
-    marginBottom: 16,
-  },
-  cell: {
-    width: CARD_WIDTH,
-    gap: 5,
-  },
+  column: { gap: GAP, marginBottom: 18 },
+  cell: { width: CARD_WIDTH, gap: 5 },
   cellImage: {
     width: CARD_WIDTH,
     height: CARD_WIDTH * 0.75,
     borderRadius: 14,
     backgroundColor: colors.darkCard,
   },
+  countBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 9,
+    backgroundColor: 'rgba(20,24,35,0.72)',
+  },
+  countBadgeText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
   cellTitle: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
+    lineHeight: 18,
     color: colors.textPrimary,
   },
-  cellLocation: {
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
-  footerLoading: {
-    paddingVertical: 18,
-  },
-
-  // 큰 사진 보기
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(15,18,26,0.7)',
-  },
+  cellLocation: { fontSize: 11, color: colors.textSecondary },
+  footerLoading: { paddingVertical: 18 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(15,18,26,0.76)' },
   modalDismiss: {
     position: 'absolute',
     top: 0,
@@ -315,61 +358,56 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     flex: 1,
-    marginHorizontal: 16,
-    marginBottom: 32,
+    marginHorizontal: SIDE,
+    marginBottom: 24,
     borderRadius: 22,
     overflow: 'hidden',
     backgroundColor: colors.background,
   },
+  viewerHeader: {
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+  },
+  viewerClose: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewerCount: {
+    paddingRight: 8,
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  viewerPage: { width: VIEWER_WIDTH },
   modalImage: {
-    width: '100%',
-    height: 260,
+    width: VIEWER_WIDTH,
+    height: 300,
     backgroundColor: colors.darkCard,
   },
-  modalBody: {
-    padding: 18,
-  },
-  modalTitle: {
-    fontSize: 19,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  modalMeta: {
-    marginTop: 6,
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-  modalPhotographer: {
-    marginTop: 4,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  tagWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 14,
-  },
+  modalBody: { padding: 18 },
+  modalTitle: { fontSize: 19, fontWeight: '700', color: colors.textPrimary },
+  modalMeta: { marginTop: 6, fontSize: 13, color: colors.textSecondary },
+  modalPhotographer: { marginTop: 4, fontSize: 12, color: colors.textSecondary },
+  tagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 14 },
   tag: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
     backgroundColor: colors.surface,
   },
-  tagText: {
-    fontSize: 12,
-    color: colors.textPrimary,
-  },
-  modalClose: {
-    padding: 16,
-    alignItems: 'center',
+  tagText: { fontSize: 12, color: colors.textPrimary },
+  swipeHint: {
+    paddingVertical: 14,
+    textAlign: 'center',
     borderTopWidth: 1,
     borderTopColor: colors.border,
-  },
-  modalCloseText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
+    color: colors.textSecondary,
+    fontSize: 12,
   },
 });
 

@@ -20,14 +20,14 @@ import RNWebView, {
   type WebViewProps,
 } from 'react-native-webview';
 import { KAKAO_WEBVIEW_ORIGIN, isKakaoKeyConfigured } from '../../config/kakao';
-import { MAP_CENTER, MY_LOCATION } from '../../data/mapDefaults';
 import { colors } from '../../theme/colors';
 import {
   buildKakaoMapHtml,
   toMapMarkers,
   type SafetyMapMarker,
 } from './kakaoMapHtml';
-import type { TourCategory, TourPlace } from '../../types/tourPlace';
+import type { TourCategory } from '../../types/tourPlace';
+import type { MappableTourContent } from '../../types/travel';
 import type { SearchPoi, SearchStatus } from './searchTypes';
 
 /**
@@ -61,13 +61,15 @@ export type KakaoMapHandle = {
 
 type Props = {
   /** 관광정보 API 로 받아 온 마커 목록 */
-  places: TourPlace[];
+  places: MappableTourContent[];
   category: TourCategory;
   selectedId: string | null;
   safetyPlaces?: SafetyMapMarker[];
   selectedSafetyId?: string | null;
   /** 측위된 현위치. 바뀌면 지도의 파란 점도 따라 옮겨집니다. */
   myLocation: { lat: number; lng: number };
+  /** 실제 현위치를 받았을 때 최초 한 번 지도 중심도 함께 옮깁니다. */
+  centerOnMyLocation?: boolean;
   onMarkerPress: (id: string) => void;
   onSafetyMarkerPress?: (id: string) => void;
   onSearchMarkerPress: (id: string) => void;
@@ -90,6 +92,7 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
     safetyPlaces = [],
     selectedSafetyId = null,
     myLocation,
+    centerOnMyLocation = false,
     onMarkerPress,
     onSafetyMarkerPress,
     onSearchMarkerPress,
@@ -108,11 +111,12 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
 
   // HTML 은 최초 1회만 만듭니다. 최초 카테고리만 ref 로 붙잡아 둡니다.
   const initialCategoryRef = useRef(category);
+  const initialLocationRef = useRef(myLocation);
   const html = useMemo(
     () =>
       buildKakaoMapHtml({
-        center: MAP_CENTER,
-        myLocation: MY_LOCATION,
+        center: initialLocationRef.current,
+        myLocation: initialLocationRef.current,
         initialCategory: initialCategoryRef.current,
       }),
     [],
@@ -197,7 +201,10 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
   useEffect(() => {
     if (!ready) return;
     run(`window.__setMyLocation(${myLocation.lat}, ${myLocation.lng})`);
-  }, [ready, myLocation, run]);
+    if (centerOnMyLocation) {
+      run('window.__moveToMyLocation && window.__moveToMyLocation()');
+    }
+  }, [ready, myLocation, centerOnMyLocation, run]);
 
   const handleMessage = useCallback(
     (event: WebViewMessageEvent) => {

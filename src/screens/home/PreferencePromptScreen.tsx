@@ -1,5 +1,5 @@
 /**
- * 취향 프롬프트 화면 (8단계 위저드).
+ * 취향 프로필과 코스 조건을 모드에 따라 나눠 보여주는 위저드입니다.
  * 상단 진행바 → 질문 카드 → 하단 '다음'/'건너뛰기' 구조로,
  * 질문과 옵션은 data/preferences.ts 스키마를 그대로 렌더링합니다.
  */
@@ -18,25 +18,23 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { City } from '../../data/cities';
 import {
-  PREFERENCE_STEPS,
   createInitialAnswers,
+  getPreferenceSteps,
   isStepComplete,
   type PreferenceAnswers,
   type PreferenceField,
+  type PreferencePromptMode,
 } from '../../data/preferences';
 import { colors } from '../../theme/colors';
 import Chip from '../../components/Chip';
 import OptionCard from '../../components/OptionCard';
 import Slider from '../../components/Slider';
-import {
-  Chevron,
-  MicIcon,
-  SparkIcon,
-} from '../../components/icons/UiIcons';
+import { Chevron, SparkIcon } from '../../components/icons/UiIcons';
 
 type Props = {
-  /** 도시 카드에서 진입한 경우 여행 지역을 미리 채웁니다. */
+  /** 코스 생성 진입 시 이미 선택된 도시를 문맥으로 보여줍니다. */
   city?: City;
+  mode?: PreferencePromptMode;
   /** 이미 등록한 취향(편집 진입). 없으면 새로 작성합니다. */
   initialAnswers?: PreferenceAnswers | null;
   /** 저장 중이면 완료 버튼을 잠급니다. */
@@ -47,10 +45,9 @@ type Props = {
   onComplete: (answers: PreferenceAnswers) => void;
 };
 
-const TOTAL = PREFERENCE_STEPS.length;
-
 function PreferencePromptScreen({
   city,
+  mode = 'profile',
   initialAnswers,
   isSaving = false,
   saveError,
@@ -59,15 +56,27 @@ function PreferencePromptScreen({
 }: Props) {
   const [index, setIndex] = useState(0);
   const insets = useSafeAreaInsets();
-  const [answers, setAnswers] = useState<PreferenceAnswers>(() => ({
-    // 저장된 답변 위에 진입 도시를 덮어씁니다(도시 카드로 들어온 의도가 우선).
-    ...createInitialAnswers(),
-    ...(initialAnswers ?? {}),
-    ...(city?.name ? { region: city.name } : {}),
-  }));
+  const steps = useMemo(() => getPreferenceSteps(mode), [mode]);
+  const total = steps.length;
+  const [answers, setAnswers] = useState<PreferenceAnswers>(() => {
+    const visibleFieldIds = new Set(
+      steps.flatMap(visibleStep =>
+        visibleStep.fields.map(field => field.id),
+      ),
+    );
+    const visibleInitialAnswers = Object.fromEntries(
+      Object.entries(initialAnswers ?? {}).filter(([id]) =>
+        visibleFieldIds.has(id),
+      ),
+    );
+    return {
+      ...createInitialAnswers(steps),
+      ...visibleInitialAnswers,
+    };
+  });
 
-  const step = PREFERENCE_STEPS[index];
-  const isLast = index === TOTAL - 1;
+  const step = steps[index];
+  const isLast = index === total - 1;
   const canNext = useMemo(() => isStepComplete(step, answers), [step, answers]);
 
   const setAnswer = (id: string, value: PreferenceAnswers[string]) =>
@@ -98,12 +107,12 @@ function PreferencePromptScreen({
 
   const goPrev = () => (index === 0 ? onBack() : setIndex(i => i - 1));
   const goNext = () =>
-    isLast ? onComplete(answers) : setIndex(i => Math.min(TOTAL - 1, i + 1));
+    isLast ? onComplete(answers) : setIndex(i => Math.min(total - 1, i + 1));
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       {/* 진행바 */}
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <Pressable
@@ -117,12 +126,12 @@ function PreferencePromptScreen({
           <View
             style={[
               styles.progressFill,
-              { width: `${((index + 1) / TOTAL) * 100}%` },
+              { width: `${((index + 1) / total) * 100}%` },
             ]}
           />
         </View>
         <Text style={styles.stepCount}>
-          {index + 1}/{TOTAL}
+          {index + 1}/{total}
         </Text>
       </View>
 
@@ -130,6 +139,9 @@ function PreferencePromptScreen({
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
+        {mode === 'course' && city ? (
+          <Text style={styles.cityContext}>{city.name} 여행 코스</Text>
+        ) : null}
         {/* 질문 */}
         <View style={styles.titleRow}>
           <View style={styles.mascot}>
@@ -294,16 +306,6 @@ function FieldInput({
             placeholderTextColor={colors.textSecondary}
           />
           <View style={styles.textAreaFoot}>
-            <View style={styles.textActions}>
-              <Pressable style={styles.smallBtn}>
-                <SparkIcon color={colors.goldDeep} size={16} />
-                <Text style={styles.smallBtnText}>예시 받기</Text>
-              </Pressable>
-              <Pressable style={styles.smallBtn}>
-                <MicIcon color={colors.textPrimary} size={16} />
-                <Text style={styles.smallBtnText}>음성</Text>
-              </Pressable>
-            </View>
             <Text style={styles.counter}>
               {text.length}/{field.maxLength}
             </Text>
@@ -361,6 +363,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 24,
+  },
+  cityContext: {
+    color: colors.primaryStrong,
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 10,
   },
 
   // 질문 헤더
@@ -466,28 +474,8 @@ const styles = StyleSheet.create({
   textAreaFoot: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     marginTop: 12,
-  },
-  textActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  smallBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  smallBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textPrimary,
   },
   counter: {
     fontSize: 12,

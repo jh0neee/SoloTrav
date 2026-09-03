@@ -91,8 +91,13 @@ function FavoriteCoursesSection({ limit }: Props) {
     );
   }
 
-  if (status === 'loading' || isLoadingDetail) {
-    return <ActivityIndicator color={colors.goldDeep} style={styles.loader} />;
+  if (status === 'idle' || status === 'loading' || isLoadingDetail) {
+    return (
+      <View style={styles.loadingCard}>
+        <ActivityIndicator color={colors.goldDeep} />
+        <Text style={styles.loadingText}>관심 코스를 불러오는 중이에요</Text>
+      </View>
+    );
   }
   if (status === 'error') {
     return (
@@ -180,7 +185,17 @@ const styles = StyleSheet.create({
   emptyDescription: { marginTop: 7, fontSize: 13, lineHeight: 20, color: colors.textSecondary, textAlign: 'center' },
   emptyText: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
   retry: { marginTop: 6, fontSize: 13, fontWeight: '700', color: colors.goldDeep },
-  loader: { paddingVertical: 18 },
+  loadingCard: {
+    minHeight: 112,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: '#ffffff',
+  },
+  loadingText: { fontSize: 13, color: colors.textSecondary },
   detail: { padding: 16, borderRadius: 16, backgroundColor: '#ffffff', borderWidth: 1, borderColor: colors.border },
   back: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   backText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },

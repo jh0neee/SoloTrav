@@ -31,6 +31,11 @@
 @rem Set local scope for the variables with windows NT shell
 if "%OS%"=="Windows_NT" setlocal
 
+@rem Some Windows JDK distributions can resolve user.home to C:\ even when
+@rem USERPROFILE is correct. Keep Android/Gradle caches in the actual profile.
+if not defined ANDROID_USER_HOME set "ANDROID_USER_HOME=%USERPROFILE%\.android"
+if not defined GRADLE_USER_HOME set "GRADLE_USER_HOME=%USERPROFILE%\.gradle"
+
 set DIRNAME=%~dp0
 if "%DIRNAME%"=="" set DIRNAME=.
 @rem This is normally unused

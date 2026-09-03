@@ -30,18 +30,16 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  Chevron,
-  PinIcon,
-  SearchIcon,
-  ShieldIcon,
-} from '../../components/icons/UiIcons';
+import { TAB_CONTENT_BOTTOM_GAP } from '../../navigation/layout';
+import { Chevron, SearchIcon } from '../../components/icons/UiIcons';
+import PlaceResultRow from '../../components/travel/PlaceResultRow';
 import { colors } from '../../theme/colors';
-import { tourApi } from '../../api/tourApi';
+import { travelApi } from '../../api/travelApi';
+import { TOUR_CATEGORY_LABEL, formatTourDistance } from '../../types/tourPlace';
 import {
-  TOUR_CATEGORY_LABEL,
-  type TourPlace,
-} from '../../types/tourPlace';
+  isMappableTourContent,
+  type MappableTourContent,
+} from '../../types/travel';
 import type { SearchPoi, SearchStatus } from './searchTypes';
 import { formatDistance } from './searchTypes';
 
@@ -69,9 +67,11 @@ const TOUR_HIT_LIMIT = 8;
 type Props = {
   visible: boolean;
   /** 카카오 장소 검색 실행 — KakaoMap 핸들의 search 를 그대로 받습니다. */
-  onSearch: (query: string) => Promise<{ items: SearchPoi[]; status: SearchStatus }>;
+  onSearch: (
+    query: string,
+  ) => Promise<{ items: SearchPoi[]; status: SearchStatus }>;
   /** 관광 콘텐츠 선택 */
-  onSelectPlace: (place: TourPlace) => void;
+  onSelectPlace: (place: MappableTourContent) => void;
   /** 카카오 POI 선택 — 현재 결과 목록 전체를 함께 넘겨 지도에 마커를 찍습니다. */
   onSelectPoi: (poi: SearchPoi, all: SearchPoi[], query: string) => void;
   /** 키보드 검색 버튼(제출) — 결과 전체를 지도에 표시 */
@@ -107,7 +107,7 @@ function MapSearchOverlay({
   const seedTextRef = useRef('');
 
   /** 관광정보(TourAPI) 검색 결과 */
-  const [tourHits, setTourHits] = useState<TourPlace[]>([]);
+  const [tourHits, setTourHits] = useState<MappableTourContent[]>([]);
 
   const trimmed = query.trim();
 
@@ -177,11 +177,20 @@ function MapSearchOverlay({
     if (!visible || trimmed.length < 2) return;
 
     const controller = new AbortController();
-    tourApi
-      .searchKeyword(trimmed, { rows: TOUR_HIT_LIMIT }, controller.signal)
+    travelApi
+      .searchSpots(
+        {
+          keyword: trimmed,
+          regionCode: '43',
+          size: TOUR_HIT_LIMIT,
+          arrange: 'O',
+        },
+        controller.signal,
+      )
       .then(page => {
-        if (controller.signal.aborted || latestQuery.current !== trimmed) return;
-        setTourHits(page.items);
+        if (controller.signal.aborted || latestQuery.current !== trimmed)
+          return;
+        setTourHits(page.items.filter(isMappableTourContent));
       })
       .catch(() => {
         if (!controller.signal.aborted) setTourHits([]);
@@ -223,7 +232,7 @@ function MapSearchOverlay({
   }, [trimmed, pois, onSubmit]);
 
   const handlePlace = useCallback(
-    (place: TourPlace) => {
+    (place: MappableTourContent) => {
       pushRecent(place.title);
       onSelectPlace(place);
     },
@@ -254,7 +263,8 @@ function MapSearchOverlay({
           style={styles.backButton}
           onPress={onClose}
           accessibilityRole="button"
-          accessibilityLabel="검색 닫기">
+          accessibilityLabel="검색 닫기"
+        >
           <Chevron direction="left" color={colors.textPrimary} size={18} />
         </Pressable>
 
@@ -280,7 +290,8 @@ function MapSearchOverlay({
               onPress={clearInput}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="입력 지우기">
+              accessibilityLabel="입력 지우기"
+            >
               <View style={styles.clearButton}>
                 <Text style={styles.clearButtonText}>×</Text>
               </View>
@@ -292,7 +303,8 @@ function MapSearchOverlay({
       <ScrollView
         style={styles.list}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.listContent}>
+        contentContainerStyle={styles.listContent}
+      >
         {/* 입력 전 — 최근 검색어 + 앱 등록 장소 */}
         {trimmed.length === 0 && (
           <>
@@ -305,7 +317,8 @@ function MapSearchOverlay({
                       key={keyword}
                       style={styles.recentChip}
                       onPress={() => fillInput(keyword)}
-                      accessibilityRole="button">
+                      accessibilityRole="button"
+                    >
                       <Text style={styles.recentChipText}>{keyword}</Text>
                     </Pressable>
                   ))}
@@ -327,7 +340,7 @@ function MapSearchOverlay({
                 <Text style={styles.sectionTitle}>관광정보</Text>
                 {tourHits.map(place => (
                   <PlaceRow
-                    key={place.id}
+                    key={place.contentId}
                     place={place}
                     onPress={() => handlePlace(place)}
                   />
@@ -380,27 +393,25 @@ function MapSearchOverlay({
   );
 }
 
-/** 관광 콘텐츠 한 줄 — 방패 아이콘 + 카테고리 배지 */
-function PlaceRow({ place, onPress }: { place: TourPlace; onPress: () => void }) {
+/** 관광 콘텐츠 한 줄 — 홈 검색과 같은 사진·배지·주소 순서 */
+function PlaceRow({
+  place,
+  onPress,
+}: {
+  place: MappableTourContent;
+  onPress: () => void;
+}) {
   return (
-    <Pressable style={styles.row} onPress={onPress} accessibilityRole="button">
-      <View style={[styles.rowIcon, styles.rowIconSafe]}>
-        <ShieldIcon color={colors.safeText} size={18} />
-      </View>
-      <View style={styles.rowBody}>
-        <Text style={styles.rowTitle} numberOfLines={1}>
-          {place.title}
-        </Text>
-        <Text style={styles.rowSub} numberOfLines={1}>
-          {place.address}
-        </Text>
-      </View>
-      <View style={styles.rowBadge}>
-        <Text style={styles.rowBadgeText}>
-          {TOUR_CATEGORY_LABEL[place.category]}
-        </Text>
-      </View>
-    </Pressable>
+    <View style={styles.resultRow}>
+      <PlaceResultRow
+        title={place.title}
+        address={place.address}
+        categoryLabel={TOUR_CATEGORY_LABEL[place.category]}
+        imageUrl={place.imageUrl}
+        distanceLabel={formatTourDistance(place.distance)}
+        onPress={onPress}
+      />
+    </View>
   );
 }
 
@@ -416,32 +427,17 @@ function PoiRow({
 }) {
   const distance = formatDistance(poi.distance);
   return (
-    <Pressable style={styles.row} onPress={onPress} accessibilityRole="button">
-      <View style={styles.rowIndex}>
-        <Text style={styles.rowIndexText}>{index + 1}</Text>
-      </View>
-      <View style={styles.rowBody}>
-        <Text style={styles.rowTitle} numberOfLines={1}>
-          {poi.name}
-        </Text>
-        <Text style={styles.rowSub} numberOfLines={1}>
-          {poi.roadAddress || poi.address}
-        </Text>
-      </View>
-      <View style={styles.rowMeta}>
-        {poi.category ? (
-          <Text style={styles.rowCategory} numberOfLines={1}>
-            {poi.category}
-          </Text>
-        ) : null}
-        {distance ? (
-          <View style={styles.rowDistance}>
-            <PinIcon color={colors.textSecondary} size={12} />
-            <Text style={styles.rowDistanceText}>{distance}</Text>
-          </View>
-        ) : null}
-      </View>
-    </Pressable>
+    <View style={styles.resultRow}>
+      <PlaceResultRow
+        title={poi.name}
+        address={poi.roadAddress || poi.address}
+        categoryLabel={poi.category || '일반 장소'}
+        imageUrl={null}
+        distanceLabel={distance}
+        index={index + 1}
+        onPress={onPress}
+      />
+    </View>
   );
 }
 
@@ -506,7 +502,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listContent: {
-    paddingBottom: 40,
+    paddingBottom: TAB_CONTENT_BOTTOM_GAP,
   },
   sectionTitle: {
     paddingHorizontal: 20,
@@ -544,80 +540,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
 
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+  resultRow: {
     paddingHorizontal: 20,
-    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
-  },
-  rowIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowIconSafe: {
-    backgroundColor: colors.safeBg,
-  },
-  rowIndex: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.bonusBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowIndexText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.bonusText,
-  },
-  rowBody: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  rowSub: {
-    marginTop: 2,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  rowBadge: {
-    backgroundColor: colors.safeBg,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 9,
-  },
-  rowBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.safeText,
-  },
-  rowMeta: {
-    alignItems: 'flex-end',
-    maxWidth: 92,
-  },
-  rowCategory: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  rowDistance: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 3,
-  },
-  rowDistanceText: {
-    fontSize: 11,
-    color: colors.textSecondary,
   },
 
   loading: {

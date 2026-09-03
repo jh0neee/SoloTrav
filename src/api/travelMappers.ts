@@ -7,6 +7,7 @@
  */
 import { unwrap } from './mappers';
 import { CONTENT_TYPE_LABEL } from '../types/travel';
+import { CONTENT_TYPE_TO_CATEGORY } from '../types/tourPlace';
 import type {
   GalleryPhotoDto,
   MunicipalityAttractionDto,
@@ -16,7 +17,7 @@ import type {
   TourFestivalDto,
   TourImageDto,
   TourListDto,
-  TourSpotDto,
+  TourContentDto,
   VisitorRegionDto,
 } from './travelDto';
 import type {
@@ -26,8 +27,8 @@ import type {
   SafetyCategoryGrades,
   TourFestival,
   TourIntroFact,
-  TourSpot,
-  TourSpotDetail,
+  TourContent,
+  TourContentDetail,
 } from '../types/travel';
 
 /** 빈 문자열·공백만 있는 값은 없는 것으로 봅니다. */
@@ -93,7 +94,7 @@ export function toTotalCount(payload: unknown): number {
 
 // ─────────────────────────────── 관광 콘텐츠
 
-function toSpot(dto: TourSpotDto): TourSpot | null {
+function toContent(dto: TourContentDto): TourContent | null {
   const contentId = text(dto.contentid);
   const title = text(dto.title);
   // id 나 제목이 없으면 화면에 띄울 수도, 상세로 넘어갈 수도 없습니다.
@@ -108,6 +109,7 @@ function toSpot(dto: TourSpotDto): TourSpot | null {
     contentId,
     contentTypeId,
     typeLabel: CONTENT_TYPE_LABEL[contentTypeId] ?? '관광정보',
+    category: CONTENT_TYPE_TO_CATEGORY[contentTypeId] ?? null,
     title,
     address: [addr1, addr2].filter(Boolean).join(' '),
     tel: text(dto.tel),
@@ -119,13 +121,15 @@ function toSpot(dto: TourSpotDto): TourSpot | null {
     districtCode: text(dto.lDongSignguCd),
     // 소수점이 길게 붙어 오므로(262.796…) 정수 미터로 끊습니다.
     distance: dto.dist ? Math.round(num(dto.dist) ?? 0) : null,
+    eventStartDate: text(dto.eventstartdate),
+    eventEndDate: text(dto.eventenddate),
   };
 }
 
-export function toTourSpots(payload: unknown): TourSpot[] {
-  return itemsOf<TourSpotDto>(payload)
-    .map(toSpot)
-    .filter((spot): spot is TourSpot => spot !== null);
+export function toTourContents(payload: unknown): TourContent[] {
+  return itemsOf<TourContentDto>(payload)
+    .map(toContent)
+    .filter((spot): spot is TourContent => spot !== null);
 }
 
 // ─────────────────────────────── 축제
@@ -171,7 +175,7 @@ export function toTourFestivals(payload: unknown): TourFestival[] {
 
   return itemsOf<TourFestivalDto>(payload)
     .map(dto => {
-      const spot = toSpot(dto);
+      const spot = toContent(dto);
       if (!spot) {
         return null;
       }
@@ -182,8 +186,8 @@ export function toTourFestivals(payload: unknown): TourFestival[] {
 
       const festival: TourFestival = {
         ...spot,
-        startDate,
-        endDate,
+        eventStartDate: startDate,
+        eventEndDate: endDate,
         periodLabel: [formatYmd(startDate), formatYmd(endDate)]
           .filter(Boolean)
           .join(' ~ '),
@@ -255,13 +259,13 @@ function extractUrl(value: string | null): string | null {
  * detail-common / detail-intro / detail-image 응답을 하나로 합칩니다.
  * intro·image 는 실패해도 상세 화면이 떠야 하므로 없으면 없는 대로 넘깁니다.
  */
-export function toTourSpotDetail(
+export function toTourContentDetail(
   commonPayload: unknown,
   introPayload?: unknown,
   imagePayload?: unknown,
-): TourSpotDetail | null {
+): TourContentDetail | null {
   const dto = itemsOf<TourDetailCommonDto>(commonPayload)[0];
-  const spot = dto ? toSpot(dto) : null;
+  const spot = dto ? toContent(dto) : null;
   if (!dto || !spot) {
     return null;
   }
@@ -324,12 +328,14 @@ export function toGalleryPhotos(payload: unknown): GalleryPhoto[] {
  *
  * 합이 1이어야 점수가 0~100 범위에 들어옵니다.
  */
-const SOLO_SAFETY_WEIGHTS: { key: keyof SafetyCategoryGrades; weight: number }[] =
-  [
-    { key: 'crime', weight: 0.5 },
-    { key: 'lifeSafety', weight: 0.3 },
-    { key: 'traffic', weight: 0.2 },
-  ];
+const SOLO_SAFETY_WEIGHTS: {
+  key: keyof SafetyCategoryGrades;
+  weight: number;
+}[] = [
+  { key: 'crime', weight: 0.4 },
+  { key: 'traffic', weight: 0.35 },
+  { key: 'lifeSafety', weight: 0.25 },
+];
 
 /**
  * 평균 등급(1~5) → 화면 표기 등급.
@@ -349,6 +355,15 @@ function toSafetyGrade(average: number): string {
     return 'D';
   }
   return 'E';
+}
+
+/**
+ * 상대등급을 혼행 안전점수로 환산합니다.
+ * 행정안전부 5등급은 안전도가 0이라는 뜻이 아니므로 40점을 하한으로 둡니다.
+ * 1~5등급은 각각 100·85·70·55·40점에 대응합니다.
+ */
+function toSoloSafetyScore(average: number): number {
+  return Math.round(Math.max(40, Math.min(100, 115 - average * 15)));
 }
 
 export function toRegionSafetyList(payload: unknown): RegionSafety[] {
@@ -402,7 +417,7 @@ export function toRegionSafetyList(payload: unknown): RegionSafety[] {
         grade: toSafetyGrade(average),
         // 1등급=100점, 5등급=0점으로 선형 환산
         score: Math.round(((5 - average) / 4) * 100),
-        soloScore: Math.round(((5 - soloAverage) / 4) * 100),
+        soloScore: toSoloSafetyScore(soloAverage),
         soloGrade: toSafetyGrade(soloAverage),
       };
       return safety;

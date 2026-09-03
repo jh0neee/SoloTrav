@@ -56,9 +56,11 @@ type Props = {
   message: ChatMessage;
   /** 실패한 말풍선에서 누르는 다시 시도. 없으면 버튼을 감춥니다 */
   onRetry?: () => void;
+  /** 생성된 AI 답변을 개발자에게 신고합니다. */
+  onReport?: () => void;
 };
 
-function ChatBubble({ message, onRetry }: Props) {
+function ChatBubble({ message, onRetry, onReport }: Props) {
   const isUser = message.role === 'user';
   const isPending = message.state === 'pending';
   const isFailed = message.state === 'failed';
@@ -99,6 +101,17 @@ function ChatBubble({ message, onRetry }: Props) {
 
       {message.course ? (
         <CourseCard course={message.course} requestId={message.requestId} />
+      ) : null}
+
+      {!isUser && !isPending && !isFailed && onReport ? (
+        <Pressable
+          onPress={onReport}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="AI 답변 신고"
+          style={styles.reportButton}>
+          <Text style={styles.reportText}>이 답변 신고</Text>
+        </Pressable>
       ) : null}
     </View>
   );
@@ -175,6 +188,16 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: colors.chatStarterText,
+  },
+  reportButton: {
+    alignSelf: 'flex-end',
+    marginTop: 7,
+    paddingVertical: 4,
+  },
+  reportText: {
+    fontSize: 11,
+    color: colors.chatHeaderSub,
+    textDecorationLine: 'underline',
   },
 });
 

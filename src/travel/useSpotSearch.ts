@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { travelApi } from '../api/travelApi';
 import { toApiError } from '../api/errors';
-import type { TourSpot } from '../types/travel';
+import type { TourContent } from '../types/travel';
 
 const PAGE_SIZE = 20;
 
@@ -23,7 +23,7 @@ export type SpotSearchParams = {
 };
 
 export type SpotSearchResult = {
-  items: TourSpot[];
+  items: TourContent[];
   totalCount: number;
   status: 'idle' | 'loading' | 'ready' | 'error';
   error: string | null;
@@ -39,7 +39,7 @@ export function useSpotSearch({
   contentTypeId,
   regionCode,
 }: SpotSearchParams): SpotSearchResult {
-  const [items, setItems] = useState<TourSpot[]>([]);
+  const [items, setItems] = useState<TourContent[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [status, setStatus] = useState<SpotSearchResult['status']>('idle');
   const [error, setError] = useState<string | null>(null);

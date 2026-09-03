@@ -3,15 +3,15 @@
  *
  * 공모전 키워드가 '혼자 여행 · 안전' 이라 화면 위쪽일수록 안전 정보를 둡니다.
  *  - 히어로 통계 : 충북에 볼 것이 얼마나 있고, 안전 데이터는 언제 기준인지
- *  - 혼행 랭킹   : 안전한 곳 / 핫한 곳 / 한적한 곳 (지역안전지수 + 지역방문자수)
+ *  - 혼행 랭킹   : 안전한 곳 / 많이 찾는 곳 / 여유로운 곳 (지역안전지수 + 지역방문자수)
  *  - 숨은 동네   : 대표 사진 + 치안 등급 + 주말 외지인 비율
  *  - 축제 / 사진 : 행사정보조회, 관광사진갤러리
  *
  * 섹션마다 독립적으로 로딩·실패하므로 하나가 실패해도 나머지는 그대로 뜹니다.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Image,
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,82 +20,87 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMyProfile } from '../../user/userStore';
-import { type City } from '../../data/cities';
+import { CITIES, SPOTLIGHT_CITY_IDS, type City } from '../../data/cities';
 import { colors } from '../../theme/colors';
-import {
-  BellIcon,
-  Chevron,
-  PinIcon,
-  SearchIcon,
-  ShieldIcon,
-  SparkIcon,
-} from '../../components/icons/UiIcons';
+import { Chevron, SearchIcon } from '../../components/icons/UiIcons';
 import {
   FestivalCard,
   PhotoCard,
   RankingRow,
   SectionState,
-  StatTile,
+  safetyStatusColor,
 } from '../../components/travel/TravelCards';
+import { ChungbukMap } from '../../components/travel/ChungbukMap';
 import {
   safetyOf,
   useCityRankings,
   useGalleryPhotos,
   useRegionSafety,
-  useSpotTotal,
-  useSpotlightCities,
   useUpcomingFestivals,
-  useVisitorStats,
-  type SpotlightCity,
-  type VisitorMap,
 } from '../../travel/homeQueries';
-import type { SafetyMap } from '../../travel/homeQueries';
 import {
   RANKING_KINDS,
+  type GalleryPhoto,
   type RankingKind,
-  type TourSpot,
+  type TourContent,
 } from '../../types/travel';
+import { TAB_CONTENT_BOTTOM_GAP } from '../../navigation/layout';
 
 type Props = {
   /** 검색 화면 열기 */
   onOpenSearch: () => void;
-  /** 도시 선택 화면 열기 */
-  onOpenCitySelect: () => void;
+  /** 선택한 기준의 충북 11개 시군 전체 순위 열기 */
+  onOpenCityRanking: (kind: RankingKind) => void;
   /** 사진첩 화면 열기 */
-  onOpenGallery: () => void;
+  onOpenGallery: (albumTitle?: string) => void;
   onSelectCity: (city: City) => void;
   onOpenPreference: () => void;
+  onOpenPreferenceDetail: () => void;
   /** 축제·장소 카드 탭 → 상세 화면 */
-  onSelectSpot: (spot: TourSpot) => void;
+  onSelectSpot: (spot: TourContent) => void;
   /** 취향 프롬프트를 설정했다면 요약 문구, 아직이면 null */
   preferenceSummary?: string | null;
+  preferenceTags?: string[];
+  preferenceStatus: 'idle' | 'loading' | 'ready' | 'error';
+  onRetryPreference: () => void;
 };
 
 function HomeScreen({
   onOpenSearch,
-  onOpenCitySelect,
+  onOpenCityRanking,
   onOpenGallery,
   onSelectCity,
   onOpenPreference,
+  onOpenPreferenceDetail,
   onSelectSpot,
   preferenceSummary,
+  preferenceTags,
+  preferenceStatus,
+  onRetryPreference,
 }: Props) {
   const insets = useSafeAreaInsets();
   const profile = useMyProfile();
-  const hasPreference = !!preferenceSummary;
 
   const safety = useRegionSafety();
-  const visitors = useVisitorStats();
-  const spotTotal = useSpotTotal();
-  const spotlight = useSpotlightCities();
   const festivals = useUpcomingFestivals();
   const photos = useGalleryPhotos();
   const ranking = useCityRankings();
 
   const [rankingKind, setRankingKind] = useState<RankingKind>('safe');
-  const rankedCities = ranking.rankings[rankingKind].slice(0, 5);
+  const [mapCityId, setMapCityId] = useState<string | null>(null);
+  const rankedCities = ranking.rankings[rankingKind].slice(0, 3);
   const rankingCaption =
     RANKING_KINDS.find(kind => kind.id === rankingKind)?.caption ?? '';
+  const rankingLabel =
+    RANKING_KINDS.find(kind => kind.id === rankingKind)?.label ?? '동네';
+  const selectedMapCity = CITIES.find(city => city.id === mapCityId) ?? null;
+  const selectedMapCitySafety = selectedMapCity
+    ? safetyOf(selectedMapCity, safety.data)
+    : null;
+  const photoAlbums = useMemo(
+    () => groupPhotosByTitle(photos.data ?? []),
+    [photos.data],
+  );
 
   return (
     <ScrollView
@@ -111,14 +116,11 @@ function HomeScreen({
             <Lighthouse />
             <Text style={styles.brand}>혼행등대</Text>
           </View>
-          <View style={styles.bellBtn}>
-            <BellIcon color={colors.textPrimary} size={20} />
-          </View>
         </View>
 
-        <Text style={styles.heroKicker}>오늘 밤도 안전한 길로</Text>
+        {/* <Text style={styles.heroKicker}>오늘 밤도 안전한 길로</Text> */}
         <Text style={styles.heroTitle}>
-          {profile.displayName}님, 어디로{'\n'}혼자 떠나볼까요?
+          {profile.displayName}님,{'\n'}어디로 혼자 떠나볼까요?
         </Text>
 
         {/* 검색 input (누르면 검색 화면으로 이동) */}
@@ -132,51 +134,88 @@ function HomeScreen({
           <Text style={styles.searchPlaceholder}>
             가고 싶은 도시 또는 키워드
           </Text>
-          <View style={styles.searchDivider} />
-          <PinIcon color={colors.goldDeep} size={20} />
         </Pressable>
       </View>
 
-      {/* ── 취향 프롬프트 배너 ── */}
-      <Pressable
-        style={styles.promptCard}
-        onPress={onOpenPreference}
-        accessibilityRole="button"
-        accessibilityLabel="취향 프롬프트 설정하기"
-      >
-        <View style={styles.promptIcon}>
-          <SparkIcon color={colors.goldDeep} size={24} />
+      <PreferencePromptCard
+        status={preferenceStatus}
+        configured={!!preferenceSummary}
+        tags={preferenceTags}
+        onPress={preferenceSummary ? onOpenPreferenceDetail : onOpenPreference}
+        onRetry={onRetryPreference}
+      />
+
+      {/* ── 충북 지역 지도 ── */}
+      <View style={styles.section}>
+        <SectionHead kicker="EXPLORE" title="지역별로 둘러보기" />
+
+        <Text style={styles.spotlightIntro}>
+          지도를 눌러 마음에 드는 동네를 먼저 살펴보세요
+        </Text>
+
+        <View style={styles.spotlightMapCard}>
+          <View style={styles.mapLegend}>
+            <View style={styles.mapLegendItem}>
+              <View style={[styles.mapLegendDot, styles.mapLegendDecline]} />
+              <Text style={styles.mapLegendText}>인구감소지역</Text>
+            </View>
+            <View style={styles.mapLegendItem}>
+              <View style={styles.mapLegendDot} />
+              <Text style={styles.mapLegendText}>그 외 지역</Text>
+            </View>
+          </View>
+          <ChungbukMap
+            selectedCityId={mapCityId}
+            highlightedCityIds={SPOTLIGHT_CITY_IDS}
+            onSelectCity={setMapCityId}
+            height={286}
+          />
+          <View style={styles.mapSelectionBar}>
+            {selectedMapCity && selectedMapCitySafety ? (
+              <>
+                <View style={styles.mapSelectionInfo}>
+                  <Text style={styles.mapSelectionName}>
+                    {selectedMapCity.name}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.mapSelectionStatus,
+                      {
+                        color: safetyStatusColor(
+                          selectedMapCitySafety.status,
+                        ),
+                      },
+                    ]}
+                  >
+                    혼행 안전 {selectedMapCitySafety.status}
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.mapDetailButton}
+                  onPress={() => onSelectCity(selectedMapCity)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${selectedMapCity.name} 상세 정보 보기`}
+                >
+                  <Text style={styles.mapDetailButtonText}>자세히 보기</Text>
+                  <Chevron
+                    direction="right"
+                    color={colors.primary}
+                    size={16}
+                  />
+                </Pressable>
+              </>
+            ) : (
+              <Text style={styles.mapSelectionEmpty}>
+                지도에서 지역을 선택해보세요
+              </Text>
+            )}
+          </View>
         </View>
-        <View style={styles.promptTexts}>
-          <Text style={styles.promptKicker}>
-            {hasPreference ? '취향 프롬프트 설정 완료' : '2분이면 끝!'}
-          </Text>
-          <Text style={styles.promptTitle}>
-            {hasPreference
-              ? '취향에 맞춰 코스를 찾는 중이에요'
-              : '취향을 알려주시면\n딱 맞는 코스를 찾아드려요'}
-          </Text>
-          <Text style={styles.promptSub} numberOfLines={2}>
-            {hasPreference
-              ? preferenceSummary
-              : '아직 취향 프롬프트가 비어있어요'}
-          </Text>
-        </View>
-        <View style={styles.promptBtn}>
-          <Text style={styles.promptBtnText}>
-            {hasPreference ? '수정하기' : '설정하기'}
-          </Text>
-          <Chevron direction="right" color="#ffffff" size={16} />
-        </View>
-      </Pressable>
+      </View>
 
       {/* ── 혼행 랭킹 ── */}
       <View style={styles.section}>
-        <SectionHead
-          kicker="혼행 랭킹 · 충북 11개 시군"
-          title="어떤 기준으로 고를까요?"
-          onMore={onOpenCitySelect}
-        />
+        <SectionHead kicker="RANKING" title="혼행 랭킹" />
 
         <View style={styles.rankTabs}>
           {RANKING_KINDS.map(kind => {
@@ -186,6 +225,8 @@ function HomeScreen({
                 key={kind.id}
                 style={[styles.rankTab, active && styles.rankTabActive]}
                 onPress={() => setRankingKind(kind.id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
               >
                 <Text
                   style={[
@@ -204,9 +245,7 @@ function HomeScreen({
           <Text style={styles.rankHint}>
             {rankingCaption}
             {rankingKind === 'safe'
-              ? ' · 행정안전부 지역안전지수'
-              : ranking.visitorBaseLabel
-              ? ` · 한국관광공사 지역방문자수 ${ranking.visitorBaseLabel}`
+              ? ' · 행정안전부 지역안전지수를 혼행 관점에서 재구성했어요.'
               : ''}
           </Text>
 
@@ -228,49 +267,30 @@ function HomeScreen({
               name={item.city.name}
               value={item.value}
               caption={item.caption}
-              safetyGrade={item.safetyGrade}
+              safetyStatus={
+                rankingKind === 'safe' ? item.safetyStatus : undefined
+              }
               onPress={() => onSelectCity(item.city)}
             />
           ))}
+          {rankingKind !== 'safe' && ranking.visitorBaseLabel ? (
+            <Text style={styles.rankSource}>
+              한국관광공사 지역방문자수 · {ranking.visitorBaseLabel}
+            </Text>
+          ) : null}
+          <Pressable
+            style={styles.rankingMoreButton}
+            onPress={() => onOpenCityRanking(rankingKind)}
+            accessibilityRole="button"
+            accessibilityLabel={`${rankingLabel} 전체 목록 보기`}
+          >
+            <Text style={styles.rankingMoreText}>
+              {rankingLabel} 전체 목록 보기
+            </Text>
+            <Chevron direction="right" color={colors.primary} size={16} />
+          </Pressable>
         </View>
       </View>
-
-      {/* ── 숨은 동네 ── */}
-      <View style={styles.section}>
-        <SectionHead
-          kicker="SPOTLIGHT · 충북"
-          title="등대가 비추는 숨은 동네"
-          onMore={onOpenCitySelect}
-        />
-
-        <SectionState
-          status={spotlight.status}
-          error={spotlight.error}
-          isEmpty={spotlight.data?.length === 0}
-          emptyText="추천할 동네를 불러오지 못했어요"
-          onRetry={spotlight.reload}
-          height={250}
-        />
-
-        {spotlight.data && spotlight.data.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.spotlightRow}
-          >
-            {spotlight.data.map(item => (
-              <SpotlightCard
-                key={item.city.id}
-                item={item}
-                safety={safety.data}
-                visitors={visitors.data?.stats ?? null}
-                onPress={() => onSelectCity(item.city)}
-              />
-            ))}
-          </ScrollView>
-        ) : null}
-      </View>
-
       {/* ── 지금 열리는 축제 ── */}
       <View style={styles.section}>
         <SectionHead kicker="FESTIVAL" title="지금 충북에서 열리는 축제" />
@@ -313,90 +333,28 @@ function HomeScreen({
         <SectionState
           status={photos.status}
           error={photos.error}
-          isEmpty={photos.data?.length === 0}
+          isEmpty={photoAlbums.length === 0}
           emptyText="사진을 불러오지 못했어요"
           onRetry={photos.reload}
           height={180}
         />
 
-        {photos.data && photos.data.length > 0 ? (
+        {photoAlbums.length > 0 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.photoRow}
           >
-            {photos.data.map(photo => (
-              <PhotoCard key={photo.id} photo={photo} onPress={onOpenGallery} />
+            {photoAlbums.map(album => (
+              <PhotoCard
+                key={album.title}
+                photo={album.cover}
+                count={album.photos.length}
+                onPress={() => onOpenGallery(album.title)}
+              />
             ))}
           </ScrollView>
         ) : null}
-      </View>
-
-      {/* ── 빠른 시작 ── */}
-      <View style={styles.section}>
-        <Text style={styles.quickTitle}>빠른 시작</Text>
-        <View style={styles.quickRow}>
-          <Pressable
-            style={[styles.tile, styles.tileLight]}
-            onPress={onOpenCitySelect}
-          >
-            <View style={styles.tileTop}>
-              <SparkIcon color={colors.goldDeep} size={18} />
-              <Chevron
-                direction="right"
-                color={colors.textSecondary}
-                size={16}
-              />
-            </View>
-            <Text style={styles.tileTitle}>AI 코스 짜기</Text>
-            <Text style={styles.tileSub}>취향 기반 자동 일정</Text>
-          </Pressable>
-
-          <Pressable style={[styles.tile, styles.tileDark]}>
-            <View style={styles.tileTop}>
-              <SparkIcon color="#ffffff" size={18} />
-              <Chevron
-                direction="right"
-                color="rgba(255,255,255,0.7)"
-                size={16}
-              />
-            </View>
-            <Text style={[styles.tileTitle, styles.tileTitleDark]}>
-              샛별이에게 묻기
-            </Text>
-            <Text style={[styles.tileSub, styles.tileSubDark]}>
-              대화로 여행 계획
-            </Text>
-          </Pressable>
-        </View>
-        {/* 충북 요약 — 공공데이터로 채운 세 칸 */}
-        <View style={styles.heroStats}>
-          <StatTile
-            label="충북 관광정보"
-            value={
-              spotTotal.data !== null && spotTotal.data !== undefined
-                ? spotTotal.data.toLocaleString()
-                : '—'
-            }
-            unit="곳"
-          />
-          <View style={styles.heroStatDivider} />
-          <StatTile
-            label="진행·예정 축제"
-            value={festivals.data ? `${festivals.data.length}` : '—'}
-            unit="개"
-          />
-          <View style={styles.heroStatDivider} />
-          <StatTile
-            label="안전 데이터"
-            value={
-              safety.data
-                ? `${Object.values(safety.data)[0]?.baseYear ?? '—'}`
-                : '—'
-            }
-            unit="년"
-          />
-        </View>
       </View>
     </ScrollView>
   );
@@ -409,7 +367,7 @@ function SectionHead({
   moreLabel = '전체',
   onMore,
 }: {
-  kicker: string;
+  kicker?: string;
   title: string;
   moreLabel?: string;
   onMore?: () => void;
@@ -417,7 +375,7 @@ function SectionHead({
   return (
     <View style={styles.sectionHead}>
       <View style={styles.sectionHeadTexts}>
-        <Text style={styles.sectionKicker}>{kicker}</Text>
+        {kicker ? <Text style={styles.sectionKicker}>{kicker}</Text> : null}
         <Text style={styles.sectionTitle}>{title}</Text>
       </View>
       {onMore ? (
@@ -440,82 +398,124 @@ function Lighthouse() {
   );
 }
 
-/**
- * 숨은 동네 카드.
- * 사진은 그 지역 관광정보에서, 치안 등급은 지역안전지수에서, 아래 한 줄은
- * 주말 방문자 집계에서 옵니다 — 세 공공데이터가 카드 하나에 모입니다.
- */
-function SpotlightCard({
-  item,
-  safety,
-  visitors,
+function PreferencePromptCard({
+  status,
+  configured,
+  tags,
   onPress,
+  onRetry,
 }: {
-  item: SpotlightCity;
-  safety: SafetyMap | null;
-  visitors: VisitorMap | null;
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  configured: boolean;
+  tags?: string[];
   onPress: () => void;
+  onRetry: () => void;
 }) {
-  const { city, imageUrl, imageCaption } = item;
-  const citySafety = safetyOf(city, safety);
-  const visitor = visitors?.[city.municipalityCode] ?? null;
-
-  return (
-    <Pressable style={styles.card} onPress={onPress}>
-      <View style={styles.cardImage}>
-        {imageUrl ? (
-          <Image
-            source={{ uri: imageUrl }}
-            style={styles.cardImagePhoto}
-            resizeMode="cover"
-          />
-        ) : null}
-        <View style={styles.cardBadge}>
-          <Text style={styles.cardBadgeText}>{city.tag}</Text>
-        </View>
-        {imageCaption ? (
-          <Text style={styles.cardCaption} numberOfLines={1}>
-            {imageCaption}
-          </Text>
-        ) : null}
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.cardCity}>{city.name}</Text>
-        <Text style={styles.cardDesc} numberOfLines={2}>
-          {city.description}
+  if (status === 'idle' || status === 'loading') {
+    return (
+      <View style={[styles.promptCard, styles.promptCardLoading]}>
+        <ActivityIndicator color={colors.goldDeep} />
+        <Text style={styles.promptLoadingText}>
+          여행 취향을 불러오는 중이에요
         </Text>
+      </View>
+    );
+  }
 
-        {/* 혼행 안전 등급 + 치안 등급 */}
-        <View style={styles.cardPills}>
-          <View style={[styles.pill, styles.pillSafe]}>
-            <ShieldIcon color={colors.safeText} size={14} />
-            <Text style={styles.pillSafeText}>
-              혼행 안전 {citySafety.grade}
-            </Text>
-          </View>
-          {citySafety.crimeGrade ? (
-            <View style={[styles.pill, styles.pillBonus]}>
-              <Text style={styles.pillBonusText}>
-                치안 {citySafety.crimeGrade}등급
+  if (status === 'error') {
+    return (
+      <View style={[styles.promptCard, styles.promptCardLoading]}>
+        <Text style={styles.promptLoadingText}>
+          여행 취향을 불러오지 못했어요
+        </Text>
+        <Pressable
+          style={styles.promptRetryButton}
+          onPress={onRetry}
+          accessibilityRole="button"
+          accessibilityLabel="여행 취향 다시 불러오기"
+        >
+          <Text style={styles.promptRetryText}>다시 시도</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (configured) {
+    return (
+      <View style={[styles.promptCard, styles.promptCardConfigured]}>
+        <View style={styles.configuredTitleRow}>
+          <Text style={styles.configuredTitle}>나의 여행 취향</Text>
+          <Pressable
+            style={styles.preferenceMoreButton}
+            onPress={onPress}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="나의 여행 취향 전체 보기"
+          >
+            <Text style={styles.preferenceMoreButtonText}>전체 보기</Text>
+            <Chevron direction="right" color={colors.primaryStrong} size={13} />
+          </Pressable>
+        </View>
+        <View style={styles.preferenceTags}>
+          {tags?.map(tag => (
+            <View key={tag} style={styles.preferenceTag}>
+              <Text style={styles.preferenceTagText} numberOfLines={1}>
+                # {tag}
               </Text>
             </View>
-          ) : null}
+          ))}
         </View>
-
-        {/* 주말 방문자 — 데이터가 오기 전에는 줄 자체를 숨깁니다 */}
-        {visitor ? (
-          <Text style={styles.cardVisitor}>
-            주말 방문객의 {visitor.visitorRatio}% 가 외지인
-            {visitor.changeRate !== null
-              ? ` · 4주 전 대비 ${visitor.changeRate > 0 ? '+' : ''}${
-                  visitor.changeRate
-                }%`
-              : ''}
-          </Text>
-        ) : null}
+        <Text style={styles.configuredSub}>
+          이 취향을 바탕으로 나에게 맞는 여행지를 찾아드려요
+        </Text>
       </View>
-    </Pressable>
+    );
+  }
+
+  return (
+    <View style={[styles.promptCard, styles.promptCardBefore]}>
+      <View style={styles.promptTop}>
+        <View style={styles.promptTexts}>
+          <Text style={styles.promptKicker}>나만의 여행 취향 찾기</Text>
+          <Text style={styles.promptTitle}>
+            몇 가지 질문에 답하면{`\n`}딱 맞는 여행지를 추천해드려요
+          </Text>
+        </View>
+      </View>
+      <View style={styles.promptFooter}>
+        <Text style={styles.promptTime}>약 2분 소요</Text>
+        <Pressable
+          style={styles.promptBtn}
+          onPress={onPress}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="취향 프롬프트 설정하기"
+        >
+          <Text style={styles.promptBtnText}>시작하기</Text>
+          <Chevron direction="right" color={colors.primaryStrong} size={16} />
+        </Pressable>
+      </View>
+    </View>
   );
+}
+
+type PhotoAlbum = {
+  title: string;
+  cover: GalleryPhoto;
+  photos: GalleryPhoto[];
+};
+
+function groupPhotosByTitle(photos: GalleryPhoto[]): PhotoAlbum[] {
+  const albums = new Map<string, GalleryPhoto[]>();
+  photos.forEach(photo => {
+    const title = photo.title.trim() || '이름 없는 여행 사진';
+    albums.set(title, [...(albums.get(title) ?? []), photo]);
+  });
+  return Array.from(albums, ([title, albumPhotos]) => ({
+    title,
+    cover: albumPhotos[0],
+    photos: albumPhotos,
+  }));
 }
 
 const styles = StyleSheet.create({
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cream,
   },
   content: {
-    paddingBottom: 24,
+    paddingBottom: TAB_CONTENT_BOTTOM_GAP,
   },
 
   // 히어로
@@ -550,14 +550,6 @@ const styles = StyleSheet.create({
     fontSize: 19,
     fontWeight: '700',
     letterSpacing: -0.4,
-  },
-  bellBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   heroKicker: {
     color: colors.primary,
@@ -590,11 +582,6 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.textSecondary,
     fontSize: 15,
-  },
-  searchDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: colors.border,
   },
   heroStats: {
     flexDirection: 'row',
@@ -633,24 +620,46 @@ const styles = StyleSheet.create({
 
   // 취향 프롬프트 배너
   promptCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
     marginHorizontal: 20,
     marginTop: 18,
-    padding: 16,
-    borderRadius: 18,
+    padding: 18,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.promptBannerBorder,
     backgroundColor: colors.promptBanner,
   },
-  promptIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  promptCardConfigured: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+  },
+  promptCardLoading: {
+    minHeight: 112,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.55)',
+    gap: 10,
+  },
+  promptLoadingText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  promptRetryButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+  },
+  promptRetryText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primaryStrong,
+  },
+  promptCardBefore: {
+    paddingBottom: 10,
+  },
+  promptTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
   },
   promptTexts: {
     flex: 1,
@@ -659,34 +668,100 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: colors.bonusText,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   promptTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '700',
     color: colors.textPrimary,
-    lineHeight: 21,
+    lineHeight: 23,
   },
-  promptSub: {
-    fontSize: 12,
+  promptFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  promptTime: {
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.textSecondary,
-    marginTop: 5,
-    lineHeight: 17,
   },
   promptBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 2,
-    paddingLeft: 14,
-    paddingRight: 10,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: colors.ink,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   promptBtnText: {
-    color: '#ffffff',
-    fontSize: 14,
+    color: colors.primaryStrong,
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  checkIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+  },
+  checkIconText: {
+    color: colors.primaryStrong,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  configuredTitle: {
+    color: colors.textPrimary,
+    fontSize: 17,
     fontWeight: '700',
+  },
+  configuredTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  preferenceTags: {
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 11,
+  },
+  preferenceTag: {
+    flexShrink: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+  },
+  preferenceTagText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  preferenceMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 1,
+    paddingVertical: 3,
+  },
+  preferenceMoreButtonText: {
+    color: colors.primaryStrong,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  configuredSub: {
+    marginTop: 13,
+    color: colors.textSecondary,
+    fontSize: 12,
+    lineHeight: 18,
   },
 
   // 섹션 공통
@@ -732,18 +807,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 12,
-  },
-  rankTab: {
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 12,
-    backgroundColor: '#ffffff',
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
   },
+  rankTab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
   rankTabActive: {
-    backgroundColor: colors.ink,
-    borderColor: colors.ink,
+    backgroundColor: colors.background,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
   },
   rankTabText: {
     fontSize: 13,
@@ -753,7 +835,8 @@ const styles = StyleSheet.create({
     includeFontPadding: true,
   },
   rankTabTextActive: {
-    color: '#ffffff',
+    color: colors.primary,
+    fontWeight: '700',
   },
   rankCard: {
     backgroundColor: '#ffffff',
@@ -772,8 +855,143 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 4,
   },
+  rankSource: {
+    fontSize: 10,
+    color: colors.textTertiary,
+    textAlign: 'right',
+    paddingTop: 8,
+    paddingBottom: 10,
+  },
+  rankingMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    marginTop: 4,
+    paddingVertical: 13,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  rankingMoreText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '700',
+  },
 
   // 스포트라이트 카드
+  spotlightIntro: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: -6,
+    marginBottom: 10,
+  },
+  spotlightMapCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    paddingTop: 14,
+    paddingBottom: 14,
+    overflow: 'hidden',
+  },
+  mapLegend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    // marginTop: -2,
+    marginBottom: 6,
+  },
+  mapLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  mapLegendDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#e9edf2',
+  },
+  mapLegendDecline: {
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  mapLegendText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  cityChipRow: {
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+  },
+  cityChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  cityChipActive: {
+    backgroundColor: colors.ink,
+    borderColor: colors.ink,
+  },
+  cityChipText: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  cityChipTextActive: {
+    color: '#ffffff',
+  },
+  mapSelectionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 14,
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  mapSelectionInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  mapSelectionEmpty: {
+    flex: 1,
+    paddingVertical: 3,
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  mapSelectionName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  mapSelectionStatus: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  mapDetailButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: 4,
+    paddingLeft: 8,
+  },
+  mapDetailButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
   spotlightRow: {
     gap: 14,
     paddingRight: 8,
@@ -867,10 +1085,30 @@ const styles = StyleSheet.create({
   pillSafe: {
     backgroundColor: colors.safeBg,
   },
+  cardFullWidth: {
+    width: 'auto',
+    marginHorizontal: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  pillNormal: {
+    backgroundColor: '#fff6db',
+  },
+  pillCheck: {
+    backgroundColor: colors.dangerSoft,
+  },
   pillSafeText: {
     color: colors.safeText,
     fontSize: 12,
     fontWeight: '600',
+  },
+  pillNormalText: {
+    color: '#a66b00',
+  },
+  pillCheckText: {
+    color: colors.danger,
   },
   pillBonus: {
     backgroundColor: colors.bonusBg,

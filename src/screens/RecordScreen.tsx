@@ -21,6 +21,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_CONTENT_BOTTOM_GAP } from '../navigation/layout';
 import Chip from '../components/Chip';
 import RecordFormScreen from './record/RecordFormScreen';
 import RecordDetailScreen from './record/RecordDetailScreen';
@@ -410,7 +411,7 @@ function RecordCard({
         <View style={styles.tagRow}>
           {record.tags.map(tag => (
             <View key={tag} style={styles.tagChip}>
-              <Text style={styles.tagChipText}>#{tag}</Text>
+              <Text style={styles.tagChipText}># {tag}</Text>
             </View>
           ))}
         </View>
@@ -425,7 +426,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cream,
   },
   content: {
-    paddingBottom: 28,
+    paddingBottom: TAB_CONTENT_BOTTOM_GAP,
   },
 
   // 헤더
@@ -651,7 +652,7 @@ const styles = StyleSheet.create({
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 0,
     marginTop: 10,
   },
   tagChip: {

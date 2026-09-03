@@ -8,11 +8,12 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import BottomTabNavigator from './BottomTabNavigator';
 import LoginScreen from '../screens/auth/LoginScreen';
 import WithdrawalPendingScreen from '../screens/auth/WithdrawalPendingScreen';
+import TermsAgreementScreen from '../screens/auth/TermsAgreementScreen';
 import { useAuth } from '../auth/AuthContext';
 import { colors } from '../theme/colors';
 
 function RootNavigator() {
-  const { status, isWithdrawalPending } = useAuth();
+  const { status, isWithdrawalPending, requiresTermsAgreement } = useAuth();
 
   if (status === 'restoring') {
     return (
@@ -24,6 +25,10 @@ function RootNavigator() {
 
   if (isWithdrawalPending) {
     return <WithdrawalPendingScreen />;
+  }
+
+  if (requiresTermsAgreement) {
+    return <TermsAgreementScreen />;
   }
 
   return status === 'authenticated' ? <BottomTabNavigator /> : <LoginScreen />;

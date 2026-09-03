@@ -1,12 +1,10 @@
 /**
- * 취향 프롬프트 스키마 (8단계 위저드).
+ * 취향·코스 조건 프롬프트 스키마.
  * 화면은 이 데이터만 보고 렌더링하므로, 질문/옵션 추가는 이 파일만 수정하면 됩니다.
  *
  *   1 여행 기본  2 이동  3 여행 온도  4 회피 조건
  *   5 활동      6 맛집  7 숙소       8 예산
  */
-import { CITIES } from './cities';
-
 /** 답변 값: 단일선택(string) · 다중선택(string[]) · 슬라이더(number) · 자유입력(string) */
 export type PreferenceValue = string | string[] | number;
 export type PreferenceAnswers = Record<string, PreferenceValue>;
@@ -69,9 +67,6 @@ export type PreferenceStep = {
  */
 export const FREE_TEXT_FIELD_ID = 'freeText';
 
-/** 지역 칩: 아직 미정 + 도시 목록 */
-const REGION_OPTIONS = ['아직 미정', ...CITIES.map(c => c.name)];
-
 export const PREFERENCE_STEPS: PreferenceStep[] = [
   {
     id: 'basic',
@@ -79,13 +74,6 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
     title: '어떤 여행을 준비 중이세요?',
     subtitle: '기본 정보부터 알려주세요. 나중에 언제든 바꿀 수 있어요.',
     fields: [
-      {
-        id: 'region',
-        label: '여행 지역',
-        type: 'chips-single',
-        required: true,
-        options: REGION_OPTIONS,
-      },
       {
         id: 'duration',
         label: '여행 기간',
@@ -385,13 +373,52 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   },
 ];
 
+export type PreferencePromptMode = 'profile' | 'course';
+
+/**
+ * 취향 설정은 오래 유지되는 성향만, 코스 생성은 이번 여행의 기간·예산까지 묻습니다.
+ * 지역은 코스 생성 진입 전에 이미 선택되므로 어느 모드에서도 다시 묻지 않습니다.
+ */
+export function getPreferenceSteps(
+  mode: PreferencePromptMode,
+): PreferenceStep[] {
+  const excludedFieldIds =
+    mode === 'profile' ? new Set(['duration', 'dailyBudget']) : new Set<string>();
+
+  return PREFERENCE_STEPS.map(step => {
+    const fields = step.fields.filter(field => !excludedFieldIds.has(field.id));
+    if (mode === 'profile' && step.id === 'budget') {
+      return {
+        ...step,
+        title: '여행에서 무엇을 중요하게 생각하세요?',
+        subtitle: '더 마음을 쓰고 싶은 부분과 원하는 여행을 알려주세요.',
+        fields,
+      };
+    }
+    return { ...step, fields };
+  }).filter(step => step.fields.length > 0);
+}
+
+/** 코스마다 달라지는 조건을 제외하고 계정에 저장할 취향만 남깁니다. */
+export function toProfilePreferenceAnswers(
+  answers: PreferenceAnswers,
+): PreferenceAnswers {
+  return Object.fromEntries(
+    Object.entries(answers).filter(
+      ([id]) => id !== 'duration' && id !== 'dailyBudget' && id !== 'region',
+    ),
+  );
+}
+
 /**
  * 슬라이더처럼 초기값이 필요한 항목만 채운 빈 답변.
  * 저장된 답변·진입 도시는 호출하는 쪽에서 이 위에 덮어씁니다.
  */
-export function createInitialAnswers(): PreferenceAnswers {
+export function createInitialAnswers(
+  steps: PreferenceStep[] = PREFERENCE_STEPS,
+): PreferenceAnswers {
   const answers: PreferenceAnswers = {};
-  PREFERENCE_STEPS.forEach(step =>
+  steps.forEach(step =>
     step.fields.forEach(field => {
       if (field.type === 'slider') {
         answers[field.id] = field.defaultValue;
@@ -420,10 +447,11 @@ export function isStepComplete(
 
 /** 마이페이지 '나의 여행 취향' 카드에 보여줄 값 */
 export type PreferenceHighlights = {
-  duration: string | null;
   pace: string | null;
-  /** 만원 단위 */
-  dailyBudget: number | null;
+  transport: string[];
+  moveLoad: string | null;
+  planStyle: string | null;
+  avoid: string[];
   moods: string[];
 };
 
@@ -433,12 +461,13 @@ const asText = (value: PreferenceValue | undefined) =>
 export function highlightPreferences(
   answers: PreferenceAnswers,
 ): PreferenceHighlights {
-  const budget = answers.dailyBudget;
   const activities = answers.activities;
   return {
-    duration: asText(answers.duration),
     pace: asText(answers.pace),
-    dailyBudget: typeof budget === 'number' ? budget : null,
+    transport: Array.isArray(answers.transport) ? answers.transport : [],
+    moveLoad: asText(answers.moveLoad),
+    planStyle: asText(answers.planStyle),
+    avoid: Array.isArray(answers.avoid) ? answers.avoid : [],
     moods: Array.isArray(activities) ? activities : [],
   };
 }
@@ -453,11 +482,20 @@ export function summarizePreferences(answers: PreferenceAnswers): string {
       : firstActivity;
 
   const parts = [
-    answers.region !== '아직 미정' ? answers.region : undefined,
-    answers.duration,
     answers.pace,
     activityText,
   ].filter(part => typeof part === 'string' && part.length > 0);
 
   return parts.length ? parts.join(' · ') : '기본 설정으로 추천 중';
+}
+
+/** 홈의 완료 카드에 보여줄 짧은 취향 태그 목록입니다. */
+export function preferenceTagLabels(answers: PreferenceAnswers): string[] {
+  const pace = asText(answers.pace);
+  const activities = Array.isArray(answers.activities)
+    ? answers.activities
+    : [];
+  const allTags = [...(pace ? [pace] : []), ...activities];
+
+  return allTags.slice(0, 3);
 }

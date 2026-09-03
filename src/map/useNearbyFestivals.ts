@@ -6,8 +6,12 @@
  * 화면에서는 지도 경계·기간 필터만 다시 적용합니다.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FESTIVAL_RADIUS, tourApi } from '../api/tourApi';
-import type { TourPlace } from '../types/tourPlace';
+import { FESTIVAL_RADIUS, travelApi } from '../api/travelApi';
+import {
+  isMappableTourContent,
+  type MappableTourContent,
+  type TourFestival,
+} from '../types/travel';
 import {
   isInsideBounds,
   roughDistance,
@@ -46,7 +50,7 @@ function weekendRange(today: Date): { from: string; to: string } {
 
 /** 축제 기간 [start, end] 가 [from, to] 와 겹치는지 */
 function overlaps(
-  place: TourPlace,
+  place: MappableTourContent,
   from: string,
   to: string,
 ): boolean {
@@ -62,22 +66,29 @@ function overlaps(
  * 충북 축제 목록 캐시.
  * 키는 조회 기준일이라, 날짜가 바뀌면 자연스럽게 다시 받습니다.
  */
-let cache: { key: string; items: TourPlace[] } | null = null;
-let inFlight: { key: string; promise: Promise<TourPlace[]> } | null = null;
+let cache: { key: string; items: MappableTourContent[] } | null = null;
+let inFlight: {
+  key: string;
+  promise: Promise<MappableTourContent[]>;
+} | null = null;
 
-function loadFestivals(baseYmd: string): Promise<TourPlace[]> {
+function loadFestivals(baseYmd: string): Promise<MappableTourContent[]> {
   if (cache?.key === baseYmd) {
     return Promise.resolve(cache.items);
   }
   if (inFlight?.key === baseYmd) {
     return inFlight.promise;
   }
-  const promise = tourApi
-    .festivals({ eventStartDate: baseYmd })
-    .then(page => {
+  const promise = travelApi
+    .listFestivals({ from: baseYmd, regionCode: '43', size: 300 })
+    .then(results => {
       // 서버 응답이 같은 contentid 를 중복해서 주더라도 마커-상세 연결은 1:1로 유지합니다.
-      const items = [
-        ...new Map(page.items.map(item => [item.id, item])).values(),
+      const mappable = results.filter(
+        (item): item is TourFestival & MappableTourContent =>
+          isMappableTourContent(item),
+      );
+      const items: MappableTourContent[] = [
+        ...new Map(mappable.map(item => [item.contentId, item])).values(),
       ];
       cache = { key: baseYmd, items };
       return items;
@@ -95,7 +106,7 @@ export function useNearbyFestivals(
   radius: number = FESTIVAL_RADIUS,
   bounds: ViewportBounds | null = null,
 ) {
-  const [all, setAll] = useState<TourPlace[]>([]);
+  const [all, setAll] = useState<MappableTourContent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** 재시도 카운터 — 실패한 캐시를 버리고 다시 받게 합니다. */
@@ -148,7 +159,10 @@ export function useNearbyFestivals(
       .map(place => ({
         ...place,
         // 목록 응답에 dist 가 없어 직접 계산해 시트·카드에서 쓰게 합니다.
-        distance: roughDistance({ lat, lng }, { lat: place.lat, lng: place.lng }),
+        distance: roughDistance(
+          { lat, lng },
+          { lat: place.lat, lng: place.lng },
+        ),
       }))
       .filter(place =>
         bounds

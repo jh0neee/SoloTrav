@@ -6,7 +6,13 @@
  * - 드래그는 핸들·header 영역에서만 받습니다. 본문은 ScrollView 라 제스처가 겹치지 않습니다.
  * - 지도 위에 띄우는 용도라 어두운 배경막(backdrop)은 두지 않습니다. 지도는 계속 보이고 조작됩니다.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Animated,
   BackHandler,
@@ -38,6 +44,17 @@ type Props = {
   /** 핸들 아래 고정 영역. 여기서도 드래그가 됩니다. */
   header?: React.ReactNode;
   children: React.ReactNode;
+  /** 본문 기본 좌우 여백. 전체 폭 상세 콘텐츠는 0으로 넘깁니다. */
+  contentPaddingHorizontal?: number;
+  /** 스크롤 끝의 안전 여백까지 이어질 본문 배경색입니다. */
+  contentBackgroundColor?: string;
+  /** 손잡이를 별도 상단 영역 대신 본문 위에 겹쳐 표시합니다. */
+  overlayHandle?: boolean;
+  showCloseButton?: boolean;
+  /** 상단 이미지를 시트의 둥근 모서리에 맞춰 자릅니다. */
+  clipContent?: boolean;
+  /** 지정하면 기본 탭바·safe area 계산 대신 이 값만 마지막 여백으로 씁니다. */
+  bottomContentInset?: number;
 };
 
 function BottomSheet({
@@ -46,6 +63,12 @@ function BottomSheet({
   snapPoints = [0.52, 0.92],
   header,
   children,
+  contentPaddingHorizontal = 20,
+  contentBackgroundColor = colors.background,
+  overlayHandle = false,
+  showCloseButton = true,
+  clipContent = false,
+  bottomContentInset,
 }: Props) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -125,15 +148,19 @@ function BottomSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, defaultOffset, closedY, animateTo]);
 
-  // 안드로이드 뒤로가기로 닫기
+  // 안드로이드 뒤로가기: 확장 상태면 먼저 낮추고, 낮은 상태에서 한 번 더 누르면 닫습니다.
   useEffect(() => {
     if (!visible || Platform.OS !== 'android') return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (snapOffset < defaultOffset) {
+        animateTo(defaultOffset);
+        return true;
+      }
       onClose();
       return true;
     });
     return () => sub.remove();
-  }, [visible, onClose]);
+  }, [visible, snapOffset, defaultOffset, animateTo, onClose]);
 
   const panResponder = useMemo(
     () =>
@@ -178,37 +205,55 @@ function BottomSheet({
     <Animated.View
       style={[
         styles.sheet,
+        clipContent && styles.sheetClipped,
+        { backgroundColor: contentBackgroundColor },
         { height: sheetHeight, transform: [{ translateY }] },
-      ]}>
+      ]}
+    >
       {/* 드래그 가능 영역: 핸들 + header */}
-      <View {...panResponder.panHandlers}>
-        <View style={styles.handleZone}>
-          <View style={styles.handle} />
+      <View
+        style={overlayHandle && styles.overlayHeader}
+        {...panResponder.panHandlers}
+      >
+        <View
+          style={[styles.handleZone, overlayHandle && styles.handleZoneOverlay]}
+        >
+          <View
+            style={[styles.handle, overlayHandle && styles.handleOverlay]}
+          />
         </View>
         {header}
       </View>
 
       <ScrollView
-        style={styles.body}
+        style={[styles.body, { backgroundColor: contentBackgroundColor }]}
         contentContainerStyle={[
           styles.bodyContent,
           {
+            paddingHorizontal: contentPaddingHorizontal,
+            backgroundColor: contentBackgroundColor,
             // 하단 탭바 + 화면 밖으로 밀려난 시트 아랫부분만큼 비워 둡니다.
-            paddingBottom: insets.bottom + TAB_BAR_CLEARANCE + snapOffset,
+            paddingBottom:
+              (bottomContentInset ?? insets.bottom + TAB_BAR_CLEARANCE) +
+              snapOffset,
           },
         ]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         {children}
       </ScrollView>
 
-      <Pressable
-        style={styles.close}
-        onPress={onClose}
-        hitSlop={10}
-        accessibilityRole="button"
-        accessibilityLabel="닫기">
-        <CloseMark />
-      </Pressable>
+      {showCloseButton ? (
+        <Pressable
+          style={styles.close}
+          onPress={onClose}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="닫기"
+        >
+          <CloseMark />
+        </Pressable>
+      ) : null}
     </Animated.View>
   );
 }
@@ -238,6 +283,16 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 10,
   },
+  sheetClipped: {
+    overflow: 'hidden',
+  },
+  overlayHeader: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    zIndex: 2,
+  },
   handleZone: {
     alignItems: 'center',
     paddingTop: 10,
@@ -249,12 +304,20 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: colors.border,
   },
+  handleZoneOverlay: {
+    paddingBottom: 10,
+  },
+  handleOverlay: {
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    shadowColor: '#000',
+    shadowOpacity: 0.28,
+    shadowRadius: 3,
+    elevation: 2,
+  },
   body: {
     flex: 1,
   },
-  bodyContent: {
-    paddingHorizontal: 20,
-  },
+  bodyContent: {},
   close: {
     position: 'absolute',
     top: 16,

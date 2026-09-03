@@ -23,7 +23,6 @@ import {
   BedIcon,
   Chevron,
   FestivalIcon,
-  FilterIcon,
   FoodIcon,
   MountainIcon,
   MuseumIcon,
@@ -53,17 +52,13 @@ import {
   useNearbyFestivals,
   type FestivalRange,
 } from '../../map/useNearbyFestivals';
-import {
-  TOUR_CATEGORY_LABEL,
-  type TourCategory,
-  type TourPlace,
-} from '../../types/tourPlace';
+import { TOUR_CATEGORY_LABEL, type TourCategory } from '../../types/tourPlace';
+import type { MappableTourContent } from '../../types/travel';
 import type { SearchPoi } from './searchTypes';
 import { type SafetyPlaceType } from '../../api/safetyPlaceApi';
 import { useSafetyPlaces, type MapBounds } from '../../map/useSafetyPlaces';
 import type { SafetyMapMarker } from './kakaoMapHtml';
 import SafetyFilterSheet, { SAFETY_FILTERS } from './SafetyFilterSheet';
-import MapDetailFilterSheet from './MapDetailFilterSheet';
 import type { TabScreenProps } from '../../navigation/tabs';
 
 /** 지도에서 제공하는 관광정보의 고정 서비스 범위 */
@@ -119,7 +114,6 @@ function MapScreen({ onBack }: TabScreenProps) {
     [],
   );
   const [safetyFilterOpen, setSafetyFilterOpen] = useState(false);
-  const [detailFilterOpen, setDetailFilterOpen] = useState(false);
   const [selectedSafetyId, setSelectedSafetyId] = useState<string | null>(null);
 
   /**
@@ -193,12 +187,7 @@ function MapScreen({ onBack }: TabScreenProps) {
     loading: festivalLoading,
     error: festivalError,
     retry: retryFestivals,
-  } = useNearbyFestivals(
-    queryCenter,
-    festivalRange,
-    undefined,
-    queryBounds,
-  );
+  } = useNearbyFestivals(queryCenter, festivalRange, undefined, queryBounds);
 
   const places = isFestival ? festivalPlaces : tourPlaces;
   const placesLoading = isFestival ? festivalLoading : tourLoading;
@@ -221,7 +210,7 @@ function MapScreen({ onBack }: TabScreenProps) {
   const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
 
   const selectedPlace = useMemo(
-    () => places.find(place => place.id === selectedId) ?? null,
+    () => places.find(place => place.contentId === selectedId) ?? null,
     [places, selectedId],
   );
 
@@ -280,7 +269,6 @@ function MapScreen({ onBack }: TabScreenProps) {
       setQueryCenter(mapCenter);
       setQueryBounds(mapBounds);
       setSelectedId(null); // 현재 보고 있는 지역을 기준으로 새 카테고리를 조회합니다.
-      setDetailFilterOpen(false);
     },
     [mapCenter, mapBounds],
   );
@@ -354,21 +342,19 @@ function MapScreen({ onBack }: TabScreenProps) {
 
   /* ── 검색 ── */
 
-  const runSearch = useCallback(
-    async (query: string) => {
-      const result =
-        (await mapRef.current?.search(query)) ??
-        ({ items: [], status: 'ERROR' as const });
-      return {
-        ...result,
-        items: result.items.filter(item => {
-          const address = item.roadAddress || item.address;
-          return /^(충청북도|충북)(\s|$)/.test(address.trim());
-        }),
-      };
-    },
-    [],
-  );
+  const runSearch = useCallback(async (query: string) => {
+    const result = (await mapRef.current?.search(query)) ?? {
+      items: [],
+      status: 'ERROR' as const,
+    };
+    return {
+      ...result,
+      items: result.items.filter(item => {
+        const address = item.roadAddress || item.address;
+        return /^(충청북도|충북)(\s|$)/.test(address.trim());
+      }),
+    };
+  }, []);
 
   /** 검색 결과 마커를 지도에 올리고, 특정 항목이 있으면 강조합니다. */
   const applyResults = useCallback(
@@ -400,7 +386,7 @@ function MapScreen({ onBack }: TabScreenProps) {
    * 관광정보 검색 결과를 고르면 그 좌표를 새 조회 기준점으로 삼습니다.
    * (충북 어디든 검색될 수 있어서, 지도만 옮기면 마커가 하나도 없는 화면이 됩니다.)
    */
-  const handleSelectPlace = useCallback((place: TourPlace) => {
+  const handleSelectPlace = useCallback((place: MappableTourContent) => {
     const center = { lat: place.lat, lng: place.lng };
     setSearchQuery(place.title);
     setSearchResults([]);
@@ -411,7 +397,7 @@ function MapScreen({ onBack }: TabScreenProps) {
     setQueryCenter(center);
     setQueryBounds(null);
     setMapCenter(center);
-    setSelectedId(place.id);
+    setSelectedId(place.contentId);
     mapRef.current?.moveTo(place.lat, place.lng);
   }, []);
 
@@ -444,20 +430,28 @@ function MapScreen({ onBack }: TabScreenProps) {
 
   return (
     <View style={styles.container}>
-      <KakaoMap
-        ref={mapRef}
-        places={places}
-        category={category}
-        selectedId={selectedId}
-        safetyPlaces={safetyMarkers}
-        selectedSafetyId={selectedSafetyId}
-        myLocation={myLocation}
-        onMarkerPress={handleMarkerPress}
-        onSafetyMarkerPress={handleSafetyMarkerPress}
-        onSearchMarkerPress={handleSearchMarkerPress}
-        onMapPress={handleMapPress}
-        onCenterChanged={handleViewportChanged}
-      />
+      {locationStatus === 'locating' ? (
+        <View style={styles.locationLoading}>
+          <ActivityIndicator color={colors.goldDeep} />
+          <Text style={styles.locationLoadingText}>현위치를 확인하고 있어요</Text>
+        </View>
+      ) : (
+        <KakaoMap
+          ref={mapRef}
+          places={places}
+          category={category}
+          selectedId={selectedId}
+          safetyPlaces={safetyMarkers}
+          selectedSafetyId={selectedSafetyId}
+          myLocation={myLocation}
+          centerOnMyLocation={locationStatus === 'granted'}
+          onMarkerPress={handleMarkerPress}
+          onSafetyMarkerPress={handleSafetyMarkerPress}
+          onSearchMarkerPress={handleSearchMarkerPress}
+          onMapPress={handleMapPress}
+          onCenterChanged={handleViewportChanged}
+        />
+      )}
 
       {/* 상단 검색바 + 필터칩 — pointerEvents="box-none" 이라야 빈 곳으로 지도 조작이 통과합니다 */}
       <View
@@ -587,20 +581,6 @@ function MapScreen({ onBack }: TabScreenProps) {
       >
         <Pressable
           style={styles.floatButton}
-          onPress={() => {
-            setSelectedId(null);
-            setSelectedPoiId(null);
-            setSelectedSafetyId(null);
-            setSafetyFilterOpen(false);
-            setDetailFilterOpen(true);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="상세 필터"
-        >
-          <FilterIcon color={colors.textPrimary} size={18} />
-        </Pressable>
-        <Pressable
-          style={styles.floatButton}
           onPress={() => mapRef.current?.moveToMyLocation()}
           accessibilityRole="button"
           accessibilityLabel="현위치로 이동"
@@ -633,7 +613,7 @@ function MapScreen({ onBack }: TabScreenProps) {
       {/* SOS — 시트나 검색 카드가 열리면 가려지지 않게 숨깁니다 */}
       {!selectedPlace && !selectedPoi && !selectedSafetyPlace && (
         <Pressable
-          style={[styles.sos, { bottom: insets.bottom + 96 }]}
+          style={[styles.sos, { bottom: insets.bottom + 76 }]}
           onPress={() => setSosOpen(true)}
           accessibilityRole="button"
           accessibilityLabel="긴급 SOS"
@@ -729,18 +709,14 @@ function MapScreen({ onBack }: TabScreenProps) {
         </View>
       )}
 
-      {selectedPoi && (
-        <View style={[styles.poiLayer, { bottom: insets.bottom + 20 }]}>
-          <PoiCard
-            poi={selectedPoi}
-            index={selectedPoiIndex}
-            total={searchResults.length}
-            onPrev={() => stepPoi(-1)}
-            onNext={() => stepPoi(1)}
-            onClose={closePoiCard}
-          />
-        </View>
-      )}
+      <PoiCard
+        poi={selectedPoi}
+        index={selectedPoiIndex}
+        total={searchResults.length}
+        onPrev={() => stepPoi(-1)}
+        onNext={() => stepPoi(1)}
+        onClose={closePoiCard}
+      />
 
       {selectedSafetyPlace && (
         <View style={[styles.safetyCard, { bottom: insets.bottom + 20 }]}>
@@ -794,13 +770,6 @@ function MapScreen({ onBack }: TabScreenProps) {
         onClose={() => setSafetyFilterOpen(false)}
       />
 
-      <MapDetailFilterSheet
-        visible={detailFilterOpen}
-        selected={category}
-        onSelect={handleCategory}
-        onClose={() => setDetailFilterOpen(false)}
-      />
-
       <SosScreen visible={sosOpen} onClose={() => setSosOpen(false)} />
 
       <MapSearchOverlay
@@ -849,6 +818,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.cream,
+  },
+  locationLoading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  locationLoadingText: {
+    fontSize: 13,
+    color: colors.textSecondary,
   },
   topLayer: {
     position: 'absolute',
@@ -1089,11 +1068,6 @@ const styles = StyleSheet.create({
     color: colors.textOnPrimary,
   },
 
-  poiLayer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-  },
   resultBanner: {
     position: 'absolute',
     alignSelf: 'center',
