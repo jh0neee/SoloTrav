@@ -17,8 +17,23 @@ import {
   View,
 } from 'react-native';
 import { colors } from '../../theme/colors';
-import { Chevron, ShieldIcon } from '../icons/UiIcons';
-import type { GalleryPhoto, TourFestival, TourSpot } from '../../types/travel';
+import PlaceResultRow from './PlaceResultRow';
+import type {
+  GalleryPhoto,
+  TourContent,
+  TourFestival,
+} from '../../types/travel';
+import type { SafetyStatus } from '../../travel/homeQueries';
+
+export function safetyStatusColor(status: SafetyStatus): string {
+  if (status === '안심') {
+    return colors.safeText;
+  }
+  if (status === '보통') {
+    return '#a66b00';
+  }
+  return colors.danger;
+}
 
 // ─────────────────────────────── 상태 표시
 
@@ -62,7 +77,8 @@ export function SectionState({
           <Pressable
             style={styles.retryBtn}
             onPress={onRetry}
-            accessibilityRole="button">
+            accessibilityRole="button"
+          >
             <Text style={styles.retryText}>다시 시도</Text>
           </Pressable>
         ) : null}
@@ -108,38 +124,25 @@ export function SpotRow({
   spot,
   onPress,
 }: {
-  spot: TourSpot;
+  spot: TourContent;
   onPress: () => void;
 }) {
+  const distanceLabel =
+    spot.distance === null
+      ? null
+      : spot.distance < 1000
+      ? `${spot.distance}m`
+      : `${(spot.distance / 1000).toFixed(1)}km`;
+
   return (
-    <Pressable
-      style={styles.row}
+    <PlaceResultRow
+      title={spot.title}
+      address={spot.address}
+      categoryLabel={spot.typeLabel}
+      imageUrl={spot.thumbnailUrl ?? spot.imageUrl}
+      distanceLabel={distanceLabel}
       onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={`${spot.title} ${spot.typeLabel}`}>
-      <Thumb uri={spot.thumbnailUrl} label={spot.title} style={styles.rowThumb} />
-      <View style={styles.rowBody}>
-        <View style={styles.rowTitleLine}>
-          <Text style={styles.rowTitle} numberOfLines={1}>
-            {spot.title}
-          </Text>
-          <View style={styles.typeBadge}>
-            <Text style={styles.typeBadgeText}>{spot.typeLabel}</Text>
-          </View>
-        </View>
-        <Text style={styles.rowAddress} numberOfLines={1}>
-          {spot.address || '주소 정보 없음'}
-        </Text>
-        {spot.distance !== null ? (
-          <Text style={styles.rowDistance}>
-            {spot.distance < 1000
-              ? `${spot.distance}m`
-              : `${(spot.distance / 1000).toFixed(1)}km`}
-          </Text>
-        ) : null}
-      </View>
-      <Chevron direction="right" color={colors.textSecondary} size={18} />
-    </Pressable>
+    />
   );
 }
 
@@ -171,12 +174,14 @@ export function FestivalCard({
           style={[
             styles.ddayBadge,
             festival.isOngoing && styles.ddayBadgeOngoing,
-          ]}>
+          ]}
+        >
           <Text
             style={[
               styles.ddayText,
               festival.isOngoing && styles.ddayTextOngoing,
-            ]}>
+            ]}
+          >
             {dday}
           </Text>
         </View>
@@ -198,9 +203,11 @@ export function FestivalCard({
 
 export function PhotoCard({
   photo,
+  count,
   onPress,
 }: {
   photo: GalleryPhoto;
+  count?: number;
   onPress?: () => void;
 }) {
   return (
@@ -216,6 +223,7 @@ export function PhotoCard({
         </Text>
         <Text style={styles.photoLocation} numberOfLines={1}>
           {photo.location}
+          {count && count > 1 ? ` · ${count}장` : ''}
         </Text>
       </View>
     </Pressable>
@@ -226,7 +234,7 @@ export function PhotoCard({
 
 /**
  * 등급(1~5)에 맞는 색.
- * 1·2 는 안전(초록), 3 은 보통(골드), 4·5 는 주의(빨강)로 묶습니다.
+ * 1·2는 초록, 3은 파랑, 4는 노랑, 5는 빨강으로 구분합니다.
  * 숫자만 보여주면 "3등급이 좋은 건가?" 를 매번 되묻게 되어 색으로 방향을 줍니다.
  */
 export function gradeColor(grade: number): string {
@@ -235,6 +243,9 @@ export function gradeColor(grade: number): string {
   }
   if (grade === 3) {
     return colors.goldDeep;
+  }
+  if (grade === 4) {
+    return '#d99a00';
   }
   return colors.danger;
 }
@@ -289,31 +300,45 @@ export function RankingRow({
   name,
   value,
   caption,
-  safetyGrade,
+  safetyStatus,
   onPress,
 }: {
   rank: number;
   name: string;
   value: string;
   caption: string;
-  safetyGrade: string;
+  safetyStatus?: SafetyStatus;
   onPress: () => void;
 }) {
   const isTop = rank <= 3;
 
   return (
     <Pressable style={styles.rankRow} onPress={onPress}>
-      <View
-        style={[styles.rankBadge, isTop && styles.rankBadgeTop]}>
+      <View style={[styles.rankBadge, isTop && styles.rankBadgeTop]}>
         <Text style={[styles.rankNum, isTop && styles.rankNumTop]}>{rank}</Text>
       </View>
       <View style={styles.rankBody}>
         <View style={styles.rankNameLine}>
           <Text style={styles.rankName}>{name}</Text>
-          <View style={styles.rankSafety}>
-            <ShieldIcon color={colors.safeText} size={12} />
-            <Text style={styles.rankSafetyText}>{safetyGrade}</Text>
-          </View>
+          {safetyStatus ? (
+            <View
+              style={[
+                styles.rankSafety,
+                safetyStatus === '보통' && styles.rankSafetyNormal,
+                safetyStatus === '확인 필요' && styles.rankSafetyCheck,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.rankSafetyText,
+                  safetyStatus === '보통' && styles.rankSafetyTextNormal,
+                  safetyStatus === '확인 필요' && styles.rankSafetyTextCheck,
+                ]}
+              >
+                {safetyStatus}
+              </Text>
+            </View>
+          ) : null}
         </View>
         <Text style={styles.rankCaption}>{caption}</Text>
       </View>
@@ -603,10 +628,22 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: colors.safeBg,
   },
+  rankSafetyNormal: {
+    backgroundColor: '#fff6db',
+  },
+  rankSafetyCheck: {
+    backgroundColor: colors.dangerSoft,
+  },
   rankSafetyText: {
     fontSize: 11,
     fontWeight: '700',
     color: colors.safeText,
+  },
+  rankSafetyTextNormal: {
+    color: '#a66b00',
+  },
+  rankSafetyTextCheck: {
+    color: colors.danger,
   },
   rankCaption: {
     fontSize: 12,
@@ -637,5 +674,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
-
 });

@@ -9,7 +9,13 @@
  * 있고 화면 상태는 디바운스 뒤에만 갱신합니다. 코드로 입력칸을 채울 때는
  * key 를 바꿔 리마운트하고, 비울 때는 clear() 를 씁니다.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -21,11 +27,12 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TAB_CONTENT_BOTTOM_GAP } from '../../navigation/layout';
 import { colors } from '../../theme/colors';
 import { Chevron, SearchIcon } from '../../components/icons/UiIcons';
 import { SectionState, SpotRow } from '../../components/travel/TravelCards';
 import { useSpotSearch } from '../../travel/useSpotSearch';
-import { SEARCH_FILTERS, type TourSpot } from '../../types/travel';
+import { SEARCH_FILTERS, type TourContent } from '../../types/travel';
 
 const DEBOUNCE_MS = 350;
 const MIN_QUERY_LENGTH = 2;
@@ -35,7 +42,14 @@ const MAX_RECENT = 8;
 const CHUNGBUK = '43';
 
 /** 검색어 제안 — 아직 서버에 인기 검색어가 없어 기획 고정값입니다 */
-const SUGGESTIONS = ['도담삼봉', '단양', '소백산', '청풍호', '속리산', '수옥정'];
+const SUGGESTIONS = [
+  '도담삼봉',
+  '단양',
+  '소백산',
+  '청풍호',
+  '속리산',
+  '수옥정',
+];
 
 /**
  * 최근 검색어. 지도 검색과 마찬가지로 AsyncStorage 를 아직 안 붙여서
@@ -56,7 +70,7 @@ function pushRecent(keyword: string) {
 
 type Props = {
   onBack: () => void;
-  onSelectSpot: (spot: TourSpot) => void;
+  onSelectSpot: (spot: TourContent) => void;
 };
 
 function SearchScreen({ onBack, onSelectSpot }: Props) {
@@ -66,7 +80,6 @@ function SearchScreen({ onBack, onSelectSpot }: Props) {
   /** 디바운스를 거쳐 확정된 검색어 — 실제 요청은 이 값으로만 나갑니다 */
   const [query, setQuery] = useState('');
   const [filterId, setFilterId] = useState<string>('all');
-  const [chungbukOnly, setChungbukOnly] = useState(true);
 
   /** 조합 중인 글자까지 담긴 원문 — 리렌더를 일으키지 않습니다 */
   const typedRef = useRef('');
@@ -85,7 +98,7 @@ function SearchScreen({ onBack, onSelectSpot }: Props) {
   const search = useSpotSearch({
     keyword: isSearching ? trimmed : '',
     contentTypeId,
-    regionCode: chungbukOnly ? CHUNGBUK : undefined,
+    regionCode: CHUNGBUK,
   });
 
   useEffect(() => {
@@ -159,7 +172,8 @@ function SearchScreen({ onBack, onSelectSpot }: Props) {
           onPress={onBack}
           style={styles.backBtn}
           accessibilityRole="button"
-          accessibilityLabel="뒤로 가기">
+          accessibilityLabel="뒤로 가기"
+        >
           <Chevron direction="left" color={colors.textPrimary} size={22} />
         </Pressable>
 
@@ -182,38 +196,16 @@ function SearchScreen({ onBack, onSelectSpot }: Props) {
               onPress={clearInput}
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="검색어 지우기">
+              accessibilityLabel="검색어 지우기"
+            >
               <Text style={styles.clearText}>✕</Text>
             </Pressable>
           ) : null}
         </View>
       </View>
 
-      {/* 지역 · 종류 필터 */}
+      {/* 종류 필터 — 서비스 지역은 충북으로 고정합니다. */}
       <View style={styles.filterArea}>
-        <View style={styles.regionToggle}>
-          {[
-            { label: '충북', value: true },
-            { label: '전국', value: false },
-          ].map(option => {
-            const active = chungbukOnly === option.value;
-            return (
-              <Pressable
-                key={option.label}
-                style={[styles.regionItem, active && styles.regionItemActive]}
-                onPress={() => setChungbukOnly(option.value)}>
-                <Text
-                  style={[
-                    styles.regionText,
-                    active && styles.regionTextActive,
-                  ]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
         <FlatList
           horizontal
           data={SEARCH_FILTERS}
@@ -225,8 +217,11 @@ function SearchScreen({ onBack, onSelectSpot }: Props) {
             return (
               <Pressable
                 style={[styles.chip, active && styles.chipActive]}
-                onPress={() => setFilterId(item.id)}>
-                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                onPress={() => setFilterId(item.id)}
+              >
+                <Text
+                  style={[styles.chipText, active && styles.chipTextActive]}
+                >
                   {item.label}
                 </Text>
               </Pressable>
@@ -311,7 +306,8 @@ function IdleView({
               <Pressable
                 key={keyword}
                 style={styles.keywordChip}
-                onPress={() => onSelectKeyword(keyword)}>
+                onPress={() => onSelectKeyword(keyword)}
+              >
                 <Text style={styles.keywordText}>{keyword}</Text>
               </Pressable>
             ))}
@@ -326,7 +322,8 @@ function IdleView({
             <Pressable
               key={keyword}
               style={[styles.keywordChip, styles.keywordChipSoft]}
-              onPress={() => onSelectKeyword(keyword)}>
+              onPress={() => onSelectKeyword(keyword)}
+            >
               <Text style={styles.keywordText}>{keyword}</Text>
             </Pressable>
           ))}
@@ -385,32 +382,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  regionToggle: {
-    flexDirection: 'row',
-    alignSelf: 'flex-start',
-    marginHorizontal: 16,
-    padding: 3,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-  },
-  regionItem: {
-    paddingHorizontal: 18,
-    paddingVertical: 7,
-    borderRadius: 10,
-  },
-  regionItemActive: {
-    backgroundColor: colors.ink,
-  },
-  regionText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    lineHeight: 18,
-    includeFontPadding: true,
-  },
-  regionTextActive: {
-    color: '#ffffff',
-  },
   chipRow: {
     gap: 8,
     paddingHorizontal: 16,
@@ -441,7 +412,7 @@ const styles = StyleSheet.create({
 
   resultContent: {
     paddingHorizontal: 16,
-    paddingBottom: 32,
+    paddingBottom: TAB_CONTENT_BOTTOM_GAP,
     flexGrow: 1,
   },
   resultCount: {

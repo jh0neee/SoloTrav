@@ -236,8 +236,10 @@ export const CITIES: City[] = [
   },
 ];
 
-/** 홈 스포트라이트에 노출할 추천 도시 */
-export const SPOTLIGHT_CITY_IDS = ['danyang', 'jecheon'];
+/** 홈 '숨은 동네'에 노출할 인구감소지역 전체 */
+export const SPOTLIGHT_CITY_IDS = CITIES.filter(
+  city => city.type === 'decline',
+).map(city => city.id);
 
 export const getCityById = (id: string) =>
   CITIES.find(city => city.id === id) ?? CITIES[0];

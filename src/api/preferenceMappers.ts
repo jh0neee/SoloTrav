@@ -1,7 +1,7 @@
 /**
  * 여행 취향: 화면이 쓰는 평평한 답변 ↔ 서버가 쓰는 카테고리 문서 변환.
  *
- * 화면(위저드)은 `{ region: '단양', duration: '1박 2일', ... }` 처럼 필드 id 를
+ * 화면(위저드)은 `{ pace: '느긋하게', activities: [...], ... }` 처럼 필드 id 를
  * 키로 하는 한 겹짜리 객체를 다룹니다. 반면 서버 바디는 카테고리 8개로 나뉘어
  * 있습니다. 다행히 위저드 8단계와 카테고리 8개가 1:1이라, 각 단계에 적어둔
  * `category` 를 보고 기계적으로 나누고 합칠 수 있습니다.
@@ -32,7 +32,7 @@ import type {
 } from './dto';
 
 /** 카테고리 안쪽 필드 구성이 바뀌면 이 값을 올립니다. */
-export const PREFERENCE_SCHEMA_VERSION = '1.0';
+export const PREFERENCE_SCHEMA_VERSION = '1.1';
 
 function emptyCategories(): Record<PreferenceCategory, PreferenceCategoryDto> {
   return {
