@@ -22,6 +22,8 @@ export type TabKey = 'home' | 'map' | 'assistant' | 'record' | 'my';
 export type TabScreenProps = {
   /** 탭 안의 화면이 자체 상단 뒤로 버튼을 제공할 때 홈으로 돌아갑니다. */
   onBack?: () => void;
+  /** 홈 내부 콘텐츠에서 마이 탭으로 이동할 때 사용합니다. */
+  onOpenMy?: () => void;
 };
 
 export type TabItem = {

@@ -134,7 +134,7 @@ function RecordFormScreen({
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <Pressable
@@ -198,7 +198,7 @@ function RecordFormScreen({
           <View style={styles.chipWrap}>
             {tags.map(tag => (
               <View key={tag} style={styles.tagPill}>
-                <Text style={styles.tagPillText}>#{tag}</Text>
+                <Text style={styles.tagPillText}># {tag}</Text>
               </View>
             ))}
           </View>

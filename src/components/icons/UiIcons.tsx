@@ -30,9 +30,11 @@ import {
   ForkKnifeIcon as PhForkKnife,
   DotsThreeIcon as PhDotsThree,
   HeartIcon as PhHeart,
+  IdentificationCardIcon as PhIdentificationCard,
   LockIcon as PhLock,
   MagnifyingGlassIcon as PhMagnifyingGlass,
   MapPinIcon as PhMapPin,
+  MedalIcon as PhMedal,
   MicrophoneIcon as PhMicrophone,
   MountainsIcon as PhMountains,
   PaperPlaneTiltIcon as PhPaperPlaneTilt,
@@ -147,6 +149,11 @@ export function SirenIcon({ color, size = 20 }: IconProps) {
   return <PhSiren color={color} size={size} weight={WEIGHT} />;
 }
 
+/** 혈액형·알레르기 등을 담는 긴급 정보 카드 */
+export function IdCardIcon({ color, size = 20 }: IconProps) {
+  return <PhIdentificationCard color={color} size={size} weight={WEIGHT} />;
+}
+
 /** 필터 (슬라이더) */
 export function FilterIcon({ color, size = 18 }: IconProps) {
   return <PhSlidersHorizontal color={color} size={size} weight={WEIGHT} />;
@@ -160,6 +167,11 @@ export function PersonIcon({ color, size = 18 }: IconProps) {
 /** 반짝임 — AI·추천 표시 */
 export function SparkIcon({ color, size = 18 }: IconProps) {
   return <PhSparkle color={color} size={size} weight={WEIGHT} />;
+}
+
+/** 메달 — 배지 수집과 성취 표시 */
+export function MedalIcon({ color, size = 20 }: IconProps) {
+  return <PhMedal color={color} size={size} weight={WEIGHT} />;
 }
 
 /** 더하기 */
