@@ -49,6 +49,14 @@ export const ENDPOINTS = {
   /** 카카오 재인증으로 회원 탈퇴 예약 취소 */
   cancelWithdrawal: () => `/auth/withdrawal/cancel`,
 
+  // 약관
+  /** 서비스 이용약관 전문 조회 (공개) */
+  serviceTerms: () => `/terms/service`,
+  /** 내 약관 동의 상태 조회 (인증) */
+  myTermsStatus: () => `/auth/terms`,
+  /** 현재 약관에 동의 (인증) */
+  termsAccept: () => `/auth/terms/accept`,
+
   // 인증 — 세션
   /** 서비스 refresh token 으로 JWT 재발급 */
   refresh: () => `/auth/refresh`,

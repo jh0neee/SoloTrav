@@ -8,5 +8,13 @@ export const PRIVACY_POLICY_URL =
 export const TERMS_OF_SERVICE_URL =
   'https://app.notion.com/p/3d04e03f580580fd915ee9cf107483b4';
 
-/** 기존 가입자도 UI를 확인할 수 있도록 개발 빌드에서만 약관 화면을 노출합니다. */
-export const FORCE_TERMS_AGREEMENT_PREVIEW = __DEV__;
+/** 현재 서비스 이용약관 최신 버전 (GET /terms/service 기준 기본값) */
+export const CURRENT_TERMS_VERSION =
+  '7973f2c0fb603d1afc3f29f03766511c5514653e1dad88aec94b7f588093b354';
+
+/**
+ * 약관 화면 강제 노출 플래그.
+ * 실제 API 연동이 완료되었으므로 기본값은 false이며,
+ * 사용자의 실제 약관 동의 상태(GET /auth/terms)에 따라 노출됩니다.
+ */
+export const FORCE_TERMS_AGREEMENT_PREVIEW = false;

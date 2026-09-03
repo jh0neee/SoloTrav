@@ -37,6 +37,11 @@ export class ApiError extends Error {
   get isUnauthorized(): boolean {
     return this.status === 401;
   }
+
+  /** 리소스 충돌 (구버전 약관 동의 등) */
+  get isConflict(): boolean {
+    return this.status === 409;
+  }
 }
 
 /** 서버 에러 바디에서 사람이 읽을 메시지를 최대한 뽑아냅니다. */

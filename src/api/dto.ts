@@ -91,6 +91,53 @@ export type RefreshTokenRequest = {
   refreshToken: string;
 };
 
+/** POST /auth/terms/accept 요청 바디 */
+export type AcceptTermsRequest = {
+  version: string;
+  accepted: boolean;
+};
+
+/** POST /auth/terms/accept 응답 바디 */
+export type AcceptTermsResponseDto = {
+  version?: string;
+  accepted?: boolean;
+  acceptedAt?: string;
+  agreedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+/** GET /terms/service 응답 (서비스 이용약관 전문) */
+export type ServiceTermsDto = {
+  title?: string;
+  version?: string;
+  effectiveDate?: string | null;
+  effectiveDateText?: string;
+  format?: string;
+  content?: string;
+  [key: string]: unknown;
+};
+
+/** GET /auth/terms 응답 바디 (내 약관 동의 상태) */
+export type MyTermsStatusDto = {
+  required?: boolean;
+  currentVersion?: string;
+  acceptedVersion?: string | null;
+  acceptedAt?: string | null;
+  accepted?: boolean;
+  agreed?: boolean;
+  version?: string;
+  termsVersion?: string;
+  agreedAt?: string | null;
+  title?: string;
+  content?: string;
+  url?: string;
+  termsUrl?: string;
+  [key: string]: unknown;
+};
+
+export type TermsInfoDto = MyTermsStatusDto;
+
 /**
  * GET /users/me 응답(봉투를 벗긴 뒤).
  * 로그인 응답의 user 와 같은 모양으로 보고 AuthUserDto 를 재사용합니다.

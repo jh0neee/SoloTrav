@@ -9,9 +9,21 @@ import {
   toAuthSession,
   toKakaoAuthUrl,
   toKakaoNativeConfig,
+  toTermsInfo,
+  unwrap,
+  type ParsedTermsInfo,
 } from './mappers';
 import { refreshSession } from './sessionRefresh';
-import type { KakaoNativeLoginRequest, RefreshTokenRequest } from './dto';
+import type {
+  AcceptTermsRequest,
+  AcceptTermsResponseDto,
+  Envelope,
+  KakaoNativeLoginRequest,
+  MyTermsStatusDto,
+  RefreshTokenRequest,
+  ServiceTermsDto,
+  TermsInfoDto,
+} from './dto';
 import type { AuthSession, AuthTokens, KakaoNativeConfig } from '../types/auth';
 
 export const authApi = {
@@ -63,6 +75,56 @@ export const authApi = {
     };
     const { data } = await apiClient.post(ENDPOINTS.cancelWithdrawal(), body);
     return toAuthSession(data);
+  },
+
+  /** GET /terms/service — 서비스 이용약관 전문 조회 (공개) */
+  getServiceTerms: async (): Promise<ServiceTermsDto> => {
+    console.log('[authApi] >>> GET /terms/service 요청 전송');
+    try {
+      const { data } = await apiClient.get(ENDPOINTS.serviceTerms());
+      console.log('[authApi] <<< GET /terms/service 응답 수신:', data);
+      return unwrap(data as Envelope<ServiceTermsDto>);
+    } catch (error) {
+      console.error('[authApi] !!! GET /terms/service 실패:', error);
+      throw error;
+    }
+  },
+
+  /** GET /auth/terms — 내 약관 동의 상태 조회 (인증) */
+  getMyTermsStatus: async (): Promise<MyTermsStatusDto> => {
+    console.log('[authApi] >>> GET /auth/terms 요청 전송');
+    try {
+      const { data } = await apiClient.get(ENDPOINTS.myTermsStatus());
+      console.log(
+        '[authApi] <<< GET /auth/terms 전체 응답 수신:',
+        JSON.stringify(data, null, 2),
+      );
+      return unwrap(data as Envelope<MyTermsStatusDto>);
+    } catch (error) {
+      console.error('[authApi] !!! GET /auth/terms 실패:', error);
+      throw error;
+    }
+  },
+
+  /** GET /auth/terms — 파싱된 약관 정보 조회 */
+  getTerms: async (): Promise<ParsedTermsInfo> => {
+    const data = await authApi.getMyTermsStatus();
+    return toTermsInfo(data);
+  },
+
+  /** POST /auth/terms/accept — 이용약관 동의 */
+  acceptTerms: async (
+    body: AcceptTermsRequest,
+  ): Promise<AcceptTermsResponseDto> => {
+    console.log('[authApi] >>> POST /auth/terms/accept 요청 바디:', body);
+    try {
+      const { data } = await apiClient.post(ENDPOINTS.termsAccept(), body);
+      console.log('[authApi] <<< POST /auth/terms/accept 응답 수신:', data);
+      return unwrap(data as Envelope<AcceptTermsResponseDto>);
+    } catch (error) {
+      console.error('[authApi] !!! POST /auth/terms/accept 실패:', error);
+      throw error;
+    }
   },
 
   /**

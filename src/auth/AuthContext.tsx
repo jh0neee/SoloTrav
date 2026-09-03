@@ -48,7 +48,7 @@ type AuthContextValue = {
   loginWithKakao: () => Promise<void>;
   cancelWithdrawal: () => Promise<void>;
   leaveWithdrawalRecovery: () => Promise<void>;
-  completeTermsAgreement: () => void;
+  completeTermsAgreement: (version?: string) => Promise<void>;
   logout: () => Promise<void>;
   withdraw: () => Promise<void>;
   clearError: () => void;
@@ -85,10 +85,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       setStatus(session ? 'authenticated' : 'unauthenticated');
-      // 백엔드 연동 전 UI 확인용. 프로덕션 빌드에서는 항상 false 입니다.
-      setRequiresTermsAgreement(
-        Boolean(session) && FORCE_TERMS_AGREEMENT_PREVIEW,
-      );
+      if (session) {
+        if (FORCE_TERMS_AGREEMENT_PREVIEW) {
+          setRequiresTermsAgreement(true);
+        } else {
+          const needsAgreement =
+            await authService.checkTermsAgreementRequired();
+          if (!cancelled) {
+            setRequiresTermsAgreement(needsAgreement);
+          }
+        }
+      } else {
+        setRequiresTermsAgreement(false);
+      }
     })();
     return () => {
       cancelled = true;
@@ -135,7 +144,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       setStatus('authenticated');
-      setRequiresTermsAgreement(FORCE_TERMS_AGREEMENT_PREVIEW);
+      if (FORCE_TERMS_AGREEMENT_PREVIEW) {
+        setRequiresTermsAgreement(true);
+      } else {
+        const needsAgreement =
+          await authService.checkTermsAgreementRequired();
+        if (mounted.current) {
+          setRequiresTermsAgreement(needsAgreement);
+        }
+      }
     } catch (caught) {
       if (!mounted.current) {
         return;
@@ -187,7 +204,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       setIsWithdrawalPending(false);
       setStatus('authenticated');
-      setRequiresTermsAgreement(FORCE_TERMS_AGREEMENT_PREVIEW);
+      if (FORCE_TERMS_AGREEMENT_PREVIEW) {
+        setRequiresTermsAgreement(true);
+      } else {
+        const needsAgreement =
+          await authService.checkTermsAgreementRequired();
+        if (mounted.current) {
+          setRequiresTermsAgreement(needsAgreement);
+        }
+      }
     } catch (caught) {
       if (mounted.current) {
         setError(toApiError(caught).message);
@@ -210,9 +235,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setError(null);
   }, []);
 
-  const completeTermsAgreement = useCallback(() => {
-    // TODO: 백엔드 API 확정 후 agreementToken과 약관 버전을 전송하고,
-    // 응답으로 받은 정식 세션을 저장한 뒤 이 상태를 해제합니다.
+  const completeTermsAgreement = useCallback(async (version?: string) => {
+    await authService.acceptTerms(version);
+    if (!mounted.current) {
+      return;
+    }
     setRequiresTermsAgreement(false);
   }, []);
 

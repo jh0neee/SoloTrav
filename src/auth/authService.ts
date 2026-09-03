@@ -8,7 +8,7 @@
 import { authApi } from '../api/authApi';
 import { userApi } from '../api/userApi';
 import { setSessionExpiredHandler } from '../api/sessionRefresh';
-import { toApiError } from '../api/errors';
+import { ApiError, toApiError } from '../api/errors';
 import { tokenStorage } from '../storage/tokenStorage';
 import { userStore } from '../user/userStore';
 import {
@@ -16,7 +16,10 @@ import {
   signOutFromKakao,
   type KakaoTokens,
 } from './kakaoSdk';
+import { CURRENT_TERMS_VERSION } from '../config/legal';
+import type { ParsedTermsInfo } from '../api/mappers';
 import type { AuthSession, AuthTokens } from '../types/auth';
+import type { MyTermsStatusDto, ServiceTermsDto } from '../api/dto';
 import { WithdrawalPendingError } from './withdrawalPendingError';
 
 function isWithdrawalPending(error: ReturnType<typeof toApiError>): boolean {
@@ -122,6 +125,94 @@ export const authService = {
     await tokenStorage.save(session.tokens);
     await userStore.save(session.user);
     return session;
+  },
+
+
+  /** 서비스 이용약관 전문 및 최신 버전 조회 (GET /terms/service) */
+  getServiceTerms: async (): Promise<ServiceTermsDto> => {
+    return authApi.getServiceTerms();
+  },
+
+  /** 내 약관 동의 상태 조회 (GET /auth/terms) */
+  getMyTermsStatus: async (): Promise<MyTermsStatusDto> => {
+    return authApi.getMyTermsStatus();
+  },
+
+  /** 파싱된 약관 정보 조회 */
+  getTerms: async (): Promise<ParsedTermsInfo> => {
+    return authApi.getTerms();
+  },
+
+  /**
+   * 현재 사용자의 약관 동의 필요 여부 확인.
+   * GET /auth/terms 응답의 accepted 가 true 이거나 agreedAt/acceptedAt 이 존재하면 false,
+   * 미동의 상태이면 true 를 반환합니다.
+   */
+  checkTermsAgreementRequired: async (): Promise<boolean> => {
+    try {
+      const status = await authApi.getMyTermsStatus();
+      console.log(
+        '[authService] 내 약관 동의 상태 원본 (GET /auth/terms):',
+        JSON.stringify(status, null, 2),
+      );
+      // 서버의 required 필드가 있으면 그것을 우선하고, 없으면 버전/시각으로 동의 여부(isAgreed) 판별
+      const isAgreed =
+        typeof status.required === 'boolean'
+          ? !status.required
+          : Boolean(
+              (status.acceptedVersion &&
+                status.currentVersion &&
+                status.acceptedVersion === status.currentVersion) ||
+                status.accepted === true ||
+                status.agreed === true ||
+                Boolean(status.agreedAt) ||
+                Boolean(status.acceptedAt),
+            );
+
+      const requiresTermsAgreement = !isAgreed;
+
+      console.log('[authService] 약관 동의 판별 결과:', {
+        required: status.required,
+        currentVersion: status.currentVersion,
+        acceptedVersion: status.acceptedVersion,
+        acceptedAt: status.acceptedAt,
+        isAgreed,
+        '약관동의화면표시(requiresTermsAgreement)': requiresTermsAgreement,
+      });
+
+      return requiresTermsAgreement;
+    } catch (error) {
+      console.warn('[authService] 약관 상태 조회 실패 (기본값 false):', error);
+      return false;
+    }
+  },
+
+  /**
+   * 이용약관 동의 요청.
+   * 전달된 version이 없거나 64자리 해시가 아니면 GET /terms/service 에서 최신 버전(또는 기본 상수)을 가져와 동의합니다.
+   * 이전 버전 요청 시 409 ApiError 가 발생합니다.
+   */
+  acceptTerms: async (version?: string): Promise<void> => {
+    let targetVersion = version?.trim();
+    if (!targetVersion || !/^[a-f0-9]{64}$/i.test(targetVersion)) {
+      try {
+        const serviceTerms = await authApi.getServiceTerms();
+        const fetched = serviceTerms.version?.trim();
+        if (fetched && /^[a-f0-9]{64}$/i.test(fetched)) {
+          targetVersion = fetched;
+        }
+      } catch (err) {
+        console.warn('[authService] GET /terms/service 조회 실패, 기본 버전 상수 사용:', err);
+      }
+    }
+    if (!targetVersion || !/^[a-f0-9]{64}$/i.test(targetVersion)) {
+      targetVersion = CURRENT_TERMS_VERSION;
+    }
+    console.log('[authService] 최종 약관 동의 요청 전송. version:', targetVersion);
+    await authApi.acceptTerms({
+      version: targetVersion,
+      accepted: true,
+    });
   },
 
   /** 탈퇴 취소 화면을 닫을 때 임시 카카오 세션도 정리합니다. */

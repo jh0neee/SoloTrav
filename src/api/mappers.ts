@@ -138,3 +138,64 @@ export function toKakaoAuthUrl(payload: unknown): string {
   }
   return url;
 }
+
+export type ParsedTermsInfo = {
+  version: string | null;
+  url: string | null;
+  raw: unknown;
+};
+
+export function toTermsInfo(payload: unknown): ParsedTermsInfo {
+  const unwrapped = unwrap(payload as Envelope<Record<string, unknown>>);
+
+  function findHex64(node: unknown): string | null {
+    if (!node) return null;
+    if (typeof node === 'string' && /^[a-f0-9]{64}$/i.test(node.trim())) {
+      return node.trim();
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        const found = findHex64(item);
+        if (found) return found;
+      }
+    } else if (typeof node === 'object') {
+      for (const val of Object.values(node as Record<string, unknown>)) {
+        const found = findHex64(val);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  function findUrl(node: unknown): string | null {
+    if (!node) return null;
+    if (typeof node === 'string' && /^https?:\/\//i.test(node.trim())) {
+      return node.trim();
+    }
+    if (Array.isArray(node)) {
+      for (const item of node) {
+        const found = findUrl(item);
+        if (found) return found;
+      }
+    } else if (typeof node === 'object') {
+      for (const val of Object.values(node as Record<string, unknown>)) {
+        const found = findUrl(val);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  const rec = (unwrapped && typeof unwrapped === 'object' ? unwrapped : {}) as Record<string, unknown>;
+  const directVersion = rec.version ?? rec.termsVersion ?? rec.hash ?? rec.documentHash;
+  const version = (typeof directVersion === 'string' && /^[a-f0-9]{64}$/i.test(directVersion.trim()))
+    ? directVersion.trim()
+    : findHex64(unwrapped);
+
+  const directUrl = rec.url ?? rec.termsUrl ?? rec.link ?? rec.documentUrl;
+  const url = (typeof directUrl === 'string' && /^https?:\/\//i.test(directUrl.trim()))
+    ? directUrl.trim()
+    : findUrl(unwrapped);
+
+  return { version, url, raw: payload };
+}
