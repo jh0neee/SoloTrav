@@ -31,7 +31,9 @@ import { badgeStore, countEarned, useBadges } from '../badges/badgeStore';
 import { recordStore, useRecords } from '../records/recordStore';
 import PreferencePromptScreen from './home/PreferencePromptScreen';
 import FavoriteCoursesSection from './favorites/FavoriteCoursesSection';
+import BlockedUsersScreen from './my/BlockedUsersScreen';
 import { favoriteStore } from '../favorites/favoriteStore';
+import { blockStore } from '../blocks/blockStore';
 import {
   highlightPreferences,
   toProfilePreferenceAnswers,
@@ -106,6 +108,7 @@ function MyScreen() {
       badgeStore.reload(),
       favoriteStore.reload(),
       recordStore.reload('mine'),
+      blockStore.reload(),
     ]);
     setRefreshing(false);
   };
@@ -205,6 +208,10 @@ function MyScreen() {
 
   if (view === 'courses') {
     return <SavedCoursesListScreen onBack={() => setView('root')} />;
+  }
+
+  if (view === 'blocks') {
+    return <BlockedUsersScreen onBack={() => setView('root')} />;
   }
 
   if (badgeView === 'detail' && selectedBadge) {
@@ -357,6 +364,18 @@ function MyScreen() {
           })}
         </View>
       </Section>
+
+      {/* ── 커뮤니티 관리 ── */}
+      {!isGuest && (
+        <Section title="커뮤니티 관리">
+          <View style={styles.card}>
+            <PolicyRow
+              label="차단 목록 관리"
+              onPress={() => setView('blocks')}
+            />
+          </View>
+        </Section>
+      )}
 
       {/* ── 약관 및 정책 ── */}
       <Section title="약관 및 정책">

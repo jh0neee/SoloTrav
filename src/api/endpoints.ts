@@ -75,6 +75,13 @@ export const ENDPOINTS = {
   /** 현장 방문 인증 — 좌표는 보내지 않고 기기에서 계산한 거리만 보냅니다. */
   placeCheckIns: () => `/users/me/place-check-ins`,
 
+  /** 내 차단 목록 조회 (GET) */
+  userBlocks: (params?: { page?: number; limit?: number }) =>
+    withQuery(`/users/me/blocks`, params),
+  /** 사용자 차단 (PUT) / 사용자 차단 해제 (DELETE) */
+  userBlock: (userId: string) =>
+    `/users/me/blocks/${encodeURIComponent(userId)}`,
+
   // 여행 기록
   /** 여행 기록 조회(GET) / 등록(POST) */
   travelRecords: () => `/travel-records`,

@@ -352,3 +352,30 @@ export type TravelPreferenceRequest = Required<
   freeText: string;
   meta: Record<string, unknown>;
 };
+
+/** PUT/DELETE /users/me/blocks/{userId} 응답 바디 */
+export type BlockUserResponseDto = {
+  userId?: string;
+  blocked?: boolean;
+};
+
+/** 차단된 사용자 항목 */
+export type BlockedUserDto = {
+  userId?: string | number;
+  nickname?: string | null | Record<string, unknown>;
+  nickName?: string | null;
+  name?: string | null;
+  profileImage?: string | null | Record<string, unknown>;
+  profileImageUrl?: string | null;
+  profile_image_url?: string | null;
+  blockedAt?: string | null;
+  createdAt?: string | null;
+};
+
+/** GET /users/me/blocks 응답 바디 */
+export type BlockedUserListResponseDto = {
+  items?: BlockedUserDto[];
+  total?: number;
+  page?: number;
+  limit?: number;
+};

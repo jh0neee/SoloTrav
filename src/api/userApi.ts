@@ -83,4 +83,22 @@ export const userApi = {
     const { data } = await apiClient.post(ENDPOINTS.travelPreferences(), body);
     return toPreferenceAnswers(data) ?? answers;
   },
+
+  /** PUT /users/me/blocks/{userId} — 사용자 차단 */
+  blockUser: async (userId: string) => {
+    const { blockApi } = await import('./blockApi');
+    return blockApi.block(userId);
+  },
+
+  /** DELETE /users/me/blocks/{userId} — 사용자 차단 해제 */
+  unblockUser: async (userId: string) => {
+    const { blockApi } = await import('./blockApi');
+    return blockApi.unblock(userId);
+  },
+
+  /** GET /users/me/blocks — 내 차단 목록 조회 */
+  getBlockedUsers: async (params?: { page?: number; limit?: number }) => {
+    const { blockApi } = await import('./blockApi');
+    return blockApi.list(params);
+  },
 };

@@ -42,6 +42,8 @@ import {
 } from '../../records/recordStore';
 import { useMyProfile } from '../../user/userStore';
 import { useAuth } from '../../auth/AuthContext';
+import { blockStore } from '../../blocks/blockStore';
+import { toApiError } from '../../api/errors';
 import type { RecordComment, TravelRecord } from '../../types/travelRecord';
 
 type Props = {
@@ -164,14 +166,21 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
     if (!target) {
       return;
     }
-    // UI 확인 단계에서는 작성자 id가 없는 응답도 차단 흐름을 끝까지 보여줍니다.
-    // TODO: 차단 API 연결 전 서버가 기록·댓글에 authorId를 내려주도록 확정합니다.
-    const authorId =
-      target.authorId ?? `mock:${target.targetType}:${target.targetId}`;
+    if (isGuest) {
+      setModerationTarget(null);
+      promptLogin('사용자 차단은 로그인 후 이용할 수 있습니다.');
+      return;
+    }
+    const authorId = target.authorId;
+    if (!authorId) {
+      setModerationTarget(null);
+      Alert.alert('차단 불가', '작성자 정보를 확인할 수 없어 차단할 수 없습니다.');
+      return;
+    }
     setModerationTarget(null);
     Alert.alert(
       '이 사용자를 차단할까요?',
-      '이 사용자의 여행 기록과 댓글이 더 이상 표시되지 않습니다.',
+      '이 사용자의 여행 기록과 댓글이 더 이상 표시되지 않으며, 양방향 상호작용이 제한됩니다.',
       [
         { text: '취소', style: 'cancel' },
         {
@@ -180,21 +189,13 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
           onPress: async () => {
             setIsModerating(true);
             try {
-              // TODO: 차단 API가 확정되면 성공 후 아래 로컬 숨김을 실행합니다.
-              await new Promise<void>(resolve =>
-                setTimeout(() => resolve(), 500),
-              );
-              if (__DEV__) {
-                console.log('[moderation mock] block user', authorId);
-              }
-              if (target.authorId) {
-                recordStore.hideAuthor(target.authorId);
-                commentStore.hideAuthor(target.authorId);
-              }
+              await blockStore.block(authorId);
               if (target.targetType === 'TRAVEL_RECORD') {
                 onBack();
               }
-              Alert.alert('차단했어요', '이 사용자의 콘텐츠를 숨겼습니다.');
+              Alert.alert('차단 완료', '이 사용자를 차단했습니다.');
+            } catch (caught) {
+              Alert.alert('차단 실패', toApiError(caught).message);
             } finally {
               setIsModerating(false);
             }

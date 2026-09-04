@@ -18,6 +18,7 @@ const ROOT = toPath('my');
 const SEGMENT: Record<Exclude<MyView, 'root'>, string> = {
   preference: 'preference',
   courses: 'courses',
+  blocks: 'blocks',
 };
 
 function toView(segments: string[]): MyView {
