@@ -199,8 +199,11 @@ function CityDetailScreen({
           ) : null}
 
           <Pressable
-            style={styles.cta}
-            onPress={() => onCreateCourse(city)}
+            style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
+            onPress={() => {
+              console.log('[CityDetail] onCreateCourse button clicked for:', city.name);
+              onCreateCourse(city);
+            }}
             accessibilityRole="button"
           >
             <Text style={styles.ctaText}>{city.name} (으)로 코스 만들기</Text>
@@ -396,6 +399,10 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: colors.ink,
     marginTop: 4,
+  },
+  ctaPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
   },
   ctaText: { color: '#ffffff', fontSize: 16, fontWeight: '700' },
   exploreSection: { marginTop: 24, gap: 12 },

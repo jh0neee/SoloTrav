@@ -442,33 +442,34 @@ function PreferencePromptCard({
 
   if (configured) {
     return (
-      <View style={[styles.promptCard, styles.promptCardConfigured]}>
-        <View style={styles.configuredTitleRow}>
-          <Text style={styles.configuredTitle}>나의 여행 취향</Text>
-          <Pressable
-            style={styles.preferenceMoreButton}
-            onPress={onPress}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="나의 여행 취향 전체 보기"
-          >
-            <Text style={styles.preferenceMoreButtonText}>전체 보기</Text>
-            <Chevron direction="right" color={colors.primaryStrong} size={13} />
-          </Pressable>
+      <Pressable
+        style={({ pressed }) => [
+          styles.promptCard,
+          styles.promptCardConfigured,
+          pressed && styles.promptCardPressed,
+        ]}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel="나의 여행 취향 상세 보기"
+      >
+        <View style={styles.promptTop}>
+          <View style={styles.promptTexts}>
+            <Text style={styles.configuredTitle}>
+              나만의 여행 취향이 등록되었어요 ✈️
+            </Text>
+            <Text style={styles.configuredSub}>
+              등록된 취향을 바탕으로 딱 맞는 여행지를 추천해드려요
+            </Text>
+          </View>
         </View>
-        <View style={styles.preferenceTags}>
-          {tags?.map(tag => (
-            <View key={tag} style={styles.preferenceTag}>
-              <Text style={styles.preferenceTagText} numberOfLines={1}>
-                # {tag}
-              </Text>
-            </View>
-          ))}
+        <View style={[styles.promptFooter, styles.configuredFooter]}>
+          <Text style={styles.promptTime}>마이페이지에서 언제든 관리</Text>
+          <View style={styles.promptBtn}>
+            <Text style={styles.promptBtnText}>상세 보기</Text>
+            <Chevron direction="right" color={colors.primaryStrong} size={15} />
+          </View>
         </View>
-        <Text style={styles.configuredSub}>
-          이 취향을 바탕으로 나에게 맞는 여행지를 찾아드려요
-        </Text>
-      </View>
+      </Pressable>
     );
   }
 
@@ -630,7 +631,11 @@ const styles = StyleSheet.create({
   },
   promptCardConfigured: {
     backgroundColor: colors.primarySoft,
-    borderColor: colors.primary,
+    borderColor: colors.primaryBorder,
+    paddingBottom: 8,
+  },
+  promptCardPressed: {
+    opacity: 0.88,
   },
   promptCardLoading: {
     minHeight: 112,
@@ -680,8 +685,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 10,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
@@ -717,51 +722,21 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   configuredTitle: {
+    fontSize: 16,
+    fontWeight: '700',
     color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  configuredTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  preferenceTags: {
-    flexDirection: 'row',
-    gap: 4,
-    marginTop: 11,
-  },
-  preferenceTag: {
-    flexShrink: 1,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: colors.primaryBorder,
-  },
-  preferenceTagText: {
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  preferenceMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 1,
-    paddingVertical: 3,
-  },
-  preferenceMoreButtonText: {
-    color: colors.primaryStrong,
-    fontSize: 13,
-    fontWeight: '700',
+    lineHeight: 23,
   },
   configuredSub: {
-    marginTop: 13,
+    marginTop: 4,
     color: colors.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
     lineHeight: 18,
+  },
+  configuredFooter: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopColor: colors.primaryBorder,
   },
 
   // 섹션 공통

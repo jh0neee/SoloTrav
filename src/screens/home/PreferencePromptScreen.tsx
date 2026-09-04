@@ -5,6 +5,7 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   BackHandler,
   KeyboardAvoidingView,
   Platform,
@@ -19,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { City } from '../../data/cities';
 import {
   createInitialAnswers,
+  getFirstMissingRequiredField,
   getPreferenceSteps,
   isStepComplete,
   type PreferenceAnswers,
@@ -30,6 +32,7 @@ import Chip from '../../components/Chip';
 import OptionCard from '../../components/OptionCard';
 import Slider from '../../components/Slider';
 import { Chevron, SparkIcon } from '../../components/icons/UiIcons';
+import { TAB_CONTENT_BOTTOM_GAP } from '../../navigation/layout';
 
 type Props = {
   /** 코스 생성 진입 시 이미 선택된 도시를 문맥으로 보여줍니다. */
@@ -37,18 +40,24 @@ type Props = {
   mode?: PreferencePromptMode;
   /** 이미 등록한 취향(편집 진입). 없으면 새로 작성합니다. */
   initialAnswers?: PreferenceAnswers | null;
+  /** true 이면 initialAnswers 를 무시하고 백지 상태에서 시작합니다. */
+  resetAnswers?: boolean;
   /** 저장 중이면 완료 버튼을 잠급니다. */
   isSaving?: boolean;
   /** 저장 실패 메시지. 있으면 하단에 띄우고 화면은 그대로 둡니다. */
   saveError?: string | null;
   onBack: () => void;
-  onComplete: (answers: PreferenceAnswers) => void;
+  onComplete: (
+    answers: PreferenceAnswers,
+    saveToProfile: boolean,
+  ) => void | Promise<void>;
 };
 
 function PreferencePromptScreen({
   city,
   mode = 'profile',
   initialAnswers,
+  resetAnswers = false,
   isSaving = false,
   saveError,
   onBack,
@@ -64,8 +73,9 @@ function PreferencePromptScreen({
         visibleStep.fields.map(field => field.id),
       ),
     );
+    const initial = resetAnswers ? {} : initialAnswers ?? {};
     const visibleInitialAnswers = Object.fromEntries(
-      Object.entries(initialAnswers ?? {}).filter(([id]) =>
+      Object.entries(initial).filter(([id]) =>
         visibleFieldIds.has(id),
       ),
     );
@@ -106,14 +116,29 @@ function PreferencePromptScreen({
   }, [index]);
 
   const goPrev = () => (index === 0 ? onBack() : setIndex(i => i - 1));
-  const goNext = () =>
-    isLast ? onComplete(answers) : setIndex(i => Math.min(total - 1, i + 1));
+  const goNext = (saveToProfile: boolean = mode === 'profile') => {
+    if (!canNext) {
+      const missing = getFirstMissingRequiredField(step, answers);
+      Alert.alert(
+        '필수 항목 확인',
+        missing
+          ? `'${missing.label}' 항목을 선택해주세요.`
+          : '필수 항목을 모두 선택해주세요.',
+      );
+      return;
+    }
+    if (isLast) {
+      onComplete(answers, saveToProfile);
+    } else {
+      setIndex(i => Math.min(total - 1, i + 1));
+    }
+  };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      {/* 진행바 */}
+      {/* 진행바 & 헤더 */}
       <View style={[styles.topBar, { paddingTop: insets.top + 10 }]}>
         <Pressable
           onPress={goPrev}
@@ -133,6 +158,18 @@ function PreferencePromptScreen({
         <Text style={styles.stepCount}>
           {index + 1}/{total}
         </Text>
+        <Pressable
+          onPress={() =>
+            isLast
+              ? onComplete(answers, mode === 'profile')
+              : setIndex(i => i + 1)
+          }
+          disabled={isSaving}
+          hitSlop={8}
+          accessibilityRole="button"
+          style={styles.topSkipBtn}>
+          <Text style={styles.topSkipText}>건너뛰기</Text>
+        </Pressable>
       </View>
 
       <ScrollView
@@ -172,33 +209,91 @@ function PreferencePromptScreen({
             />
           </View>
         ))}
-      </ScrollView>
 
-      {/* 하단 액션 */}
-      <View style={styles.footer}>
-        {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
-        <Pressable
-          onPress={goNext}
-          disabled={!canNext || isSaving}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !canNext || isSaving }}
-          style={[styles.cta, (!canNext || isSaving) && styles.ctaOff]}>
-          <Text
-            style={[
-              styles.ctaText,
-              (!canNext || isSaving) && styles.ctaTextOff,
-            ]}>
-            {isSaving ? '저장 중...' : isLast ? '완료' : '다음'}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => (isLast ? onComplete(answers) : setIndex(i => i + 1))}
-          disabled={isSaving}
-          accessibilityRole="button"
-          style={styles.skipBtn}>
-          <Text style={styles.skipText}>건너뛰기</Text>
-        </Pressable>
-      </View>
+        {/* 질문 바로 아래 인라인 액션 버튼 */}
+        <View style={styles.actionArea}>
+          {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
+          {isLast && mode === 'course' ? (
+            <View style={styles.courseCompleteActions}>
+              <Pressable
+                onPress={() => {
+                  console.log('[PreferencePromptScreen] course complete -> saveToProfile: true');
+                  goNext(true);
+                }}
+                disabled={isSaving}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isSaving }}
+                style={({ pressed }) => [
+                  styles.cta,
+                  (!canNext || isSaving) && styles.ctaOff,
+                  pressed && canNext && !isSaving && styles.ctaPressed,
+                ]}>
+                <Text
+                  style={[
+                    styles.ctaText,
+                    (!canNext || isSaving) && styles.ctaTextOff,
+                  ]}>
+                  {isSaving ? '저장 중...' : '내 취향에도 저장하고 코스 만들기'}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  console.log('[PreferencePromptScreen] course complete -> saveToProfile: false');
+                  goNext(false);
+                }}
+                disabled={isSaving}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isSaving }}
+                style={({ pressed }) => [
+                  styles.ctaSecondary,
+                  (!canNext || isSaving) && styles.ctaSecondaryOff,
+                  pressed && canNext && !isSaving && styles.ctaSecondaryPressed,
+                ]}>
+                <Text
+                  style={[
+                    styles.ctaSecondaryText,
+                    (!canNext || isSaving) && styles.ctaSecondaryTextOff,
+                  ]}>
+                  이번 여행에만 적용하고 코스 만들기
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => {
+                console.log(
+                  '[PreferencePromptScreen] button pressed, isLast:',
+                  isLast,
+                  'mode:',
+                  mode,
+                );
+                goNext(mode === 'profile');
+              }}
+              disabled={isSaving}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isSaving }}
+              style={({ pressed }) => [
+                styles.cta,
+                (!canNext || isSaving) && styles.ctaOff,
+                pressed && canNext && !isSaving && styles.ctaPressed,
+              ]}>
+              <Text
+                style={[
+                  styles.ctaText,
+                  (!canNext || isSaving) && styles.ctaTextOff,
+                ]}>
+                {isSaving
+                  ? '저장 중...'
+                  : isLast
+                  ? mode === 'course-quick'
+                    ? '이 조건으로 코스 만들기'
+                    : '완료'
+                  : '다음'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -325,13 +420,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cream,
   },
 
-  // 진행바
+  // 진행바 & 헤더
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     paddingLeft: 8,
-    paddingRight: 20,
+    paddingRight: 16,
     // paddingTop 은 상태바 높이(insets.top)를 더해 인라인으로 지정합니다.
     paddingBottom: 10,
   },
@@ -358,11 +453,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textSecondary,
   },
+  topSkipBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+  },
+  topSkipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
 
   content: {
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 24,
+    paddingBottom: TAB_CONTENT_BOTTOM_GAP,
   },
   cityContext: {
     color: colors.primaryStrong,
@@ -482,14 +586,12 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  // 하단 액션
-  footer: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 12,
+  // 질문 아래 액션 영역
+  actionArea: {
+    marginTop: 36,
   },
   error: {
-    marginBottom: 10,
+    marginBottom: 12,
     fontSize: 13,
     lineHeight: 18,
     fontWeight: '600',
@@ -506,6 +608,10 @@ const styles = StyleSheet.create({
   ctaOff: {
     backgroundColor: colors.ctaDisabled,
   },
+  ctaPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
   ctaText: {
     color: '#ffffff',
     fontSize: 16,
@@ -514,14 +620,32 @@ const styles = StyleSheet.create({
   ctaTextOff: {
     color: colors.ctaDisabledText,
   },
-  skipBtn: {
-    alignItems: 'center',
-    paddingVertical: 14,
+  courseCompleteActions: {
+    gap: 10,
   },
-  skipText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
+  ctaSecondary: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    paddingVertical: 16,
+  },
+  ctaSecondaryOff: {
+    opacity: 0.5,
+  },
+  ctaSecondaryPressed: {
+    backgroundColor: colors.surface,
+    transform: [{ scale: 0.98 }],
+  },
+  ctaSecondaryText: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  ctaSecondaryTextOff: {
+    color: colors.textTertiary,
   },
 });
 

@@ -373,25 +373,55 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   },
 ];
 
-export type PreferencePromptMode = 'profile' | 'course';
+export type PreferencePromptMode = 'profile' | 'course' | 'course-quick';
 
 /**
  * 취향 설정은 오래 유지되는 성향만, 코스 생성은 이번 여행의 기간·예산까지 묻습니다.
+ * 빠른 코스 생성(course-quick)은 기간·예산·추가 메모만 묻습니다.
  * 지역은 코스 생성 진입 전에 이미 선택되므로 어느 모드에서도 다시 묻지 않습니다.
  */
 export function getPreferenceSteps(
   mode: PreferencePromptMode,
 ): PreferenceStep[] {
+  if (mode === 'course-quick') {
+    const basicStep = PREFERENCE_STEPS.find(s => s.id === 'basic');
+    const budgetStep = PREFERENCE_STEPS.find(s => s.id === 'budget');
+
+    const quickSteps: PreferenceStep[] = [];
+
+    if (basicStep) {
+      quickSteps.push({
+        ...basicStep,
+        title: '여행 일정을 알려주세요',
+        subtitle: '선택하신 도시에서 며칠 동안 머무르시나요?',
+        fields: basicStep.fields.filter(f => f.id === 'duration'),
+      });
+    }
+
+    if (budgetStep) {
+      quickSteps.push({
+        ...budgetStep,
+        title: '예산과 추가 요청사항을 알려주세요',
+        subtitle: '저장된 내 취향과 함께 반영하여 맞춤 코스를 만들어드려요.',
+        fields: budgetStep.fields.filter(
+          f => f.id === 'dailyBudget' || f.id === 'freeText',
+        ),
+      });
+    }
+
+    return quickSteps;
+  }
+
   const excludedFieldIds =
-    mode === 'profile' ? new Set(['duration', 'dailyBudget']) : new Set<string>();
+    mode === 'profile' ? new Set(['duration']) : new Set<string>();
 
   return PREFERENCE_STEPS.map(step => {
     const fields = step.fields.filter(field => !excludedFieldIds.has(field.id));
     if (mode === 'profile' && step.id === 'budget') {
       return {
         ...step,
-        title: '여행에서 무엇을 중요하게 생각하세요?',
-        subtitle: '더 마음을 쓰고 싶은 부분과 원하는 여행을 알려주세요.',
+        title: '하루 예산과 소중히 생각하는 부분',
+        subtitle: '숙소를 뺀 하루 경비 기준과 더 쓰고 싶은 곳을 알려주세요.',
         fields,
       };
     }
@@ -399,13 +429,13 @@ export function getPreferenceSteps(
   }).filter(step => step.fields.length > 0);
 }
 
-/** 코스마다 달라지는 조건을 제외하고 계정에 저장할 취향만 남깁니다. */
+/** 코스마다 달라지는 조건을 제외하고 계정에 저장할 취향만 남깁니다 (하루 예산은 프로필에도 보존). */
 export function toProfilePreferenceAnswers(
   answers: PreferenceAnswers,
 ): PreferenceAnswers {
   return Object.fromEntries(
     Object.entries(answers).filter(
-      ([id]) => id !== 'duration' && id !== 'dailyBudget' && id !== 'region',
+      ([id]) => id !== 'duration' && id !== 'region',
     ),
   );
 }
@@ -445,6 +475,28 @@ export function isStepComplete(
   );
 }
 
+/** 채워지지 않은 첫 번째 필수 항목 반환 */
+export function getFirstMissingRequiredField(
+  step: PreferenceStep,
+  answers: PreferenceAnswers,
+): PreferenceField | undefined {
+  return step.fields.find(
+    field => field.required && !hasValue(answers[field.id]),
+  );
+}
+
+/** 전체 스텝에서 채워지지 않은 첫 번째 필수 항목 반환 */
+export function getFirstMissingRequiredFieldInSteps(
+  steps: PreferenceStep[],
+  answers: PreferenceAnswers,
+): PreferenceField | undefined {
+  for (const step of steps) {
+    const missing = getFirstMissingRequiredField(step, answers);
+    if (missing) return missing;
+  }
+  return undefined;
+}
+
 /** 마이페이지 '나의 여행 취향' 카드에 보여줄 값 */
 export type PreferenceHighlights = {
   pace: string | null;
@@ -453,6 +505,7 @@ export type PreferenceHighlights = {
   planStyle: string | null;
   avoid: string[];
   moods: string[];
+  dailyBudget: number | null;
 };
 
 const asText = (value: PreferenceValue | undefined) =>
@@ -469,10 +522,12 @@ export function highlightPreferences(
     planStyle: asText(answers.planStyle),
     avoid: Array.isArray(answers.avoid) ? answers.avoid : [],
     moods: Array.isArray(activities) ? activities : [],
+    dailyBudget:
+      typeof answers.dailyBudget === 'number' ? answers.dailyBudget : null,
   };
 }
 
-/** 홈 배너에 보여줄 한 줄 요약 */
+/** 홈 배너 및 샛별이 상단에 보여줄 한 줄 요약 */
 export function summarizePreferences(answers: PreferenceAnswers): string {
   const activities = answers.activities;
   const firstActivity = Array.isArray(activities) ? activities[0] : undefined;
@@ -481,21 +536,35 @@ export function summarizePreferences(answers: PreferenceAnswers): string {
       ? `${firstActivity} 외 ${activities.length - 1}`
       : firstActivity;
 
+  const budgetText =
+    typeof answers.dailyBudget === 'number'
+      ? `하루 ${answers.dailyBudget}만원`
+      : undefined;
+
   const parts = [
     answers.pace,
+    budgetText,
     activityText,
   ].filter(part => typeof part === 'string' && part.length > 0);
 
   return parts.length ? parts.join(' · ') : '기본 설정으로 추천 중';
 }
 
-/** 홈의 완료 카드에 보여줄 짧은 취향 태그 목록입니다. */
+/** 홈 및 코스 모달에 보여줄 짧은 취향 태그 목록입니다. */
 export function preferenceTagLabels(answers: PreferenceAnswers): string[] {
   const pace = asText(answers.pace);
+  const budget =
+    typeof answers.dailyBudget === 'number'
+      ? `하루 ${answers.dailyBudget}만`
+      : null;
   const activities = Array.isArray(answers.activities)
     ? answers.activities
     : [];
-  const allTags = [...(pace ? [pace] : []), ...activities];
+  const allTags = [
+    ...(pace ? [pace] : []),
+    ...(budget ? [budget] : []),
+    ...activities,
+  ];
 
-  return allTags.slice(0, 3);
+  return allTags.slice(0, 4);
 }

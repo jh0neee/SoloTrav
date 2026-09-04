@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BackHandler } from 'react-native';
 import type { City } from '../data/cities';
+import type { PreferenceAnswers, PreferencePromptMode } from '../data/preferences';
 import type { RankingKind, TourContent } from '../types/travel';
 
 /**
@@ -32,7 +33,18 @@ export type HomeRoute =
   | { name: 'spot'; spot: TourContent }
   | { name: 'citySelect'; rankingKind: RankingKind }
   | { name: 'cityDetail'; city: City }
-  | { name: 'preference'; city?: City };
+  | {
+      name: 'preference';
+      city?: City;
+      promptMode?: PreferencePromptMode;
+      initialAnswersOverride?: PreferenceAnswers | null;
+      resetAnswers?: boolean;
+    }
+  | {
+      name: 'preferenceEdit';
+      city: City;
+      initialAnswersOverride?: PreferenceAnswers | null;
+    };
 
 export type HomeStackState = {
   /** 지금 그려야 할 화면 */
