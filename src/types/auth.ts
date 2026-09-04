@@ -39,3 +39,11 @@ export type KakaoNativeConfig = {
 
 /** 인증 상태 머신 */
 export type AuthStatus = 'restoring' | 'authenticated' | 'unauthenticated';
+
+/** DELETE /auth/me 응답 — 회원 탈퇴 예약 결과 */
+export type WithdrawalResult = {
+  /** 탈퇴를 접수한 시각 */
+  requestedAt: Date | null;
+  /** 이 시각 이후 정기 작업에서 데이터가 영구 삭제됩니다 */
+  purgeAfter: Date | null;
+};

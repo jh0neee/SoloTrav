@@ -11,16 +11,26 @@
 import type { KakaoTokens } from './kakaoSdk';
 
 /**
+ * 탈퇴 예약 취소에 쓸 재인증 증거.
+ * 네이티브는 카카오 SDK 가 준 토큰 쌍, 웹은 서버 주도 OAuth 콜백이 내려준
+ * 1회용 취소 티켓입니다 — 웹은 카카오 토큰 자체를 받을 방법이 없습니다
+ * (web/src/web/kakaoWebLogin.ts 상단 주석 참고).
+ */
+export type WithdrawalRecoveryCredential =
+  | { kind: 'kakaoTokens'; tokens: KakaoTokens }
+  | { kind: 'ticket'; ticket: string };
+
+/**
  * 카카오 본인 확인은 끝났지만 서버 계정이 탈퇴 예약 상태일 때의 별도 흐름.
- * 토큰은 취소 API에만 사용하며 디스크에는 저장하지 않습니다.
+ * credential 은 취소 API에만 사용하며 디스크에는 저장하지 않습니다.
  */
 export class WithdrawalPendingError extends Error {
-  readonly kakaoTokens: KakaoTokens;
+  readonly credential: WithdrawalRecoveryCredential;
 
-  constructor(kakaoTokens: KakaoTokens) {
+  constructor(credential: WithdrawalRecoveryCredential) {
     super('탈퇴 예약된 계정입니다.');
     this.name = 'WithdrawalPendingError';
-    this.kakaoTokens = kakaoTokens;
+    this.credential = credential;
     Object.setPrototypeOf(this, WithdrawalPendingError.prototype);
   }
 }

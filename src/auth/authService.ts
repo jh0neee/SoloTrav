@@ -8,19 +8,18 @@
 import { authApi } from '../api/authApi';
 import { userApi } from '../api/userApi';
 import { setSessionExpiredHandler } from '../api/sessionRefresh';
-import { ApiError, toApiError } from '../api/errors';
+import { toApiError } from '../api/errors';
 import { tokenStorage } from '../storage/tokenStorage';
 import { userStore } from '../user/userStore';
-import {
-  signInWithKakao,
-  signOutFromKakao,
-  type KakaoTokens,
-} from './kakaoSdk';
+import { signInWithKakao, signOutFromKakao } from './kakaoSdk';
 import { CURRENT_TERMS_VERSION } from '../config/legal';
 import type { ParsedTermsInfo } from '../api/mappers';
-import type { AuthSession, AuthTokens } from '../types/auth';
+import type { AuthSession, AuthTokens, WithdrawalResult } from '../types/auth';
 import type { MyTermsStatusDto, ServiceTermsDto } from '../api/dto';
-import { WithdrawalPendingError } from './withdrawalPendingError';
+import {
+  WithdrawalPendingError,
+  type WithdrawalRecoveryCredential,
+} from './withdrawalPendingError';
 
 function isWithdrawalPending(error: ReturnType<typeof toApiError>): boolean {
   return (
@@ -75,7 +74,7 @@ export const authService = {
       const apiError = toApiError(error);
       if (isWithdrawalPending(apiError)) {
         // 방금 받은 카카오 토큰으로 탈퇴 취소를 진행해야 하므로 로그아웃하지 않습니다.
-        throw new WithdrawalPendingError(kakaoTokens);
+        throw new WithdrawalPendingError({ kind: 'kakaoTokens', tokens: kakaoTokens });
       }
       // 서버 교환에 실패하면 카카오 세션도 정리해 다음 시도에서 계정 선택부터
       // 다시 시작하도록 합니다.
@@ -112,21 +111,26 @@ export const authService = {
    * 서버가 탈퇴 예약을 정상 처리한 뒤에만 로컬 세션을 지웁니다. 요청이 실패하면
    * 사용자가 오류를 확인하고 다시 시도할 수 있도록 로그인 상태를 유지합니다.
    */
-  withdraw: async (): Promise<void> => {
-    await userApi.requestWithdrawal();
+  withdraw: async (): Promise<WithdrawalResult> => {
+    const result = await userApi.requestWithdrawal();
     await tokenStorage.clear();
     await userStore.clear();
     await signOutFromKakao();
+    return result;
   },
 
   /** 카카오 토큰으로 탈퇴 예약을 취소하고 새 서비스 세션을 저장합니다. */
-  cancelWithdrawal: async (kakaoTokens: KakaoTokens): Promise<AuthSession> => {
-    const session = await authApi.cancelWithdrawal(kakaoTokens);
+  cancelWithdrawal: async (
+    credential: WithdrawalRecoveryCredential,
+  ): Promise<AuthSession> => {
+    if (credential.kind !== 'kakaoTokens') {
+      throw new Error('네이티브 앱은 카카오 재인증 토큰으로만 탈퇴를 취소할 수 있습니다.');
+    }
+    const session = await authApi.cancelWithdrawal(credential.tokens);
     await tokenStorage.save(session.tokens);
     await userStore.save(session.user);
     return session;
   },
-
 
   /** 서비스 이용약관 전문 및 최신 버전 조회 (GET /terms/service) */
   getServiceTerms: async (): Promise<ServiceTermsDto> => {

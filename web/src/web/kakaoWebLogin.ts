@@ -66,6 +66,55 @@ const TICKET_ENDPOINT = '/auth/kakao/ticket/exchange';
 /** 취소 표식. 'cancel' 이라는 낱말이 들어가야 취소로 알아봅니다. */
 export const CANCELLED = 'cancelled — 카카오 로그인이 취소되었습니다.';
 
+/**
+ * 탈퇴 예약 취소용 1회용 티켓으로 세션을 발급받습니다.
+ * 웹은 카카오 SDK 토큰을 받을 수 없어(파일 상단 주석 참고) 네이티브의
+ * `POST /auth/withdrawal/cancel`(카카오 토큰) 대신 이 티켓 기반 엔드포인트를 씁니다.
+ */
+const WITHDRAWAL_CANCEL_TICKET_ENDPOINT = '/auth/withdrawal/cancel/ticket';
+
+export async function cancelWithdrawalWithTicket(
+  ticket: string,
+): Promise<AuthSession> {
+  const { data } = await apiClient.post(WITHDRAWAL_CANCEL_TICKET_ENDPOINT, {
+    ticket,
+  });
+  return toAuthSession(data);
+}
+
+/**
+ * 로그인 실패 중에서도 "탈퇴 예약 계정" 케이스를 구분해서 던지는 에러.
+ * 서버 콜백이 이 계정을 감지하면 `#error=...` 와 함께 취소용 티켓
+ * (`withdrawalTicket`) 을 실어 보내주기로 되어 있습니다 — 그 티켓이 실려
+ * 왔을 때만 이 클래스로 던집니다.
+ */
+export class KakaoLoginFailed extends Error {
+  readonly code?: string;
+  readonly withdrawalTicket?: string;
+
+  constructor(
+    message: string,
+    options: { code?: string; withdrawalTicket?: string } = {},
+  ) {
+    super(message);
+    this.name = 'KakaoLoginFailed';
+    this.code = options.code;
+    this.withdrawalTicket = options.withdrawalTicket;
+    Object.setPrototypeOf(this, KakaoLoginFailed.prototype);
+  }
+}
+
+/** 실패 메시지 → 일반 에러 또는(취소 티켓이 실려 있으면) KakaoLoginFailed */
+function toLoginError(message: CallbackMessage): Error {
+  if (message.withdrawalTicket) {
+    return new KakaoLoginFailed(
+      message.error || '탈퇴 예약된 계정입니다.',
+      { code: message.code, withdrawalTicket: message.withdrawalTicket },
+    );
+  }
+  return new Error(message.error || '카카오 로그인에 실패했습니다.');
+}
+
 function returnUrl(): string {
   return `${window.location.origin}${KAKAO_REDIRECT_PATH}`;
 }
@@ -148,11 +197,15 @@ export type CallbackMessage = {
   channel?: string;
   state?: string;
   error?: string;
+  /** 서버 에러 코드 (예: `COMMON.CONFLICT`) */
+  code?: string;
   /** 형식 1 — 1회용 티켓 (권장) */
   ticket?: string;
   /** 형식 2 — 서비스 토큰을 그대로 실어 보내는 경우 */
   accessToken?: string;
   refreshToken?: string;
+  /** 탈퇴 예약 계정으로 실패했을 때만 함께 오는, 탈퇴 취소 전용 1회용 티켓 */
+  withdrawalTicket?: string;
 };
 
 /**
@@ -271,7 +324,7 @@ async function requestCredentials(): Promise<Credentials> {
           refreshToken: payload.refreshToken ?? '',
         });
       } else {
-        reject(new Error(payload.error || '카카오 로그인에 실패했습니다.'));
+        reject(toLoginError(payload));
       }
     };
 
@@ -352,7 +405,12 @@ export type CallbackArrival = {
 
 /** 티켓·토큰처럼 주소에 남으면 안 되는 값이 실려 왔는가 */
 function carriesSecret(message: CallbackMessage): boolean {
-  return Boolean(message.ticket || message.accessToken || message.refreshToken);
+  return Boolean(
+    message.ticket ||
+      message.accessToken ||
+      message.refreshToken ||
+      message.withdrawalTicket,
+  );
 }
 
 /**
@@ -378,11 +436,17 @@ export function readCallbackFromUrl(): CallbackArrival {
     channel: CALLBACK_CHANNEL,
     state: pick('state'),
     error: pick('error_description') || pick('error'),
+    // 에러 코드는 별도 `code` 파라미터가 아니라 `error` 자리에 옵니다
+    // (예: `error=COMMON.CONFLICT&error_description=...`).
+    code: pick('code') || pick('error'),
     // 형식 1 — 1회용 티켓 (권장)
     ticket: pick('ticket'),
     // 형식 2 — 서비스 토큰을 그대로 실어 보내는 경우
     accessToken: pick('accessToken') || pick('access_token'),
     refreshToken: pick('refreshToken') || pick('refresh_token'),
+    // 탈퇴 예약 계정으로 실패했을 때만 함께 오는 취소 전용 티켓
+    withdrawalTicket:
+      pick('withdrawalTicket') || pick('withdrawal_cancel_ticket'),
   };
 
   // 값 자체는 비밀일 수 있으니 이름만 모읍니다.
@@ -439,7 +503,7 @@ export async function completeLoginInThisTab(
 ): Promise<void> {
   const credentials = credentialsFromMessage(message);
   if (!credentials) {
-    throw new Error(message.error || '카카오 로그인에 실패했습니다.');
+    throw toLoginError(message);
   }
   const session = await exchangeCredentials(credentials);
   await tokenStorage.save(session.tokens);

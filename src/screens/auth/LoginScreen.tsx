@@ -33,7 +33,6 @@ function LoginScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <KakaoLoginButton onPress={loginWithKakao} loading={isSigningIn} />
-
       </View>
     </View>
   );

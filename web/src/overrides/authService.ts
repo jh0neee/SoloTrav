@@ -17,6 +17,7 @@
  * (오버라이드 대상이라 여기서 원본을 import 하면 자기 자신이 됩니다)
  */
 import { authApi } from '@solotrav/src/api/authApi';
+import { userApi } from '@solotrav/src/api/userApi';
 import { setSessionExpiredHandler } from '@solotrav/src/api/sessionRefresh';
 import { toApiError } from '@solotrav/src/api/errors';
 import { tokenStorage } from '@solotrav/src/storage/tokenStorage';
@@ -25,8 +26,20 @@ import {
   KakaoLoginCancelled,
   signOutFromKakao,
 } from '@solotrav/src/auth/kakaoSdk';
-import type { AuthSession, AuthTokens } from '@solotrav/src/types/auth';
-import { loginWithKakaoWeb } from '../web/kakaoWebLogin';
+import {
+  WithdrawalPendingError,
+  type WithdrawalRecoveryCredential,
+} from '@solotrav/src/auth/withdrawalPendingError';
+import type {
+  AuthSession,
+  AuthTokens,
+  WithdrawalResult,
+} from '@solotrav/src/types/auth';
+import {
+  cancelWithdrawalWithTicket,
+  KakaoLoginFailed,
+  loginWithKakaoWeb,
+} from '../web/kakaoWebLogin';
 
 /** 원본과 동일 — 서버 refresh token 폐기 + 카카오 세션 해제. */
 async function revokeRemoteSession(tokens: AuthTokens | null): Promise<void> {
@@ -66,6 +79,7 @@ export const authService = {
    * 서버가 세션까지 만들어 주므로 authApi.loginWithKakaoNative 를 거치지 않습니다.
    *
    * @throws {KakaoLoginCancelled} 사용자가 팝업을 닫은 경우
+   * @throws {WithdrawalPendingError} 탈퇴 예약된 계정인 경우 — 취소 티켓을 담아 던집니다
    * @throws {ApiError} 서버 교환에 실패한 경우
    */
   loginWithKakao: async (): Promise<AuthSession> => {
@@ -73,6 +87,12 @@ export const authService = {
     try {
       session = await loginWithKakaoWeb();
     } catch (error) {
+      if (error instanceof KakaoLoginFailed && error.withdrawalTicket) {
+        throw new WithdrawalPendingError({
+          kind: 'ticket',
+          ticket: error.withdrawalTicket,
+        });
+      }
       if (isCancelledError(error)) {
         throw new KakaoLoginCancelled();
       }
@@ -83,6 +103,40 @@ export const authService = {
     await userStore.save(session.user);
     return session;
   },
+
+  /**
+   * 원본과 동일 — 회원 탈퇴 예약.
+   * 서버가 탈퇴 예약을 정상 처리한 뒤에만 로컬 세션을 지웁니다.
+   */
+  withdraw: async (): Promise<WithdrawalResult> => {
+    const result = await userApi.requestWithdrawal();
+    await tokenStorage.clear();
+    await userStore.clear();
+    await signOutFromKakao();
+    return result;
+  },
+
+  /**
+   * 탈퇴 취소 티켓으로 탈퇴 예약을 취소하고 새 서비스 세션을 저장합니다.
+   * 웹은 카카오 SDK 토큰이 없어 네이티브(카카오 토큰)와는 다른 방식입니다.
+   */
+  cancelWithdrawal: async (
+    credential: WithdrawalRecoveryCredential,
+  ): Promise<AuthSession> => {
+    if (credential.kind !== 'ticket') {
+      throw new Error('웹은 취소 티켓으로만 탈퇴를 취소할 수 있습니다.');
+    }
+    const session = await cancelWithdrawalWithTicket(credential.ticket);
+    await tokenStorage.save(session.tokens);
+    await userStore.save(session.user);
+    return session;
+  },
+
+  /**
+   * 탈퇴 취소 화면을 닫을 때 정리할 것.
+   * 웹은 카카오 SDK 세션을 들고 있지 않아(서버 주도 OAuth) 정리할 게 없습니다.
+   */
+  abandonWithdrawalRecovery: async (): Promise<void> => {},
 
   /** 원본과 동일 — 로컬을 먼저 비우고 서버 폐기는 뒤에서 이어서 처리합니다. */
   logout: async (): Promise<void> => {

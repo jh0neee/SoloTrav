@@ -10,4 +10,17 @@
 # 아래 규칙은 그 외의 경로에만 적용됩니다.
 #
 # 다른 호스팅을 쓴다면 README 의 '배포할 때' 항목을 참고하세요.
+
+# API 서버로 중계(프록시) — 로컬 dev 서버의 vite.config.ts proxy 와 대응합니다.
+# 이 규칙들이 없으면 /api/... 요청도 전부 아래 SPA 폴백에 걸려 index.html 을
+# 200 으로 돌려받고, "인가 URL 응답을 해석할 수 없습니다" 같은 파싱 에러가 납니다.
+# (순서가 중요합니다 — 위에서부터 먼저 매칭되는 규칙이 적용되므로 캐치올(/*)보다 앞에 둡니다)
+/api/*      https://mixed-light.kr/api/:splat      200
+/uploads/*  https://mixed-light.kr/uploads/:splat  200
+/files/*    https://mixed-light.kr/files/:splat    200
+/images/*   https://mixed-light.kr/images/:splat   200
+/static/*   https://mixed-light.kr/static/:splat   200
+/kapi/*     https://kapi.kakao.com/:splat           200
+
+# SPA 히스토리 폴백 (그 외 모든 경로)
 /*    /index.html   200

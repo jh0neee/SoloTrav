@@ -19,9 +19,11 @@ import React, {
   useState,
 } from 'react';
 import { authService } from './authService';
-import { WithdrawalPendingError } from './withdrawalPendingError';
+import {
+  WithdrawalPendingError,
+  type WithdrawalRecoveryCredential,
+} from './withdrawalPendingError';
 import { KakaoLoginCancelled } from './kakaoSdk';
-import type { KakaoTokens } from './kakaoSdk';
 import { toApiError } from '../api/errors';
 import { userStore } from '../user/userStore';
 import { preferenceStore } from '../preferences/preferenceStore';
@@ -30,7 +32,7 @@ import { recordStore } from '../records/recordStore';
 import { commentStore } from '../records/commentStore';
 import { assistantStore } from '../assistant/assistantStore';
 import { favoriteStore } from '../favorites/favoriteStore';
-import type { AuthStatus } from '../types/auth';
+import type { AuthStatus, WithdrawalResult } from '../types/auth';
 import { FORCE_TERMS_AGREEMENT_PREVIEW } from '../config/legal';
 
 type AuthContextValue = {
@@ -50,7 +52,7 @@ type AuthContextValue = {
   leaveWithdrawalRecovery: () => Promise<void>;
   completeTermsAgreement: (version?: string) => Promise<void>;
   logout: () => Promise<void>;
-  withdraw: () => Promise<void>;
+  withdraw: () => Promise<WithdrawalResult>;
   clearError: () => void;
 };
 
@@ -63,8 +65,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isCancellingWithdrawal, setIsCancellingWithdrawal] = useState(false);
   const [requiresTermsAgreement, setRequiresTermsAgreement] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // 취소 API에만 쓸 카카오 토큰. 디스크나 렌더링 state에는 저장하지 않습니다.
-  const pendingKakaoTokens = useRef<KakaoTokens | null>(null);
+  // 취소 API에만 쓸 재인증 증거(카카오 토큰 또는 웹 취소 티켓). 디스크나
+  // 렌더링 state에는 저장하지 않습니다.
+  const pendingRecovery = useRef<WithdrawalRecoveryCredential | null>(null);
 
   // 언마운트 이후 setState 방지
   const mounted = useRef(true);
@@ -159,7 +162,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       // 사용자가 스스로 닫은 것은 실패가 아니므로 조용히 넘어갑니다.
       if (caught instanceof WithdrawalPendingError) {
-        pendingKakaoTokens.current = caught.kakaoTokens;
+        pendingRecovery.current = caught.credential;
         setIsWithdrawalPending(true);
         setError(null);
       } else if (!(caught instanceof KakaoLoginCancelled)) {
@@ -189,16 +192,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const cancelWithdrawal = useCallback(async () => {
-    const kakaoTokens = pendingKakaoTokens.current;
-    if (!kakaoTokens) {
+    const credential = pendingRecovery.current;
+    if (!credential) {
       setError('카카오 인증 정보가 만료되었습니다. 다시 로그인해주세요.');
       return;
     }
     setIsCancellingWithdrawal(true);
     setError(null);
     try {
-      await authService.cancelWithdrawal(kakaoTokens);
-      pendingKakaoTokens.current = null;
+      await authService.cancelWithdrawal(credential);
+      pendingRecovery.current = null;
       if (!mounted.current) {
         return;
       }
@@ -225,7 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const leaveWithdrawalRecovery = useCallback(async () => {
-    pendingKakaoTokens.current = null;
+    pendingRecovery.current = null;
     await authService.abandonWithdrawalRecovery();
     if (!mounted.current) {
       return;
@@ -244,19 +247,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const withdraw = useCallback(async () => {
-    await authService.withdraw();
+    const result = await authService.withdraw();
     preferenceStore.reset();
     badgeStore.reset();
     recordStore.reset();
     commentStore.reset();
     assistantStore.reset();
     favoriteStore.reset();
-    if (!mounted.current) {
-      return;
+    if (mounted.current) {
+      setStatus('unauthenticated');
+      setRequiresTermsAgreement(false);
+      setError(null);
     }
-    setStatus('unauthenticated');
-    setRequiresTermsAgreement(false);
-    setError(null);
+    return result;
   }, []);
 
   const clearError = useCallback(() => setError(null), []);

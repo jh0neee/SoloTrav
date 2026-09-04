@@ -232,10 +232,12 @@ https://<배포주소>/account/delete
 없고, 로그인하지 않은 사람에게는 이 링크가 유일한 통로라 그때는 반드시
 보여야 합니다.
 
-호출하는 API 는 `DELETE /auth/me` 입니다
-([src/account/accountApi.ts](src/account/accountApi.ts)). 즉시 삭제가 아니라
-**탈퇴 예약**이라, 계정은 곧바로 사용 중지되고 원본 데이터는 90일 뒤 정기
-작업에서 지워집니다. 안내 문구도 그 흐름에 맞춰 써 두었습니다.
+호출하는 API 는 `DELETE /auth/me` 이고, 앱과 같은 `authService.withdraw()`
+([../src/auth/authService.ts](../src/auth/authService.ts), 웹은
+[src/overrides/authService.ts](src/overrides/authService.ts)) 를 그대로
+씁니다. 즉시 삭제가 아니라 **탈퇴 예약**이라, 계정은 곧바로 사용 중지되고
+원본 데이터는 90일 뒤 정기 작업에서 지워집니다. 안내 문구도 그 흐름에 맞춰
+써 두었습니다.
 
 > ⚠️ **앱에도 탈퇴 진입점이 필요합니다.** 플레이 정책은 웹 URL 과 **앱 내부 경로**
 > 를 둘 다 요구합니다. 이 웹은 웹 URL 요건만 채웁니다. 앱(저장소 루트)의 마이

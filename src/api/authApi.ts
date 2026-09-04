@@ -38,8 +38,10 @@ export const authApi = {
     redirectUri?: string;
     state?: string;
   }): Promise<string> => {
-    const _params = Object.assign({}, params); // 개발용 카카오 앱은 redirectUri 가 localhost 여야 합니다.
-    const { data } = await apiClient.get(ENDPOINTS.kakaoAuthUrl(Object.assign(_params, { dev: 'ENABLED' })));
+    // dev=ENABLED 는 개발용 카카오 앱(redirectUri=localhost) 전용 스위치라 로컬에서만 붙입니다.
+    // 배포본까지 붙이면 서버가 redirectUri/dev 불일치로 인가 URL 대신 다른 응답을 줍니다.
+    const _params = { ...params, dev: __DEV__ ? 'ENABLED' : undefined };
+    const { data } = await apiClient.get(ENDPOINTS.kakaoAuthUrl(_params));
     return toKakaoAuthUrl(data);
   },
 
@@ -48,8 +50,9 @@ export const authApi = {
     code: string;
     state?: string;
   }): Promise<AuthSession> => {
-    const _params = Object.assign({}, params); // 개발용 카카오 앱은 redirectUri 가 localhost 여야 합니다.
-    const { data } = await apiClient.get(ENDPOINTS.kakaoCallback(Object.assign(_params, { dev: 'ENABLED' })));
+    // dev=ENABLED 는 개발용 카카오 앱(redirectUri=localhost) 전용 스위치라 로컬에서만 붙입니다.
+    const _params = { ...params, dev: __DEV__ ? 'ENABLED' : undefined };
+    const { data } = await apiClient.get(ENDPOINTS.kakaoCallback(_params));
     return toAuthSession(data);
   },
 

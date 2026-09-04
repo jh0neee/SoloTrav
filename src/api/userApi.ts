@@ -4,7 +4,7 @@
  */
 import { apiClient } from './client';
 import { ENDPOINTS } from './endpoints';
-import { toMeUser } from './mappers';
+import { toMeUser, toWithdrawalResult } from './mappers';
 import {
   toPreferenceAnswers,
   toTravelPreferenceRequest,
@@ -13,7 +13,7 @@ import { toBadge, toTravelBadges } from './badgeMappers';
 import { unwrap } from './mappers';
 import type { Envelope, VisitCheckInResponseDto } from './dto';
 import type { PreferenceAnswers } from '../data/preferences';
-import type { AuthUser } from '../types/auth';
+import type { AuthUser, WithdrawalResult } from '../types/auth';
 import type {
   Badge,
   VisitCheckInInput,
@@ -28,8 +28,9 @@ export const userApi = {
   },
 
   /** DELETE /auth/me — 현재 로그인한 회원의 탈퇴 예약 */
-  requestWithdrawal: async (): Promise<void> => {
-    await apiClient.delete(ENDPOINTS.withdrawal());
+  requestWithdrawal: async (): Promise<WithdrawalResult> => {
+    const { data } = await apiClient.delete(ENDPOINTS.withdrawal());
+    return toWithdrawalResult(data);
   },
 
   /**

@@ -16,6 +16,7 @@ import type {
   AuthTokens,
   AuthUser,
   KakaoNativeConfig,
+  WithdrawalResult,
 } from '../types/auth';
 
 /** 공통 응답 봉투(`{ payload: {...} }`)를 한 겹 벗깁니다. */
@@ -198,4 +199,22 @@ export function toTermsInfo(payload: unknown): ParsedTermsInfo {
     : findUrl(unwrapped);
 
   return { version, url, raw: payload };
+}
+
+/** 서버가 준 ISO 문자열 → Date. 형식이 어긋나면 null 로 두고 화면에서 숨깁니다. */
+function toDate(value: unknown): Date | null {
+  if (typeof value !== 'string' || !value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/** DELETE /auth/me 응답 → 탈퇴 예약 결과 (봉투 없이 평평하게 내려옵니다) */
+export function toWithdrawalResult(payload: unknown): WithdrawalResult {
+  const dto = (payload ?? {}) as Record<string, unknown>;
+  return {
+    requestedAt: toDate(dto.requestedAt),
+    purgeAfter: toDate(dto.purgeAfter),
+  };
 }

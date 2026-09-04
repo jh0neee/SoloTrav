@@ -13,7 +13,7 @@
 import { useState } from 'react';
 import { useAuth } from '@app/auth/AuthContext';
 import { useMyProfile } from '@app/user/userStore';
-import { accountApi, type WithdrawalResult } from './accountApi';
+import type { WithdrawalResult } from '@app/types/auth';
 import { navigate, toPath } from '../shell/router';
 import './deleteAccount.css';
 
@@ -41,9 +41,13 @@ export default function DeleteAccountPage() {
   const {
     status,
     isSigningIn,
+    isWithdrawalPending,
+    isCancellingWithdrawal,
     error: authError,
     loginWithKakao,
-    logout,
+    cancelWithdrawal,
+    leaveWithdrawalRecovery,
+    withdraw,
   } = useAuth();
   const profile = useMyProfile();
 
@@ -64,11 +68,8 @@ export default function DeleteAccountPage() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const withdrawal = await accountApi.withdraw();
+      const withdrawal = await withdraw();
       setResult(withdrawal);
-      // 계정이 이미 사용 중지된 상태라 로컬 세션도 함께 비웁니다.
-      // (실패해도 결과 화면은 그대로 보여줍니다)
-      await logout().catch(() => {});
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -102,7 +103,16 @@ export default function DeleteAccountPage() {
                 <p className="da-muted">로그인 상태를 확인하는 중입니다…</p>
               )}
 
-              {status === 'unauthenticated' && (
+              {status === 'unauthenticated' && isWithdrawalPending && (
+                <WithdrawalRecovery
+                  error={authError}
+                  isCancelling={isCancellingWithdrawal}
+                  onCancel={cancelWithdrawal}
+                  onLeave={leaveWithdrawalRecovery}
+                />
+              )}
+
+              {status === 'unauthenticated' && !isWithdrawalPending && (
                 <>
                   <p className="da-muted">
                     본인 확인을 위해, 탈퇴할 계정으로 먼저 로그인해주세요.
@@ -254,6 +264,42 @@ function DataNotice() {
         복구되지 않습니다.
       </p>
     </section>
+  );
+}
+
+/** 이미 탈퇴 예약된 계정으로 로그인했을 때의 복구 안내 */
+function WithdrawalRecovery({
+  error,
+  isCancelling,
+  onCancel,
+  onLeave,
+}: {
+  error: string | null;
+  isCancelling: boolean;
+  onCancel: () => void;
+  onLeave: () => void;
+}) {
+  return (
+    <>
+      <p className="da-muted">
+        이미 탈퇴가 예약된 계정이에요. 탈퇴 요청 후 90일 이내에는 예약을
+        취소하고 기존 계정과 데이터를 그대로 이용할 수 있어요.
+      </p>
+      {error && <p className="da-error">{error}</p>}
+      <button
+        type="button"
+        className="da-button da-button-kakao"
+        onClick={onCancel}
+        disabled={isCancelling}>
+        {isCancelling ? '취소하는 중…' : '탈퇴 취소하고 계속하기'}
+      </button>
+      <button
+        type="button"
+        className="da-button da-button-ghost"
+        onClick={onLeave}>
+        로그인 화면으로 돌아가기
+      </button>
+    </>
   );
 }
 
