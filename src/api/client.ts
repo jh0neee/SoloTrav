@@ -62,8 +62,10 @@ apiClient.interceptors.response.use(
     // "세션 만료" 콜백이 떠서 정상 로그아웃인데 만료 안내가 뜹니다.
     const skipRetryPaths: string[] = [ENDPOINTS.refresh(), ENDPOINTS.logout()];
 
+    const hasRefreshToken = !!tokenStorage.get()?.refreshToken;
     const canRetry =
       status === 401 &&
+      hasRefreshToken &&
       !!config &&
       !config._retried &&
       !skipRetryPaths.includes(config.url ?? '');

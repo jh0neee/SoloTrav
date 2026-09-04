@@ -78,7 +78,7 @@ const SAFETY_ICONS: Record<SafetyIcon, IconComponent> = {
 };
 
 function MyScreen() {
-  const { logout, withdraw } = useAuth();
+  const { isGuest, logout, withdraw } = useAuth();
   const insets = useSafeAreaInsets();
   const profile = useMyProfile();
   const preferences = usePreferences();
@@ -271,12 +271,14 @@ function MyScreen() {
           </View>
           <View style={styles.heroTexts}>
             <Text style={styles.heroName} numberOfLines={1}>
-              {profile.displayName}
+              {isGuest ? '게스트 (둘러보기 모드)' : profile.displayName}
             </Text>
             <Text style={styles.heroMeta} numberOfLines={1}>
-              {profile.email ?? '카카오 계정 연결됨'}
+              {isGuest
+                ? '로그인하고 여행 기록과 배지를 저장해보세요'
+                : profile.email ?? '카카오 계정 연결됨'}
             </Text>
-            {records.mine.status === 'ready' ? (
+            {!isGuest && records.mine.status === 'ready' ? (
               <Text style={styles.heroActivity}>
                 내가 쓴 후기 {records.mine.records.length}개
               </Text>
@@ -376,34 +378,63 @@ function MyScreen() {
       {/* ── 계정 ── */}
       {/* 서버가 이메일을 안 주는 계정이 있어(카카오 동의 항목 미수집) 없으면 연결 상태만 알립니다. */}
       <Section title="계정">
-        <Pressable
-          style={styles.logoutBtn}
-          onPress={confirmLogout}
-          disabled={isWithdrawing}
-          accessibilityRole="button"
-          accessibilityLabel="로그아웃"
-        >
-          <Text style={styles.logoutText}>로그아웃</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [
-            styles.withdrawalBtn,
-            pressed ? styles.accountBtnPressed : null,
-            isWithdrawing ? styles.accountBtnDisabled : null,
-          ]}
-          onPress={confirmWithdrawal}
-          disabled={isWithdrawing}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="회원탈퇴"
-          accessibilityState={{ disabled: isWithdrawing }}
-        >
-          {isWithdrawing ? (
-            <ActivityIndicator color={colors.textSecondary} size="small" />
-          ) : (
-            <Text style={styles.withdrawalText}>회원탈퇴</Text>
-          )}
-        </Pressable>
+        {isGuest ? (
+          <View style={styles.guestAccountBox}>
+            <Pressable
+              style={styles.guestLoginBtn}
+              onPress={logout}
+              accessibilityRole="button"
+              accessibilityLabel="카카오로 로그인하기"
+            >
+              <Text style={styles.guestLoginText}>카카오로 로그인하기</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.withdrawalBtn,
+                pressed ? styles.accountBtnPressed : null,
+              ]}
+              onPress={logout}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="둘러보기 종료"
+            >
+              <Text style={styles.withdrawalText}>
+                둘러보기 종료 (로그인 화면으로 이동)
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
+            <Pressable
+              style={styles.logoutBtn}
+              onPress={confirmLogout}
+              disabled={isWithdrawing}
+              accessibilityRole="button"
+              accessibilityLabel="로그아웃"
+            >
+              <Text style={styles.logoutText}>로그아웃</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.withdrawalBtn,
+                pressed ? styles.accountBtnPressed : null,
+                isWithdrawing ? styles.accountBtnDisabled : null,
+              ]}
+              onPress={confirmWithdrawal}
+              disabled={isWithdrawing}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="회원탈퇴"
+              accessibilityState={{ disabled: isWithdrawing }}
+            >
+              {isWithdrawing ? (
+                <ActivityIndicator color={colors.textSecondary} size="small" />
+              ) : (
+                <Text style={styles.withdrawalText}>회원탈퇴</Text>
+              )}
+            </Pressable>
+          </>
+        )}
       </Section>
     </ScrollView>
   );
@@ -808,6 +839,9 @@ function TravelPreferenceCard({
   return (
     <View style={[styles.card, styles.preferenceListCard]}>
       <PreferenceRow label="여행 페이스" value={highlights.pace ?? '미설정'} />
+      {highlights.dailyBudget ? (
+        <PreferenceRow label="하루 예산" value={`${highlights.dailyBudget}만원`} />
+      ) : null}
       <PreferenceRow label="피하고 싶은 곳" value={avoidSummary} />
       <PreferenceRow label="이동" value={moveSummary} />
       <PreferenceRow label="계획 스타일" value={highlights.planStyle ?? '미설정'} />
@@ -1631,6 +1665,21 @@ const styles = StyleSheet.create({
   },
 
   // 계정
+  guestAccountBox: {
+    gap: 10,
+  },
+  guestLoginBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+  },
+  guestLoginText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
   logoutBtn: {
     alignItems: 'center',
     justifyContent: 'center',

@@ -52,12 +52,15 @@ export function refreshSession(): Promise<AuthTokens | null> {
     return inFlight;
   }
 
+  const hadRefreshToken = !!tokenStorage.get()?.refreshToken;
   inFlight = requestRefresh()
     .catch(() => null)
     .then(async tokens => {
       if (!tokens) {
         await tokenStorage.clear();
-        sessionExpiredHandler?.();
+        if (hadRefreshToken) {
+          sessionExpiredHandler?.();
+        }
       }
       return tokens;
     })

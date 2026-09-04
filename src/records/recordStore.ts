@@ -12,6 +12,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { recordApi } from '../api/recordApi';
 import { toApiError } from '../api/errors';
+import { userStore } from '../user/userStore';
+import { tokenStorage } from '../storage/tokenStorage';
 import type { UploadImage } from '../api/recordApi';
 import type { TravelRecord, TravelRecordInput } from '../types/travelRecord';
 
@@ -174,6 +176,13 @@ export const recordStore = {
   },
 
   reload(scope: RecordScope): Promise<void> {
+    if (
+      scope === 'mine' &&
+      (userStore.get()?.id === 'guest' || !tokenStorage.get()?.accessToken)
+    ) {
+      setList('mine', { status: 'ready', records: [], error: null });
+      return Promise.resolve();
+    }
     setList(scope, { status: 'loading', error: null });
     const request = (async () => {
       try {

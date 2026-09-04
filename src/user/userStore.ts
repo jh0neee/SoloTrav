@@ -16,6 +16,7 @@
 import { useMemo, useSyncExternalStore } from 'react';
 import { userApi } from '../api/userApi';
 import { userStorage } from '../storage/userStorage';
+import { tokenStorage } from '../storage/tokenStorage';
 import type { AuthUser } from '../types/auth';
 
 /** 서버가 닉네임을 안 내려줄 때 쓰는 표시용 기본값 */
@@ -61,6 +62,9 @@ export const userStore = {
    * (토큰이 만료됐다면 인터셉터가 재발급/로그아웃을 알아서 처리합니다)
    */
   async refresh(): Promise<AuthUser | null> {
+    if (cached?.id === 'guest' || !tokenStorage.get()?.accessToken) {
+      return cached;
+    }
     try {
       const user = await userApi.getMe();
       await userStore.save(user);
@@ -97,6 +101,7 @@ export type MyProfile = {
   /** 원본이 필요할 때 (id 로 API 를 부르는 등) */
   user: AuthUser | null;
   isLoggedIn: boolean;
+  isGuest: boolean;
   /** 닉네임이 없으면 '여행자' */
   displayName: string;
   /** 아바타에 넣을 한 글자 */
@@ -107,14 +112,18 @@ export type MyProfile = {
 };
 
 function derive(user: AuthUser | null): MyProfile {
-  const displayName = user?.nickname?.trim() || FALLBACK_NAME;
+  const isGuest = user?.id === 'guest';
+  const displayName = isGuest
+    ? '게스트'
+    : user?.nickname?.trim() || FALLBACK_NAME;
   return {
     user,
-    isLoggedIn: !!user,
+    isLoggedIn: !!user && !isGuest,
+    isGuest,
     displayName,
     initial: displayName.charAt(0),
-    profileImageUrl: user?.profileImageUrl ?? null,
-    email: user?.email ?? null,
+    profileImageUrl: isGuest ? null : user?.profileImageUrl ?? null,
+    email: isGuest ? '둘러보기 모드' : user?.email ?? null,
   };
 }
 

@@ -1,6 +1,8 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { favoriteApi } from '../api/favoriteApi';
 import { toApiError } from '../api/errors';
+import { userStore } from '../user/userStore';
+import { tokenStorage } from '../storage/tokenStorage';
 import type { AiRouteFavorite } from '../types/favorite';
 
 export type FavoriteState = {
@@ -31,6 +33,10 @@ export const favoriteStore = {
       : favoriteStore.reload();
   },
   reload(): Promise<void> {
+    if (userStore.get()?.id === 'guest' || !tokenStorage.get()?.accessToken) {
+      setState({ status: 'ready', favorites: [], error: null });
+      return Promise.resolve();
+    }
     setState({ status: 'loading', error: null });
     inFlight = favoriteApi
       .list()

@@ -38,7 +38,11 @@ export type KakaoNativeConfig = {
 };
 
 /** 인증 상태 머신 */
-export type AuthStatus = 'restoring' | 'authenticated' | 'unauthenticated';
+export type AuthStatus =
+  | 'restoring'
+  | 'authenticated'
+  | 'unauthenticated'
+  | 'guest';
 
 /** DELETE /auth/me 응답 — 회원 탈퇴 예약 결과 */
 export type WithdrawalResult = {

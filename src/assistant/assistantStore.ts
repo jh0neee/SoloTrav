@@ -19,6 +19,8 @@ import { assistantApi } from '../api/assistantApi';
 import { toApiError } from '../api/errors';
 import type { SseConnection } from '../api/sse';
 import type { ChatMessage, ChatResult, TravelCourse } from '../types/assistant';
+import { userStore } from '../user/userStore';
+import { tokenStorage } from '../storage/tokenStorage';
 import {
   FALLBACK_GUIDE_TEXT,
   THINKING_PHASES,
@@ -50,6 +52,76 @@ const THINKING_TEXT = THINKING_PHASES[0].text;
  * 모바일 사용자 경험을 위해 기존 180초에서 35초로 최적화했습니다.
  */
 const RESULT_TIMEOUT_MS = 35000;
+
+/** 둘러보기(게스트 모드) 시 심사관 및 체험용으로 제공할 안심 추천 코스 샘플 */
+const GUEST_SAMPLE_COURSE: TravelCourse = {
+  title: '단양 안심 힐링 1일 코스',
+  summary:
+    '도담삼봉 산책부터 구경시장 마늘먹거리, 남한강 잔도길 야경까지 여유롭고 안전한 코스예요.',
+  estimatedTotalCostKrw: 38000,
+  days: [
+    {
+      day: 1,
+      title: '1일차: 단양의 절경과 여유로운 산책',
+      stops: [
+        {
+          time: '10:30',
+          title: '도담삼봉 & 석문',
+          category: 'NATURE_WALK',
+          description:
+            '남한강 한가운데 우뚝 솟은 삼봉과 시원한 강바람을 느끼며 힐링하는 명소입니다.',
+          transport: '단양역에서 버스 또는 택시 10분',
+          estimatedCostKrw: 3000,
+          notes: [
+            '물안개 피는 아침 시간대 방문 추천',
+            '보행로 정비가 잘 되어 있어 혼자 걷기 좋습니다.',
+          ],
+        },
+        {
+          time: '12:30',
+          title: '단양 구경시장',
+          category: 'FOOD',
+          description:
+            '마늘떡갈비, 마늘만두 등 단양 특산물 먹거리를 혼자서도 부담 없이 맛볼 수 있는 전통시장입니다.',
+          transport: '도담삼봉에서 시내버스 12분',
+          estimatedCostKrw: 15000,
+          notes: ['소포장 포장이 잘 되어 있어 1인 식사에 적합합니다.'],
+        },
+        {
+          time: '14:30',
+          title: '남한강 뷰 카페 산책',
+          category: 'CAFE',
+          description:
+            '강변을 바라보며 조용히 책을 읽거나 휴식을 취하기 좋은 통유리 카페입니다.',
+          transport: '도보 5분',
+          estimatedCostKrw: 6000,
+          notes: ['창가 1인석 완비', '안심식당 인증 업소'],
+        },
+        {
+          time: '17:00',
+          title: '단양강 잔도길',
+          category: 'WALK',
+          description:
+            '강변 절벽을 따라 조성된 친환경 산책로로, 일몰과 함께 켜지는 야간 조명이 아름답습니다.',
+          transport: '구경시장에서 도보 15분',
+          estimatedCostKrw: 0,
+          notes: [
+            '야간 가로등 및 안전 CCTV 설치 구역',
+            '경사가 완만하여 편안한 도보 이동 가능',
+          ],
+        },
+      ],
+    },
+  ],
+  safetyNotes: [
+    '단양강 잔도길은 전 구간 안전 CCTV 및 비상벨이 설치된 안심 산책로입니다.',
+    '구경시장 인근은 밤 9시 이후 대중교통 배차가 줄어드니 이동 시간을 미리 확인해주세요.',
+  ],
+  assumptions: [
+    '교통 상황 및 기상 조건에 따라 소요 시간이 일부 변동될 수 있습니다.',
+    '입장료 및 식비는 1인 기준 예상 금액입니다.',
+  ],
+};
 
 const INITIAL: AssistantState = {
   messages: [],
@@ -245,6 +317,21 @@ export const assistantStore = {
       isSending: true,
       error: null,
     });
+
+    if (userStore.get()?.id === 'guest' || !tokenStorage.get()?.accessToken) {
+      setTimeout(() => {
+        applyResult(replyMessage.id, {
+          requestId: 'guest-sample-course',
+          status: 'COMPLETED',
+          answer:
+            '둘러보기(게스트 모드)를 위한 맞춤 추천 코스를 준비했어요 ✦\n로그인하시면 내 취향에 딱 맞춘 AI 코스를 실시간으로 생성할 수 있습니다.',
+          course: GUEST_SAMPLE_COURSE,
+          errorMessage: null,
+        });
+        setState({ isSending: false });
+      }, 1200);
+      return;
+    }
 
     try {
       const ticket = await assistantApi.requestCourse({

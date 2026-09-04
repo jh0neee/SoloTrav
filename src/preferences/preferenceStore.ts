@@ -13,6 +13,8 @@ import { useEffect, useSyncExternalStore } from 'react';
 import { userApi } from '../api/userApi';
 import { toApiError } from '../api/errors';
 import { badgeStore } from '../badges/badgeStore';
+import { userStore } from '../user/userStore';
+import { tokenStorage } from '../storage/tokenStorage';
 import type { PreferenceAnswers } from '../data/preferences';
 
 export type PreferenceState = {
@@ -65,6 +67,11 @@ export const preferenceStore = {
   },
 
   reload(): Promise<void> {
+    if (userStore.get()?.id === 'guest' || !tokenStorage.get()?.accessToken) {
+      setState({ status: 'ready' });
+      return Promise.resolve();
+    }
+
     setState({ status: 'loading', error: null });
     inFlight = (async () => {
       try {
@@ -84,9 +91,16 @@ export const preferenceStore = {
 
   /**
    * 서버에 저장하고 성공하면 스토어를 갱신합니다.
+   * 게스트 모드에서는 메모리에 저장하여 즉시 홈 화면에 반영합니다.
    * 실패는 던집니다 — 위저드가 화면을 닫지 않고 에러를 보여줘야 하기 때문입니다.
    */
   async save(answers: PreferenceAnswers): Promise<PreferenceAnswers> {
+    if (userStore.get()?.id === 'guest' || !tokenStorage.get()?.accessToken) {
+      setState({ status: 'ready', answers, isSaving: false, error: null });
+      await badgeStore.earnLocal('03');
+      return answers;
+    }
+
     setState({ isSaving: true, error: null });
     try {
       const saved = await userApi.saveTravelPreferences(answers);
@@ -107,10 +121,6 @@ export const preferenceStore = {
   },
 };
 
-/**
- * 취향 상태를 구독합니다. 처음 쓰이는 시점에 알아서 한 번 조회합니다.
- * (로그인 직후 어느 화면이 먼저 뜨든 동작하도록 화면 쪽에 부담을 주지 않습니다)
- */
 export function usePreferences(): PreferenceState {
   const snapshot = useSyncExternalStore(
     preferenceStore.subscribe,

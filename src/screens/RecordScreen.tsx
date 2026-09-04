@@ -26,6 +26,7 @@ import Chip from '../components/Chip';
 import RecordFormScreen from './record/RecordFormScreen';
 import RecordDetailScreen from './record/RecordDetailScreen';
 import { useRecordRoute } from '../navigation/useRecordRoute';
+import { useAuth } from '../auth/AuthContext';
 import {
   recordStore,
   useRecords,
@@ -54,6 +55,14 @@ function RecordScreen() {
   // 화면 전환은 ../navigation/useRecordRoute 가 들고 있습니다.
   // 앱은 지역 상태, 웹은 주소창(/record/:id …) 과 이어진 구현으로 교체됩니다.
   const [route, setRoute] = useRecordRoute();
+  const { isGuest, logout } = useAuth();
+
+  const promptLogin = (message: string) => {
+    Alert.alert('로그인이 필요한 기능입니다', message, [
+      { text: '둘러보기 계속', style: 'cancel' },
+      { text: '로그인하기', onPress: logout },
+    ]);
+  };
 
   const state = useRecords(scope);
   const list = state[scope];
@@ -80,6 +89,12 @@ function RecordScreen() {
   };
 
   const openForm = (record: TravelRecord | null) => {
+    if (isGuest) {
+      promptLogin(
+        '여행 기록을 작성하려면 카카오 로그인이 필요합니다. 로그인 화면으로 이동하시겠습니까?',
+      );
+      return;
+    }
     recordStore.clearSubmitError();
     setRoute({ name: 'form', record });
   };
@@ -228,13 +243,21 @@ function RecordScreen() {
           state={list}
           scope={scope}
           filtered={tagFilter !== ALL_TAGS}
+          isGuest={isGuest}
           onRetry={() => recordStore.reload(scope)}
           onWrite={() => openForm(null)}
+          onLogin={logout}
         />
       }
       renderItem={({ item }) => (
         <RecordCard
           record={item}
+          isGuest={isGuest}
+          onPromptLogin={() =>
+            promptLogin(
+              '좋아요를 누르려면 카카오 로그인이 필요합니다. 로그인 화면으로 이동하시겠습니까?',
+            )
+          }
           onPress={() => setRoute({ name: 'detail', recordId: item.id })}
         />
       )}
@@ -247,15 +270,35 @@ function ListPlaceholder({
   state,
   scope,
   filtered,
+  isGuest,
   onRetry,
   onWrite,
+  onLogin,
 }: {
   state: RecordListState;
   scope: RecordScope;
   filtered: boolean;
+  isGuest?: boolean;
   onRetry: () => void;
   onWrite: () => void;
+  onLogin?: () => void;
 }) {
+  if (isGuest && scope === 'mine') {
+    return (
+      <View style={styles.empty}>
+        <Text style={styles.emptyText}>
+          {'게스트 모드로 둘러보는 중입니다.\n로그인 후 내가 다녀온 여행 기록을 관리해보세요.'}
+        </Text>
+        <Pressable
+          style={styles.emptyCta}
+          onPress={onLogin}
+          accessibilityRole="button"
+        >
+          <Text style={styles.emptyCtaText}>카카오 로그인하기</Text>
+        </Pressable>
+      </View>
+    );
+  }
   if (state.status === 'loading' || state.status === 'idle') {
     return (
       <View style={styles.empty}>
@@ -311,9 +354,13 @@ function ListPlaceholder({
 function RecordCard({
   record,
   onPress,
+  isGuest,
+  onPromptLogin,
 }: {
   record: TravelRecord;
   onPress: () => void;
+  isGuest?: boolean;
+  onPromptLogin?: () => void;
 }) {
   const tone = photoTones[record.tone];
   const author = record.authorName ?? '혼행러';
@@ -381,6 +428,10 @@ function RecordCard({
         <Pressable
           style={styles.action}
           onPress={() => {
+            if (isGuest) {
+              onPromptLogin?.();
+              return;
+            }
             // 실패하면 스토어가 알아서 되돌립니다.
             recordStore.toggleLike(record.id).catch(() => {});
           }}

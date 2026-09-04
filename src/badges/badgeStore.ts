@@ -15,6 +15,7 @@ import { toApiError } from '../api/errors';
 import type { Badge, BadgeImageKey } from '../types/badge';
 import { BADGE_CATALOG } from '../data/badgeCatalog';
 import { userStore } from '../user/userStore';
+import { tokenStorage } from '../storage/tokenStorage';
 
 export type BadgeState = {
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -117,6 +118,14 @@ export const badgeStore = {
   },
 
   reload(): Promise<void> {
+    if (userStore.get()?.id === 'guest' || !tokenStorage.get()?.accessToken) {
+      setState({
+        status: 'ready',
+        badges: applyLocalEarned(BADGE_CATALOG),
+        error: null,
+      });
+      return Promise.resolve();
+    }
     setState({ status: 'loading', error: null });
     inFlight = (async () => {
       try {

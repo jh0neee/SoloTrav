@@ -37,6 +37,8 @@ import { FORCE_TERMS_AGREEMENT_PREVIEW } from '../config/legal';
 
 type AuthContextValue = {
   status: AuthStatus;
+  /** 둘러보기(게스트 모드) 여부 */
+  isGuest: boolean;
   /** 로그인 요청이 진행 중인지 (버튼 스피너용) */
   isSigningIn: boolean;
   /** 카카오 본인 확인 후 탈퇴 예약 계정으로 판별됐는지 */
@@ -48,6 +50,7 @@ type AuthContextValue = {
   /** 마지막 로그인 실패 메시지. 취소는 에러로 보지 않아 null 입니다. */
   error: string | null;
   loginWithKakao: () => Promise<void>;
+  enterGuestMode: () => void;
   cancelWithdrawal: () => Promise<void>;
   leaveWithdrawalRecovery: () => Promise<void>;
   completeTermsAgreement: (version?: string) => Promise<void>;
@@ -116,10 +119,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [status]);
 
+  const isGuest = status === 'guest';
+
   // 리프레시 토큰까지 만료되면 로그인 화면으로 되돌립니다.
   useEffect(() => {
     authService.onSessionExpired(() => {
-      if (!mounted.current) {
+      if (!mounted.current || status === 'guest') {
         return;
       }
       // 토큰은 sessionRefresh 가 이미 지웠고, 계정에 딸린 값은 여기서 비웁니다.
@@ -135,6 +140,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setError('로그인이 만료되었습니다. 다시 로그인해주세요.');
     });
     return () => authService.onSessionExpired(null);
+  }, [status]);
+
+  const enterGuestMode = useCallback(() => {
+    userStore.save({
+      id: 'guest',
+      nickname: '게스트',
+      email: null,
+      profileImageUrl: null,
+    });
+    badgeStore.activateLocalUser();
+    setError(null);
+    setRequiresTermsAgreement(false);
+    setIsWithdrawalPending(false);
+    setStatus('guest');
   }, []);
 
   const loginWithKakao = useCallback(async () => {
@@ -176,7 +195,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    await authService.logout();
+    if (status !== 'guest') {
+      await authService.logout();
+    }
+    await userStore.clear();
     preferenceStore.reset();
     badgeStore.reset();
     recordStore.reset();
@@ -189,7 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus('unauthenticated');
     setRequiresTermsAgreement(false);
     setError(null);
-  }, []);
+  }, [status]);
 
   const cancelWithdrawal = useCallback(async () => {
     const credential = pendingRecovery.current;
@@ -267,12 +289,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
+      isGuest,
       isSigningIn,
       isWithdrawalPending,
       isCancellingWithdrawal,
       requiresTermsAgreement,
       error,
       loginWithKakao,
+      enterGuestMode,
       cancelWithdrawal,
       leaveWithdrawalRecovery,
       completeTermsAgreement,
@@ -282,12 +306,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       status,
+      isGuest,
       isSigningIn,
       isWithdrawalPending,
       isCancellingWithdrawal,
       requiresTermsAgreement,
       error,
       loginWithKakao,
+      enterGuestMode,
       cancelWithdrawal,
       leaveWithdrawalRecovery,
       completeTermsAgreement,

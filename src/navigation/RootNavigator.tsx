@@ -27,11 +27,15 @@ function RootNavigator() {
     return <WithdrawalPendingScreen />;
   }
 
-  if (requiresTermsAgreement) {
+  if (requiresTermsAgreement && status !== 'guest') {
     return <TermsAgreementScreen />;
   }
 
-  return status === 'authenticated' ? <BottomTabNavigator /> : <LoginScreen />;
+  return status === 'authenticated' || status === 'guest' ? (
+    <BottomTabNavigator />
+  ) : (
+    <LoginScreen />
+  );
 }
 
 const styles = StyleSheet.create({

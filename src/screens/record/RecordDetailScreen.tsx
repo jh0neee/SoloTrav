@@ -41,6 +41,7 @@ import {
   useRecord,
 } from '../../records/recordStore';
 import { useMyProfile } from '../../user/userStore';
+import { useAuth } from '../../auth/AuthContext';
 import type { RecordComment, TravelRecord } from '../../types/travelRecord';
 
 type Props = {
@@ -59,6 +60,7 @@ type ModerationTarget = {
 };
 
 function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
+  const { isGuest, logout } = useAuth();
   const commentsListRef = useRef<FlatList<RecordComment>>(null);
   const composerFocusedRef = useRef(false);
   const scrollRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -69,6 +71,13 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
   const myName = profile.user?.nickname?.trim() || null;
   /** 내 기록 목록(GET /travel-records/me)에 있으면 내 글 */
   const isMineByList = useIsMyRecord(recordId);
+
+  const promptLogin = (message: string) => {
+    Alert.alert('로그인이 필요한 기능입니다', message, [
+      { text: '둘러보기 계속', style: 'cancel' },
+      { text: '로그인하기', onPress: logout },
+    ]);
+  };
 
   const [draft, setDraft] = useState('');
   /** 수정 중인 댓글 id. null 이면 새 댓글 작성 중입니다. */
