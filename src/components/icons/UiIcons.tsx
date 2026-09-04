@@ -23,6 +23,8 @@ import {
   CalendarBlankIcon as PhCalendar,
   CaretLeftIcon as PhCaretLeft,
   CaretRightIcon as PhCaretRight,
+  CaretUpIcon as PhCaretUp,
+  CaretDownIcon as PhCaretDown,
   ChatCircleIcon as PhChatCircle,
   ClockIcon as PhClock,
   ConfettiIcon as PhConfetti,
@@ -63,8 +65,8 @@ export function Chevron({
   direction = 'left',
   color,
   size = 18,
-}: IconProps & { direction?: 'left' | 'right' }) {
-  const Arrow = direction === 'left' ? PhCaretLeft : PhCaretRight;
+}: IconProps & { direction?: 'up' | 'down' |'left' | 'right' }) {
+  const Arrow = direction === 'left' ? PhCaretLeft : direction === 'up' ?PhCaretUp: direction === 'down'? PhCaretDown: PhCaretRight;
   return <Arrow color={color} size={size} weight={WEIGHT} />;
 }
 

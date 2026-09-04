@@ -288,14 +288,14 @@ export default function CourseLoadingScreen({
         {...panResponder.panHandlers}>
         {/* 상단 취소 헤더 영역 */}
         <View style={styles.topHeader}>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.cancelBtn}
             activeOpacity={0.7}
             onPress={handleCancelAndGoHome}>
             <Chevron color={colors.textSecondary} direction="left" size={18} />
             <Text style={styles.cancelBtnText}>홈으로</Text>
-          </TouchableOpacity>
-          <Text style={styles.swipeHintText}>👉 오른쪽으로 밀어 홈으로 가기</Text>
+          </TouchableOpacity> */}
+          <Text style={styles.swipeHintText}>오른쪽으로 밀어 취소</Text>
         </View>
 
         <View style={styles.centerContent}>

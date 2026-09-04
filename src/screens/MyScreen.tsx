@@ -31,6 +31,7 @@ import { badgeStore, countEarned, useBadges } from '../badges/badgeStore';
 import { recordStore, useRecords } from '../records/recordStore';
 import PreferencePromptScreen from './home/PreferencePromptScreen';
 import FavoriteCoursesSection from './favorites/FavoriteCoursesSection';
+import FavoriteCourseDetailScreen from './favorites/FavoriteCourseDetailScreen';
 import BlockedUsersScreen from './my/BlockedUsersScreen';
 import MyReportsScreen from './my/MyReportsScreen';
 import { favoriteStore } from '../favorites/favoriteStore';
@@ -39,6 +40,7 @@ import {
   highlightPreferences,
   toProfilePreferenceAnswers,
 } from '../data/preferences';
+import type { AiRouteFavorite } from '../types/favorite';
 import type {
   Badge,
   BadgeCategory,
@@ -117,6 +119,7 @@ function MyScreen() {
   // 어느 것이 열려 있는지는 useMyView 가 들고 있습니다 — 앱은 지역 상태,
   // 웹은 주소창(/my/preference, /my/courses) 과 이어진 구현으로 교체됩니다.
   const [view, setView] = useMyView();
+  const [selectedFavorite, setSelectedFavorite] = useState<AiRouteFavorite | null>(null);
   const [badgeView, setBadgeView] = useState<'main' | 'list' | 'detail'>(
     'main',
   );
@@ -125,8 +128,12 @@ function MyScreen() {
   const [safetyDetail, setSafetyDetail] = useState<SafetyDetailKey | null>(null);
 
   useEffect(() => {
-    if (badgeView === 'main') return;
+    if (!selectedFavorite && badgeView === 'main') return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (selectedFavorite) {
+        setSelectedFavorite(null);
+        return true;
+      }
       if (badgeView === 'detail') {
         setBadgeView('list');
       } else {
@@ -135,7 +142,7 @@ function MyScreen() {
       return true;
     });
     return () => sub.remove();
-  }, [badgeView]);
+  }, [selectedFavorite, badgeView]);
 
   const confirmLogout = () =>
     Alert.alert('로그아웃', '로그아웃 하시겠어요?', [
@@ -208,7 +215,12 @@ function MyScreen() {
   }
 
   if (view === 'courses') {
-    return <SavedCoursesListScreen onBack={() => setView('root')} />;
+    return (
+      <SavedCoursesListScreen
+        onBack={() => setView('root')}
+        onSelect={fav => setSelectedFavorite(fav)}
+      />
+    );
   }
 
   if (view === 'blocks') {
@@ -239,6 +251,15 @@ function MyScreen() {
           setSelectedBadge(badge);
           setBadgeView('detail');
         }}
+      />
+    );
+  }
+
+  if (selectedFavorite) {
+    return (
+      <FavoriteCourseDetailScreen
+        favorite={selectedFavorite}
+        onBack={() => setSelectedFavorite(null)}
       />
     );
   }
@@ -313,12 +334,8 @@ function MyScreen() {
       </Section>
 
       {/* ── 관심 코스 ── */}
-      <Section
-        title="관심 코스"
-        actionLabel="전체"
-        onAction={() => setView('courses')}
-      >
-        <FavoriteCoursesSection limit={2} />
+      <Section title="관심 코스">
+        <FavoriteCoursesSection onSelectCourse={setSelectedFavorite} />
       </Section>
 
       {/* ── 나의 배지 ── */}
@@ -487,7 +504,13 @@ function PolicyRow({ label, onPress }: { label: string; onPress: () => void }) {
 }
 
 /** 섹션 헤더 + 본문 */
-function SavedCoursesListScreen({ onBack }: { onBack: () => void }) {
+function SavedCoursesListScreen({
+  onBack,
+  onSelect,
+}: {
+  onBack: () => void;
+  onSelect: (favorite: AiRouteFavorite) => void;
+}) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -514,7 +537,7 @@ function SavedCoursesListScreen({ onBack }: { onBack: () => void }) {
         contentContainerStyle={styles.fullListContent}
         showsVerticalScrollIndicator={false}
       >
-        <FavoriteCoursesSection />
+        <FavoriteCoursesSection onSelectCourse={onSelect} />
       </ScrollView>
     </View>
   );
@@ -1305,81 +1328,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // 관심 코스
-  courseList: {
-    gap: 10,
-  },
   emptySavedText: {
     paddingVertical: 12,
     fontSize: 14,
     color: colors.textSecondary,
-  },
-  courseCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 12,
-  },
-  courseThumb: {
-    width: 62,
-    height: 62,
-    borderRadius: 14,
-    backgroundColor: colors.darkCard,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  courseMoon: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.goldSoft,
-  },
-  courseThumbText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.textSecondary,
-  },
-  courseBody: {
-    flex: 1,
-  },
-  courseTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  courseMeta: {
-    marginTop: 4,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  coursePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 4,
-    marginTop: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: colors.safeBg,
-  },
-  coursePillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.safeText,
-  },
-  heartBtn: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   // 배지
