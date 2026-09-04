@@ -12,6 +12,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -388,13 +389,18 @@ function SectionHead({
   );
 }
 
+const BRAND_LOGO = require('../../assets/logo.png');
+
 /** 작은 등대 로고 */
 function Lighthouse() {
   return (
-    <View style={styles.logo}>
-      <View style={styles.logoLight} />
-      <View style={styles.logoTower} />
-    </View>
+    <Image
+      source={BRAND_LOGO}
+      style={styles.brandLogo}
+      resizeMode="contain"
+      accessibilityRole="image"
+      accessibilityLabel="혼행등대 로고"
+    />
   );
 }
 
@@ -601,22 +607,9 @@ const styles = StyleSheet.create({
   },
 
   // 로고
-  logo: {
-    alignItems: 'center',
-  },
-  logoLight: {
-    width: 12,
-    height: 8,
-    backgroundColor: colors.primary,
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-  },
-  logoTower: {
-    width: 15,
-    height: 15,
-    backgroundColor: colors.textPrimary,
-    borderBottomLeftRadius: 2,
-    borderBottomRightRadius: 2,
+  brandLogo: {
+    width: 35,
+    height: 35,
   },
 
   // 취향 프롬프트 배너
