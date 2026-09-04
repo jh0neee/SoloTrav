@@ -19,6 +19,7 @@ const SEGMENT: Record<Exclude<MyView, 'root'>, string> = {
   preference: 'preference',
   courses: 'courses',
   blocks: 'blocks',
+  reports: 'reports',
 };
 
 function toView(segments: string[]): MyView {

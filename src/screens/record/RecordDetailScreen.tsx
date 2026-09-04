@@ -43,6 +43,7 @@ import {
 import { useMyProfile } from '../../user/userStore';
 import { useAuth } from '../../auth/AuthContext';
 import { blockStore } from '../../blocks/blockStore';
+import { reportApi } from '../../api/reportApi';
 import { toApiError } from '../../api/errors';
 import type { RecordComment, TravelRecord } from '../../types/travelRecord';
 
@@ -140,22 +141,32 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
     targetType: 'TRAVEL_RECORD' | 'COMMENT',
     targetId: string,
     reason: ReportReason,
-    authorId?: string,
+    description?: string,
   ) => {
+    if (isGuest) {
+      setModerationTarget(null);
+      promptLogin('신고는 로그인 후 이용할 수 있습니다.');
+      return;
+    }
     setIsModerating(true);
     try {
-      // TODO: 신고 API가 확정되면 이 모의 지연을 실제 요청으로 교체합니다.
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 500));
-      if (__DEV__) {
-        console.log('[moderation mock] report', {
-          targetType,
-          targetId,
-          authorId,
-          reason,
-        });
-      }
+      await reportApi.create({
+        targetType: targetType === 'TRAVEL_RECORD' ? 'POST' : 'COMMENT',
+        targetId,
+        reason,
+        description,
+      });
       setModerationTarget(null);
       Alert.alert('신고가 접수됐어요', '확인 후 필요한 조치를 취하겠습니다.');
+    } catch (caught) {
+      const err = toApiError(caught);
+      if (err.status === 409) {
+        Alert.alert('신고 불가', '이미 신고한 콘텐츠입니다.');
+      } else if (err.status === 429) {
+        Alert.alert('신고 제한', '최근 24시간 신고 제한 횟수를 초과했습니다.');
+      } else {
+        Alert.alert('신고 실패', err.message);
+      }
     } finally {
       setIsModerating(false);
     }
@@ -407,13 +418,13 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
         canBlockUser={moderationTarget !== null}
         submitting={isModerating}
         onClose={() => setModerationTarget(null)}
-        onReportContent={reason => {
+        onReportContent={(reason, description) => {
           if (moderationTarget) {
             submitReport(
               moderationTarget.targetType,
               moderationTarget.targetId,
               reason,
-              moderationTarget.authorId ?? undefined,
+              description,
             );
           }
         }}

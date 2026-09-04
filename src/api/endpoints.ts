@@ -74,13 +74,22 @@ export const ENDPOINTS = {
   travelBadges: () => `/users/me/travel-badges`,
   /** 현장 방문 인증 — 좌표는 보내지 않고 기기에서 계산한 거리만 보냅니다. */
   placeCheckIns: () => `/users/me/place-check-ins`,
-
   /** 내 차단 목록 조회 (GET) */
   userBlocks: (params?: { page?: number; limit?: number }) =>
     withQuery(`/users/me/blocks`, params),
   /** 사용자 차단 (PUT) / 사용자 차단 해제 (DELETE) */
   userBlock: (userId: string) =>
     `/users/me/blocks/${encodeURIComponent(userId)}`,
+
+  // 신고 (Moderation)
+  /** 게시물·댓글·사용자·AI 응답 신고 (POST) */
+  reports: () => `/reports`,
+  /** 내 신고 목록 및 처리 결과 조회 (GET) */
+  myReports: (params?: { page?: number; limit?: number; status?: string }) =>
+    withQuery(`/reports/me`, params),
+  /** 내 신고 상세 조회 (GET) */
+  myReport: (reportId: string) =>
+    `/reports/me/${encodeURIComponent(reportId)}`,
 
   // 여행 기록
   /** 여행 기록 조회(GET) / 등록(POST) */

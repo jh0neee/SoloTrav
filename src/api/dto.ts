@@ -379,3 +379,33 @@ export type BlockedUserListResponseDto = {
   page?: number;
   limit?: number;
 };
+
+/** POST /reports 요청 바디 */
+export type CreateReportRequestDto = {
+  targetType: 'POST' | 'COMMENT' | 'USER' | 'AI_RESPONSE' | string;
+  targetId: string;
+  reason: string;
+  description?: string;
+};
+
+/** 신고 항목 DTO (POST /reports 응답, GET /reports/me, GET /reports/me/{reportId}) */
+export type ReportDto = {
+  id?: string;
+  targetType?: string;
+  targetId?: string;
+  reason?: string;
+  description?: string | Record<string, unknown> | null;
+  status?: string;
+  resolution?: string | Record<string, unknown> | null;
+  resolvedAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+};
+
+/** GET /reports/me 응답 바디 */
+export type ReportListResponseDto = {
+  items?: ReportDto[];
+  total?: number;
+  page?: number;
+  limit?: number;
+};

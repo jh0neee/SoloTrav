@@ -32,6 +32,7 @@ import { recordStore, useRecords } from '../records/recordStore';
 import PreferencePromptScreen from './home/PreferencePromptScreen';
 import FavoriteCoursesSection from './favorites/FavoriteCoursesSection';
 import BlockedUsersScreen from './my/BlockedUsersScreen';
+import MyReportsScreen from './my/MyReportsScreen';
 import { favoriteStore } from '../favorites/favoriteStore';
 import { blockStore } from '../blocks/blockStore';
 import {
@@ -214,6 +215,10 @@ function MyScreen() {
     return <BlockedUsersScreen onBack={() => setView('root')} />;
   }
 
+  if (view === 'reports') {
+    return <MyReportsScreen onBack={() => setView('root')} />;
+  }
+
   if (badgeView === 'detail' && selectedBadge) {
     return (
       <BadgeDetailScreen
@@ -365,13 +370,18 @@ function MyScreen() {
         </View>
       </Section>
 
-      {/* ── 커뮤니티 관리 ── */}
+        {/* ── 커뮤니티 관리 ── */}
       {!isGuest && (
         <Section title="커뮤니티 관리">
           <View style={styles.card}>
             <PolicyRow
               label="차단 목록 관리"
               onPress={() => setView('blocks')}
+            />
+            <View style={styles.divider} />
+            <PolicyRow
+              label="신고 내역"
+              onPress={() => setView('reports')}
             />
           </View>
         </Section>

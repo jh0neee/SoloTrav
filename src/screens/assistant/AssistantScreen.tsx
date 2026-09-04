@@ -33,6 +33,9 @@ import { assistantStore, useAssistant } from '../../assistant/assistantStore';
 import { STARTER_PROMPTS, detectRegionName } from '../../assistant/suggestions';
 import { usePreferences } from '../../preferences/preferenceStore';
 import { summarizePreferences } from '../../data/preferences';
+import { useAuth } from '../../auth/AuthContext';
+import { reportApi } from '../../api/reportApi';
+import { toApiError } from '../../api/errors';
 import { colors } from '../../theme/colors';
 import type { ChatMessage } from '../../types/assistant';
 
@@ -63,6 +66,7 @@ const WELCOME_MESSAGES: ChatMessage[] = [
 
 function AssistantScreen() {
   const insets = useSafeAreaInsets();
+  const { isGuest, logout } = useAuth();
   const { messages, isSending, pending } = useAssistant();
   const preferences = usePreferences();
   const scrollRef = useRef<ScrollView>(null);
@@ -114,23 +118,44 @@ function AssistantScreen() {
     ? summarizePreferences(preferences.answers)
     : null;
 
-  const reportAiResponse = async (reason: ReportReason) => {
+  const reportAiResponse = async (
+    reason: ReportReason,
+    description?: string,
+  ) => {
     if (!reportRequestId) {
+      return;
+    }
+    if (isGuest) {
+      setReportRequestId(null);
+      Alert.alert(
+        '로그인이 필요한 기능입니다',
+        '신고는 로그인 후 이용할 수 있습니다.',
+        [
+          { text: '둘러보기 계속', style: 'cancel' },
+          { text: '로그인하기', onPress: logout },
+        ],
+      );
       return;
     }
     setIsReporting(true);
     try {
-      // TODO: AI 응답 신고 API가 확정되면 이 모의 지연을 실제 요청으로 교체합니다.
-      await new Promise<void>(resolve => setTimeout(() => resolve(), 500));
-      if (__DEV__) {
-        console.log('[moderation mock] report', {
-          targetType: 'AI_RESPONSE',
-          targetId: reportRequestId,
-          reason,
-        });
-      }
+      await reportApi.create({
+        targetType: 'AI_RESPONSE',
+        targetId: reportRequestId,
+        reason,
+        description,
+      });
       setReportRequestId(null);
       Alert.alert('신고가 접수됐어요', '더 안전한 답변을 만드는 데 반영하겠습니다.');
+    } catch (caught) {
+      const err = toApiError(caught);
+      if (err.status === 409) {
+        Alert.alert('신고 불가', '이미 신고한 답변입니다.');
+      } else if (err.status === 429) {
+        Alert.alert('신고 제한', '최근 24시간 신고 제한 횟수를 초과했습니다.');
+      } else {
+        Alert.alert('신고 실패', err.message);
+      }
     } finally {
       setIsReporting(false);
     }
