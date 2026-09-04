@@ -11,12 +11,25 @@ import { colors } from '../theme/colors';
 import { Mascot } from '../components/icons/TabIcons';
 import { TABS, type TabItem } from './tabs';
 import { useActiveTab } from './useActiveTab';
+import {
+  TabBarVisibilityProvider,
+  useTabBarVisibility,
+} from './TabBarVisibilityContext';
 
 function BottomTabNavigator() {
+  return (
+    <TabBarVisibilityProvider>
+      <BottomTabNavigatorInner />
+    </TabBarVisibilityProvider>
+  );
+}
+
+function BottomTabNavigatorInner() {
   // 어느 탭이 켜져 있는지는 ./useActiveTab 이 정합니다.
   // 앱은 지역 상태, 웹은 주소창(/record, /my …) 과 이어진 구현으로 교체됩니다.
   const [activeKey, setActiveKey] = useActiveTab();
   const insets = useSafeAreaInsets();
+  const { isTabBarHidden } = useTabBarVisibility();
 
   const activeTab = TABS.find(tab => tab.key === activeKey) ?? TABS[0];
   const ActiveScreen = activeTab.component;
@@ -32,28 +45,30 @@ function BottomTabNavigator() {
         />
       </View>
 
-      {/* 하단 탭바 */}
-      <View style={[styles.tabBarWrap, { paddingBottom: insets.bottom }]}>
-        <View style={styles.tabBar}>
-          {TABS.map(tab =>
-            tab.variant === 'center' ? (
-              <CenterTab
-                key={tab.key}
-                tab={tab}
-                focused={tab.key === activeKey}
-                onPress={() => setActiveKey(tab.key)}
-              />
-            ) : (
-              <DefaultTab
-                key={tab.key}
-                tab={tab}
-                focused={tab.key === activeKey}
-                onPress={() => setActiveKey(tab.key)}
-              />
-            ),
-          )}
+      {/* 하단 탭바 — 로딩 등 전체 화면 모드일 때 숨김 */}
+      {!isTabBarHidden && (
+        <View style={[styles.tabBarWrap, { paddingBottom: insets.bottom }]}>
+          <View style={styles.tabBar}>
+            {TABS.map(tab =>
+              tab.variant === 'center' ? (
+                <CenterTab
+                  key={tab.key}
+                  tab={tab}
+                  focused={tab.key === activeKey}
+                  onPress={() => setActiveKey(tab.key)}
+                />
+              ) : (
+                <DefaultTab
+                  key={tab.key}
+                  tab={tab}
+                  focused={tab.key === activeKey}
+                  onPress={() => setActiveKey(tab.key)}
+                />
+              ),
+            )}
+          </View>
         </View>
-      </View>
+      )}
     </View>
   );
 }

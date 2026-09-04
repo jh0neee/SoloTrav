@@ -110,6 +110,14 @@ export const ENDPOINTS = {
   /** 찜 상세 조회(GET) / 찜 해제(DELETE) */
   aiFavorite: (favoriteId: string) =>
     `/ai/favorites/${encodeURIComponent(favoriteId)}`,
+  /** AI 맞춤 코스 생성 요청 접수 (POST) — 202 Accepted, requestId 반환 */
+  aiCourses: () => `/travel/ai-courses`,
+  /** AI 맞춤 코스 처리 상태 및 결과 조회 (GET) */
+  aiCourseResult: (requestId: string) =>
+    `/travel/ai-courses/${encodeURIComponent(requestId)}`,
+  /** AI 맞춤 코스 SSE 스트림 (GET) */
+  aiCourseStream: (requestId: string) =>
+    `/travel/ai-courses/${encodeURIComponent(requestId)}/stream`,
 
   // SOS
   /** 현위치 기준 가장 가까운 안전 시설 조회 */

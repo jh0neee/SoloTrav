@@ -108,6 +108,41 @@ function toRoute(segments: string[]): HomeRoute {
         name: 'preference',
         city: segments[1] ? getCityById(segments[1]) : undefined,
       };
+    case 'preference-edit': {
+      const city = segments[1] ? getCityById(segments[1]) : undefined;
+      return city ? { name: 'preferenceEdit', city } : { name: 'home' };
+    }
+    case 'course-loading': {
+      const city = segments[1] ? getCityById(segments[1]) : undefined;
+      const state = locationState<{ answers?: any; saveToProfile?: boolean }>();
+      if (city && state?.answers) {
+        return {
+          name: 'courseLoading',
+          city,
+          answers: state.answers,
+          saveToProfile: !!state.saveToProfile,
+        };
+      }
+      return { name: 'home' };
+    }
+    case 'course-error': {
+      const city = segments[1] ? getCityById(segments[1]) : undefined;
+      const state = locationState<{
+        answers?: any;
+        saveToProfile?: boolean;
+        errorMessage?: string;
+      }>();
+      if (city && state?.answers) {
+        return {
+          name: 'courseError',
+          city,
+          answers: state.answers,
+          saveToProfile: !!state.saveToProfile,
+          errorMessage: state.errorMessage ?? '',
+        };
+      }
+      return { name: 'home' };
+    }
     default:
       return { name: 'home' };
   }
@@ -134,6 +169,14 @@ function pathFor(route: HomeRoute): string {
         'home',
         route.city ? ['preference', route.city.id] : ['preference'],
       );
+    case 'preferenceEdit':
+      return toPath('home', ['preference-edit', route.city.id]);
+    case 'courseLoading':
+      return toPath('home', ['course-loading', route.city.id]);
+    case 'courseError':
+      return toPath('home', ['course-error', route.city.id]);
+    case 'courseResult':
+      return toPath('home', ['course-result', route.city.id]);
     default:
       return HOME;
   }
@@ -145,6 +188,16 @@ function stateFor(route: HomeRoute): unknown {
   }
   if (route.name === 'gallery' && route.albumTitle) {
     return { albumTitle: route.albumTitle } satisfies GalleryState;
+  }
+  if (route.name === 'courseLoading') {
+    return { answers: route.answers, saveToProfile: route.saveToProfile };
+  }
+  if (route.name === 'courseError') {
+    return {
+      answers: route.answers,
+      saveToProfile: route.saveToProfile,
+      errorMessage: route.errorMessage,
+    };
   }
   return null;
 }

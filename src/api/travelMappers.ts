@@ -9,6 +9,7 @@ import { unwrap } from './mappers';
 import { CONTENT_TYPE_LABEL } from '../types/travel';
 import { CONTENT_TYPE_TO_CATEGORY } from '../types/tourPlace';
 import type {
+  AiCourseRequestDto,
   GalleryPhotoDto,
   MunicipalityAttractionDto,
   RegionalSafetyDto,
@@ -21,6 +22,9 @@ import type {
   VisitorRegionDto,
 } from './travelDto';
 import type {
+  AiCourse,
+  AiCourseDay,
+  AiCourseStop,
   GalleryPhoto,
   HubAttraction,
   RegionSafety,
@@ -30,6 +34,7 @@ import type {
   TourContent,
   TourContentDetail,
 } from '../types/travel';
+import type { PreferenceAnswers } from '../data/preferences';
 
 /** 빈 문자열·공백만 있는 값은 없는 것으로 봅니다. */
 function text(value: unknown): string | null {
@@ -511,3 +516,328 @@ export function toHubAttractions(payload: unknown): HubAttraction[] {
     .filter((item): item is HubAttraction => item !== null)
     .sort((a, b) => a.rank - b.rank);
 }
+
+// ─────────────────────────────── AI 맞춤 코스 매퍼
+
+function formatIsoDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function resolveStartDate(value: unknown): string {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) {
+    return value.trim();
+  }
+  const now = new Date();
+  if (value === '내일') {
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return formatIsoDate(tomorrow);
+  }
+  if (value === '이번 주말') {
+    const saturday = new Date(now);
+    const dayOfWeek = saturday.getDay();
+    const daysUntilSaturday = (6 - dayOfWeek + 7) % 7 || 7;
+    saturday.setDate(saturday.getDate() + daysUntilSaturday);
+    return formatIsoDate(saturday);
+  }
+  if (value === '다음 주') {
+    const nextWeek = new Date(now);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    return formatIsoDate(nextWeek);
+  }
+  return formatIsoDate(now);
+}
+
+export const AI_COURSE_DURATION_MAP: Record<
+  string,
+  { code: string; label: string }
+> = {
+  '당일': { code: 'DAY_TRIP', label: '당일치기' },
+  '1박 2일': { code: 'ONE_NIGHT', label: '1박 2일' },
+  '2박 3일': { code: 'TWO_NIGHTS', label: '2박 3일' },
+  '3박 이상': { code: 'THREE_NIGHTS', label: '3박 이상' },
+};
+
+/** 취향 프롬프트 답변 → POST /travel/ai-courses 요청 바디 변환 */
+export function toAiCourseRequest(
+  regionName: string,
+  answers: PreferenceAnswers,
+): AiCourseRequestDto {
+  const durationOption =
+    typeof answers.duration === 'string' ? answers.duration : '';
+  const duration =
+    AI_COURSE_DURATION_MAP[durationOption]?.code ?? 'ONE_NIGHT';
+  const startDate = resolveStartDate(answers.startDate);
+
+  // 최상위 필드로 승격된 duration, startDate, region은 preference 객체에서 제외
+  const preference: Record<string, unknown> = {};
+  Object.entries(answers).forEach(([key, val]) => {
+    if (
+      key !== 'duration' &&
+      key !== 'startDate' &&
+      key !== 'region' &&
+      val !== undefined &&
+      val !== ''
+    ) {
+      preference[key] = val;
+    }
+  });
+
+  return {
+    regionName,
+    startDate,
+    duration,
+    preference,
+  };
+}
+
+/** POST /travel/ai-courses 응답 원형 또는 metadata.course → 앱 도메인 모델(AiCourse) 변환 */
+export function toAiCourse(
+  payload: unknown,
+  fallbackRegionName?: string,
+  fallbackDuration?: string,
+): AiCourse {
+  const unwrapped = (unwrap(payload as { payload?: any }) ?? {}) as any;
+  // metadata.course 또는 course 객체가 있으면 우선 사용
+  const dto = unwrapped?.metadata?.course ?? unwrapped?.course ?? unwrapped;
+
+  const regionName =
+    text(dto.regionName) ??
+    text(dto.region) ??
+    fallbackRegionName ??
+    '';
+  const title =
+    text(dto.title) ??
+    text(dto.courseTitle) ??
+    text(dto.name) ??
+    (regionName ? `${regionName} 혼행 안전 코스` : '혼행 안전 코스');
+  const duration =
+    text(dto.duration) ??
+    text(dto.tripDuration) ??
+    fallbackDuration ??
+    'ONE_NIGHT';
+  const durationEntry = Object.values(AI_COURSE_DURATION_MAP).find(
+    entry => entry.code === duration,
+  );
+  const durationLabel =
+    durationEntry?.label ??
+    (duration === 'DAY_TRIP' ? '당일치기' : '1박 2일');
+  const summary =
+    text(dto.summary) ??
+    text(dto.description) ??
+    `${regionName} 추천 여행 동선입니다.`;
+
+  let days: AiCourseDay[] = [];
+  let stops: AiCourseStop[] = [];
+
+  // 1. metadata.course.days 일자별 중첩 구조인 경우
+  if (Array.isArray(dto.days) && dto.days.length > 0) {
+    days = dto.days.map((dayDto: any, dayIdx: number) => {
+      const dayNum =
+        typeof dayDto.day === 'number' ? dayDto.day : dayIdx + 1;
+      const dayTitle = text(dayDto.title) ?? `${dayNum}일차`;
+      const dayStopsRaw = Array.isArray(dayDto.stops) ? dayDto.stops : [];
+      const dayStops: AiCourseStop[] = dayStopsRaw.map(
+        (stopDto: any, stopIdx: number) => ({
+          day: dayNum,
+          order:
+            typeof stopDto.order === 'number'
+              ? stopDto.order
+              : Number(stopDto.step || stopDto.sequence || stopIdx + 1) ||
+                stopIdx + 1,
+          time:
+            text(stopDto.time) ??
+            text(stopDto.visitTime) ??
+            text(stopDto.scheduleTime),
+          title:
+            text(stopDto.title) ??
+            text(stopDto.name) ??
+            text(stopDto.placeName) ??
+            text(stopDto.spotName) ??
+            `장소 ${stopIdx + 1}`,
+          category:
+            text(stopDto.category) ??
+            text(stopDto.categoryName) ??
+            text(stopDto.type),
+          description:
+            text(stopDto.description) ??
+            text(stopDto.desc) ??
+            text(stopDto.content) ??
+            text(stopDto.summary),
+          safetyTip:
+            text(stopDto.safetyTip) ??
+            (Array.isArray(stopDto.notes)
+              ? stopDto.notes.join('. ')
+              : text(stopDto.notes)) ??
+            text(stopDto.tip) ??
+            text(stopDto.caution),
+        }),
+      );
+      return {
+        day: dayNum,
+        title: dayTitle,
+        stops: dayStops,
+      };
+    });
+    stops = days.flatMap(d => d.stops);
+  } else {
+    // 2. 평평한 stops 배열 구조인 경우
+    const rawStops = Array.isArray(dto.stops)
+      ? dto.stops
+      : Array.isArray(dto.courses)
+      ? dto.courses
+      : Array.isArray(dto.places)
+      ? dto.places
+      : Array.isArray(dto.schedule)
+      ? dto.schedule
+      : Array.isArray(dto.itinerary)
+      ? dto.itinerary
+      : Array.isArray(dto.items)
+      ? dto.items
+      : Array.isArray(dto)
+      ? dto
+      : [];
+
+    stops = rawStops.map((stopDto: any, index: number) => ({
+      day:
+        typeof stopDto.day === 'number'
+          ? stopDto.day
+          : Number(stopDto.dayNumber || stopDto.dayIndex || 1) || 1,
+      order:
+        typeof stopDto.order === 'number'
+          ? stopDto.order
+          : Number(stopDto.step || stopDto.sequence || index + 1) || index + 1,
+      time:
+        text(stopDto.time) ??
+        text(stopDto.visitTime) ??
+        text(stopDto.scheduleTime),
+      title:
+        text(stopDto.title) ??
+        text(stopDto.placeName) ??
+        text(stopDto.spotName) ??
+        text(stopDto.name) ??
+        `장소 ${index + 1}`,
+      category:
+        text(stopDto.category) ??
+        text(stopDto.categoryName) ??
+        text(stopDto.type),
+      description:
+        text(stopDto.description) ??
+        text(stopDto.desc) ??
+        text(stopDto.content) ??
+        text(stopDto.summary),
+      safetyTip:
+        text(stopDto.safetyTip) ??
+        (Array.isArray(stopDto.notes)
+          ? stopDto.notes.join('. ')
+          : text(stopDto.notes)) ??
+        text(stopDto.tip) ??
+        text(stopDto.caution),
+    }));
+
+    const daysMap = new Map<number, AiCourseStop[]>();
+    stops.forEach(stop => {
+      const list = daysMap.get(stop.day) ?? [];
+      list.push(stop);
+      daysMap.set(stop.day, list);
+    });
+
+    days = Array.from(daysMap.entries())
+      .sort(([dayA], [dayB]) => dayA - dayB)
+      .map(([day, dayStops]) => ({
+        day,
+        title: `${day}일차`,
+        stops: dayStops.sort((a, b) => a.order - b.order),
+      }));
+  }
+
+  if (days.length === 0) {
+    days.push({ day: 1, title: '1일차', stops: [] });
+  }
+
+  // safetyNotes 수집
+  const safetyNotes: string[] = [];
+  if (Array.isArray(dto.safetyNotes)) {
+    dto.safetyNotes.forEach((note: any) => {
+      if (typeof note === 'string' && note.trim()) {
+        safetyNotes.push(note.trim());
+      }
+    });
+  }
+  stops.forEach(s => {
+    if (s.safetyTip && !safetyNotes.includes(s.safetyTip)) {
+      safetyNotes.push(s.safetyTip);
+    }
+  });
+
+  return {
+    regionName,
+    title,
+    duration,
+    durationLabel,
+    summary,
+    stops,
+    days,
+    safetyNotes,
+  };
+}
+
+export type AiCourseTicket = {
+  requestId: string;
+  status: string;
+  isCompleted: boolean;
+  isFailed: boolean;
+  errorMessage: string | null;
+  course: AiCourse | null;
+};
+
+/** POST/GET 접수 응답에서 requestId, 처리 상태, 완성된 코스 추출 */
+export function toAiCourseTicket(
+  payload: unknown,
+  fallbackRegionName?: string,
+  fallbackDuration?: string,
+): AiCourseTicket {
+  const unwrapped = (unwrap(payload as { payload?: any }) ?? {}) as any;
+  const requestId =
+    text(unwrapped?.requestId) ??
+    text(unwrapped?.data?.requestId) ??
+    text(unwrapped?.metadata?.requestId) ??
+    '';
+  const status = text(unwrapped?.status)?.toUpperCase() ?? (requestId ? 'ACCEPTED' : 'UNKNOWN');
+  const isFailed = status === 'FAILED' || status === 'ERROR';
+
+  const courseRaw = unwrapped?.metadata?.course ?? unwrapped?.course ?? (unwrapped?.days || unwrapped?.stops ? unwrapped : null);
+
+  const course = courseRaw
+    ? toAiCourse(courseRaw, fallbackRegionName, fallbackDuration)
+    : null;
+
+  if (course && requestId && !course.requestId) {
+    course.requestId = requestId;
+  }
+
+  const isCompleted =
+    status === 'COMPLETED' ||
+    status === 'SUCCESS' ||
+    (course !== null && (course.stops.length > 0 || course.days.length > 0));
+
+  const errorMessage =
+    text(unwrapped?.error) ??
+    text(unwrapped?.message) ??
+    text(unwrapped?.reason) ??
+    null;
+
+  return {
+    requestId,
+    status,
+    isCompleted,
+    isFailed,
+    errorMessage,
+    course,
+  };
+}
+
+

@@ -46,7 +46,10 @@ import {
   SirenIcon as PhSiren,
   SlidersHorizontalIcon as PhSlidersHorizontal,
   SparkleIcon as PhSparkle,
+  HouseIcon as PhHouse,
   UserIcon as PhUser,
+  WarningCircleIcon as PhWarningCircle,
+  ArrowClockwiseIcon as PhArrowClockwise,
   type IconWeight,
 } from 'phosphor-react-native';
 
@@ -247,3 +250,20 @@ export function ShoppingIcon({ color, size = 18 }: IconProps) {
 export function FoodIcon({ color, size = 18 }: IconProps) {
   return <PhForkKnife color={color} size={size} weight={WEIGHT} />;
 }
+
+/** 경고 원 */
+export function WarningCircle({ color, size = 20 }: IconProps) {
+  return <PhWarningCircle color={color} size={size} weight={WEIGHT} />;
+}
+
+/** 새로고침 / 다시시도 */
+export function RefreshIcon({ color, size = 18 }: IconProps) {
+  return <PhArrowClockwise color={color} size={size} weight={WEIGHT} />;
+}
+
+/** 홈 아이콘 */
+export function HomeIcon({ color, size = 20 }: IconProps) {
+  return <PhHouse color={color} size={size} weight={WEIGHT} />;
+}
+
+

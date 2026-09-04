@@ -228,3 +228,35 @@ export type HubAttraction = {
   /** 예: '단양군' */
   districtName: string;
 };
+
+/** AI 코스 정류장 도메인 모델 */
+export type AiCourseStop = {
+  day: number;
+  order: number;
+  time: string | null;
+  title: string;
+  category: string | null;
+  description: string | null;
+  safetyTip: string | null;
+};
+
+/** AI 코스 하루 일정 */
+export type AiCourseDay = {
+  day: number;
+  title: string;
+  stops: AiCourseStop[];
+};
+
+/** AI 맞춤 코스 전체 도메인 모델 */
+export type AiCourse = {
+  requestId?: string;
+  regionName: string;
+  title: string;
+  duration: string;
+  durationLabel: string;
+  summary: string;
+  stops: AiCourseStop[];
+  days: AiCourseDay[];
+  safetyNotes: string[];
+};
+

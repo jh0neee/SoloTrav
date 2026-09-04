@@ -290,3 +290,58 @@ export type MunicipalityAttractionDto = {
   mapX?: number;
   mapY?: number;
 };
+
+/** POST /travel/ai-courses 요청 바디 */
+export type AiCourseRequestDto = {
+  regionName: string;
+  startDate?: string;
+  duration?: string;
+  preference?: Record<string, unknown>;
+};
+
+/** AI 코스 정류장 1건 (서버 응답) */
+export type AiCourseStopDto = {
+  day?: number;
+  order?: number;
+  time?: string | null;
+  title?: string;
+  name?: string;
+  placeName?: string;
+  category?: string | null;
+  description?: string | null;
+  transport?: string | null;
+  safetyTip?: string | null;
+  notes?: string[] | string | null;
+};
+
+/** AI 코스 하루 일정 (서버 응답) */
+export type AiCourseDayDto = {
+  day?: number;
+  title?: string;
+  stops?: AiCourseStopDto[];
+};
+
+/** AI 코스 도메인 DTO (metadata.course 원형) */
+export type AiCourseResponseDto = {
+  regionName?: string;
+  title?: string;
+  duration?: string;
+  summary?: string;
+  days?: AiCourseDayDto[];
+  stops?: AiCourseStopDto[];
+  safetyNotes?: string[];
+};
+
+/** POST /travel/ai-courses 및 GET /travel/ai-courses/{requestId} 응답 접수증 */
+export type AiCourseTicketDto = {
+  requestId?: string;
+  status?: string;
+  answer?: string | null;
+  message?: string | null;
+  error?: string | null;
+  metadata?: {
+    course?: AiCourseResponseDto;
+  } | null;
+};
+
+

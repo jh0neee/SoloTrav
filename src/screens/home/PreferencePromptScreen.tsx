@@ -74,6 +74,13 @@ function PreferencePromptScreen({
       ),
     );
     const initial = resetAnswers ? {} : initialAnswers ?? {};
+    if (mode === 'course-quick') {
+      return {
+        ...createInitialAnswers(steps),
+        ...initial,
+        freeText: typeof initial.freeText === 'string' ? initial.freeText : '',
+      };
+    }
     const visibleInitialAnswers = Object.fromEntries(
       Object.entries(initial).filter(([id]) =>
         visibleFieldIds.has(id),
@@ -82,6 +89,10 @@ function PreferencePromptScreen({
     return {
       ...createInitialAnswers(steps),
       ...visibleInitialAnswers,
+      freeText:
+        typeof initial.freeText === 'string'
+          ? initial.freeText
+          : '',
     };
   });
 
@@ -213,7 +224,29 @@ function PreferencePromptScreen({
         {/* 질문 바로 아래 인라인 액션 버튼 */}
         <View style={styles.actionArea}>
           {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
-          {isLast && mode === 'course' ? (
+          {isLast && mode === 'course-quick' ? (
+            <Pressable
+              onPress={() => {
+                console.log('[PreferencePromptScreen] quick course complete -> goNext(false)');
+                goNext(false);
+              }}
+              disabled={isSaving}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isSaving }}
+              style={({ pressed }) => [
+                styles.cta,
+                (!canNext || isSaving) && styles.ctaOff,
+                pressed && canNext && !isSaving && styles.ctaPressed,
+              ]}>
+              <Text
+                style={[
+                  styles.ctaText,
+                  (!canNext || isSaving) && styles.ctaTextOff,
+                ]}>
+                {isSaving ? '코스 생성 중...' : '코스 만들기'}
+              </Text>
+            </Pressable>
+          ) : isLast && mode === 'course' ? (
             <View style={styles.courseCompleteActions}>
               <Pressable
                 onPress={() => {

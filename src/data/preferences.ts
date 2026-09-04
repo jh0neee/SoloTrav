@@ -81,6 +81,13 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
         required: true,
         options: ['당일', '1박 2일', '2박 3일', '3박 이상'],
       },
+      {
+        id: 'startDate',
+        label: '언제 떠나시나요?',
+        hint: '선택',
+        type: 'chips-single',
+        options: ['오늘', '내일', '이번 주말', '다음 주'],
+      },
     ],
   },
   {
@@ -364,9 +371,8 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
       {
         id: 'freeText',
         label: '더 알려주고 싶은 게 있나요?',
-        hint: '자연어로 자세히 적을수록 좋아요',
         type: 'text',
-        placeholder: '가고 싶은 분위기나 하고 싶은 것을 적어주세요',
+        placeholder: '가고 싶은 분위기나 하고 싶은 것을 적어주세요. 자연어로 자세히 적을수록 좋아요.',
         maxLength: 300,
       },
     ],
@@ -394,7 +400,9 @@ export function getPreferenceSteps(
         ...basicStep,
         title: '여행 일정을 알려주세요',
         subtitle: '선택하신 도시에서 며칠 동안 머무르시나요?',
-        fields: basicStep.fields.filter(f => f.id === 'duration'),
+        fields: basicStep.fields.filter(
+          f => f.id === 'duration' || f.id === 'startDate',
+        ),
       });
     }
 
@@ -413,7 +421,9 @@ export function getPreferenceSteps(
   }
 
   const excludedFieldIds =
-    mode === 'profile' ? new Set(['duration']) : new Set<string>();
+    mode === 'profile'
+      ? new Set(['duration', 'startDate', 'freeText'])
+      : new Set<string>();
 
   return PREFERENCE_STEPS.map(step => {
     const fields = step.fields.filter(field => !excludedFieldIds.has(field.id));
@@ -435,7 +445,11 @@ export function toProfilePreferenceAnswers(
 ): PreferenceAnswers {
   return Object.fromEntries(
     Object.entries(answers).filter(
-      ([id]) => id !== 'duration' && id !== 'region',
+      ([id]) =>
+        id !== 'duration' &&
+        id !== 'startDate' &&
+        id !== 'region' &&
+        id !== 'freeText',
     ),
   );
 }

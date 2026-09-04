@@ -22,6 +22,9 @@ import CityDetailScreen from '../screens/home/CityDetailScreen';
 import PreferencePromptScreen from '../screens/home/PreferencePromptScreen';
 import CoursePreferenceEditScreen from '../screens/home/CoursePreferenceEditScreen';
 import CoursePreferenceModal from '../components/CoursePreferenceModal';
+import CourseResultScreen from '../screens/home/CourseResultScreen';
+import CourseLoadingScreen from '../screens/home/CourseLoadingScreen';
+import CourseErrorScreen from '../screens/home/CourseErrorScreen';
 import type { City } from '../data/cities';
 import {
   preferenceTagLabels,
@@ -96,27 +99,28 @@ function HomeStack({ onOpenMy }: { onOpenMy?: () => void }) {
                 : preferences.answers
             }
             resetAnswers={current.resetAnswers}
-            isSaving={preferences.isSaving}
-            saveError={preferences.error}
+            isSaving={!current.city ? preferences.isSaving : false}
+            saveError={!current.city ? preferences.error : null}
             onBack={pop}
             onComplete={async (answers, saveToProfile) => {
-              try {
-                if (saveToProfile) {
+              if (current.city) {
+                console.log('[HomeStack] preference complete -> navigating to courseLoading for:', current.city.name);
+                push({
+                  name: 'courseLoading',
+                  city: current.city,
+                  answers,
+                  saveToProfile,
+                });
+              } else {
+                try {
                   await preferenceStore.save(toProfilePreferenceAnswers(answers));
+                  pop();
+                } catch {
+                  Alert.alert(
+                    '저장 실패',
+                    '서버에 취향을 저장하지 못했습니다. 다시 시도해주세요.',
+                  );
                 }
-                pop();
-                const budgetText = answers.dailyBudget
-                  ? `\n하루 예산: ${answers.dailyBudget}만원`
-                  : '';
-                Alert.alert(
-                  '코스 생성 요청 완료',
-                  `${current.city?.name ?? ''} 맞춤 코스 생성을 요청했습니다.${budgetText}`,
-                );
-              } catch {
-                Alert.alert(
-                  '저장 실패',
-                  '서버에 취향을 저장하지 못했습니다. 다시 시도해주세요.',
-                );
               }
             }}
           />
@@ -130,29 +134,85 @@ function HomeStack({ onOpenMy }: { onOpenMy?: () => void }) {
                 ? current.initialAnswersOverride
                 : preferences.answers
             }
-            isSaving={preferences.isSaving}
-            saveError={preferences.error}
+            isSaving={false}
+            saveError={null}
             onBack={pop}
-            onComplete={async (answers, saveToProfile) => {
-              try {
-                if (saveToProfile) {
-                  await preferenceStore.save(toProfilePreferenceAnswers(answers));
-                }
-                pop();
-                const budgetText = answers.dailyBudget
-                  ? `\n하루 예산: ${answers.dailyBudget}만원`
-                  : '';
-                Alert.alert(
-                  '코스 생성 요청 완료',
-                  `${current.city?.name ?? ''} 맞춤 코스 생성을 요청했습니다.${budgetText}`,
-                );
-              } catch {
-                Alert.alert(
-                  '저장 실패',
-                  '서버에 취향을 저장하지 못했습니다. 다시 시도해주세요.',
-                );
-              }
+            onComplete={(answers, saveToProfile) => {
+              console.log('[HomeStack] preferenceEdit complete -> navigating to courseLoading for:', current.city.name);
+              push({
+                name: 'courseLoading',
+                city: current.city,
+                answers,
+                saveToProfile,
+              });
             }}
+          />
+        );
+      case 'courseLoading':
+        return (
+          <CourseLoadingScreen
+            city={current.city}
+            answers={current.answers}
+            saveToProfile={current.saveToProfile}
+            onCancel={() => {
+              console.log('[HomeStack] Course loading cancelled -> navigating to home');
+              push({ name: 'home' });
+            }}
+            onSuccess={course => {
+              console.log('[HomeStack] Course loading success -> navigating to courseResult');
+              push({
+                name: 'courseResult',
+                course,
+                city: current.city,
+              });
+            }}
+            onError={errorMessage => {
+              console.log('[HomeStack] Course loading error -> navigating to courseError:', errorMessage);
+              push({
+                name: 'courseError',
+                city: current.city,
+                answers: current.answers,
+                saveToProfile: current.saveToProfile,
+                errorMessage,
+              });
+            }}
+          />
+        );
+      case 'courseError':
+        return (
+          <CourseErrorScreen
+            city={current.city}
+            errorMessage={current.errorMessage}
+            onRetry={() => {
+              console.log('[HomeStack] Retry course loading for:', current.city.name);
+              push({
+                name: 'courseLoading',
+                city: current.city,
+                answers: current.answers,
+                saveToProfile: current.saveToProfile,
+              });
+            }}
+            onEditPreference={() => {
+              console.log('[HomeStack] Edit preference from error screen for:', current.city.name);
+              push({
+                name: 'preferenceEdit',
+                city: current.city,
+                initialAnswersOverride: current.answers,
+              });
+            }}
+            onGoHome={() => {
+              console.log('[HomeStack] Go home from error screen');
+              push({ name: 'home' });
+            }}
+          />
+        );
+      case 'courseResult':
+        return (
+          <CourseResultScreen
+            course={current.course}
+            city={current.city}
+            onBack={pop}
+            onGoHome={() => push({ name: 'home' })}
           />
         );
       case 'home':

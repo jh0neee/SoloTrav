@@ -65,6 +65,10 @@ export function CoursePreferenceEditScreen({
   const [answers, setAnswers] = useState<PreferenceAnswers>(() => ({
     ...createInitialAnswers(PREFERENCE_STEPS),
     ...(initialAnswers ?? {}),
+    freeText:
+      typeof initialAnswers?.freeText === 'string'
+        ? initialAnswers.freeText
+        : '',
   }));
 
   const setAnswer = (id: string, value: PreferenceAnswers[string]) =>
@@ -166,8 +170,8 @@ export function CoursePreferenceEditScreen({
           {saveError ? <Text style={styles.error}>{saveError}</Text> : null}
           <Pressable
             onPress={() => {
-              console.log('[CoursePreferenceEditScreen] complete (saveToProfile: true)');
-              handleComplete(true);
+              console.log('[CoursePreferenceEditScreen] complete (saveToProfile: false)');
+              handleComplete(false);
             }}
             disabled={isSaving}
             accessibilityRole="button"
@@ -177,14 +181,14 @@ export function CoursePreferenceEditScreen({
               pressed && !isSaving && styles.ctaPressed,
             ]}>
             <Text style={[styles.ctaText, isSaving && styles.ctaTextOff]}>
-              {isSaving ? '저장 중...' : '내 취향에도 저장하고 코스 만들기'}
+              {isSaving ? '코스 생성 중...' : '이 취향 조건으로 다시 만들기'}
             </Text>
           </Pressable>
 
           <Pressable
             onPress={() => {
-              console.log('[CoursePreferenceEditScreen] complete (saveToProfile: false)');
-              handleComplete(false);
+              console.log('[CoursePreferenceEditScreen] complete (saveToProfile: true)');
+              handleComplete(true);
             }}
             disabled={isSaving}
             accessibilityRole="button"
@@ -198,7 +202,7 @@ export function CoursePreferenceEditScreen({
                 styles.ctaSecondaryText,
                 isSaving && styles.ctaSecondaryTextOff,
               ]}>
-              이번 여행에만 적용하고 코스 만들기
+              내 취향에도 저장하고 다시 만들기
             </Text>
           </Pressable>
         </View>

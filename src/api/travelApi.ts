@@ -11,6 +11,8 @@ import { apiClient } from './client';
 import { ENDPOINTS } from './endpoints';
 import { APP_NAME } from '../config/userAgent';
 import {
+  toAiCourseTicket,
+  type AiCourseTicket,
   toGalleryPhotos,
   toHubAttractions,
   toRegionSafetyList,
@@ -22,8 +24,14 @@ import {
   todayYmd,
   type VisitorTotals,
 } from './travelMappers';
-import type { TourArrange, TourInfoQuery, TourMobileOs } from './travelDto';
 import type {
+  AiCourseRequestDto,
+  TourArrange,
+  TourInfoQuery,
+  TourMobileOs,
+} from './travelDto';
+import type {
+  AiCourse,
   GalleryPhoto,
   HubAttraction,
   RegionSafety,
@@ -404,6 +412,145 @@ export const travelApi = {
       }
     }
     return [];
+  },
+
+  /**
+   * AI 맞춤 코스 생성 (비동기 처리: POST 202 접수 -> 상태 폴링 조회 -> 완료 코스 반환)
+   * 지역명, 여행 기간, 출발일, 여행 취향 조건을 전달하여 최적의 혼행 코스를 생성합니다.
+   */
+  generateAiCourse: async (
+    request: AiCourseRequestDto,
+    signal?: AbortSignal,
+    onProgress?: (status: string) => void,
+  ): Promise<AiCourse> => {
+    console.log('====================================================');
+    console.log('[AI Course API] >>> POST Request to:', ENDPOINTS.aiCourses());
+    console.log('[AI Course API] Request Body:\n', JSON.stringify(request, null, 2));
+    console.log('====================================================');
+
+    let ticket: AiCourseTicket;
+    try {
+      const response = await apiClient.post(
+        ENDPOINTS.aiCourses(),
+        request,
+        { signal },
+      );
+      console.log('[AI Course API] <<< POST Response Status:', response.status);
+      console.log(
+        '[AI Course API] POST Response Data:\n',
+        JSON.stringify(response.data, null, 2),
+      );
+      ticket = toAiCourseTicket(
+        response.data,
+        request.regionName,
+        request.duration,
+      );
+    } catch (error: any) {
+      console.error(
+        '[AI Course API] !!! POST REQUEST FAILED !!!',
+        error?.response?.status,
+        error?.message,
+      );
+      throw error;
+    }
+
+    // 1. 이미 완료되었거나 코스가 동봉된 경우 즉시 반환
+    if (ticket.isCompleted && ticket.course) {
+      console.log('[AI Course API] Immediate completion. Course ready!');
+      return ticket.course;
+    }
+
+    if (ticket.isFailed) {
+      throw new Error(ticket.errorMessage || 'AI 코스 생성에 실패했습니다.');
+    }
+
+    const requestId = ticket.requestId;
+    if (!requestId) {
+      // requestId가 없는 경우, 혹시 response.data 자체가 코스인지 확인
+      if (ticket.course && ticket.course.stops.length > 0) {
+        return ticket.course;
+      }
+      throw new Error('코스 생성 접수 번호(requestId)를 받지 못했습니다.');
+    }
+
+    console.log(
+      `[AI Course API] Request accepted (${ticket.status}), polling for requestId: ${requestId}`,
+    );
+    onProgress?.(ticket.status);
+
+    // 2. 비동기 상태 폴링 (최대 30회, 1.5초 간격 = 최대 45초)
+    const MAX_POLLS = 30;
+    const POLL_INTERVAL_MS = 1500;
+
+    for (let i = 0; i < MAX_POLLS; i++) {
+      if (signal?.aborted) {
+        throw new Error('코스 생성이 취소되었습니다.');
+      }
+
+      await new Promise<void>(resolve => setTimeout(() => resolve(), POLL_INTERVAL_MS));
+
+      try {
+        console.log(
+          `[AI Course API] Polling [${i + 1}/${MAX_POLLS}] GET ${ENDPOINTS.aiCourseResult(requestId)}`,
+        );
+        const pollResponse = await apiClient.get(
+          ENDPOINTS.aiCourseResult(requestId),
+          { signal },
+        );
+        console.log(
+          `[AI Course API] Poll [${i + 1}] response status:`,
+          pollResponse.status,
+        );
+        const pollTicket = toAiCourseTicket(
+          pollResponse.data,
+          request.regionName,
+          request.duration,
+        );
+        console.log(
+          `[AI Course API] Poll [${i + 1}] ticket status:`,
+          pollTicket.status,
+          'hasCourse:',
+          !!pollTicket.course,
+        );
+
+        if (pollTicket.isCompleted && pollTicket.course) {
+          console.log('[AI Course API] Course completed successfully!');
+          return pollTicket.course;
+        }
+
+        if (pollTicket.isFailed) {
+          throw new Error(
+            pollTicket.errorMessage || '코스 생성 처리 중 오류가 발생했습니다.',
+          );
+        }
+
+        onProgress?.(pollTicket.status);
+      } catch (pollErr: any) {
+        // 일시적인 네트워크 오류는 몇 번 재시도 허용, 치명적 에러(401, 404 등)는 바로 throw
+        const status = pollErr?.response?.status;
+        if (status === 401 || status === 403 || status === 404) {
+          throw pollErr;
+        }
+        console.warn(
+          `[AI Course API] Polling warning on attempt ${i + 1}:`,
+          pollErr.message,
+        );
+      }
+    }
+
+    throw new Error('AI 코스 생성이 지연되고 있습니다. 잠시 후 다시 시도해주세요.');
+  },
+
+  /**
+   * GET /travel/ai-courses/{requestId} — AI 코스 상태 및 결과 직접 조회
+   */
+  fetchAiCourseResult: async (
+    requestId: string,
+    regionName: string = '',
+    duration: string = 'ONE_NIGHT',
+  ): Promise<AiCourseTicket> => {
+    const { data } = await apiClient.get(ENDPOINTS.aiCourseResult(requestId));
+    return toAiCourseTicket(data, regionName, duration);
   },
 };
 

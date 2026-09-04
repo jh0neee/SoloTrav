@@ -17,7 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { BackHandler } from 'react-native';
 import type { City } from '../data/cities';
 import type { PreferenceAnswers, PreferencePromptMode } from '../data/preferences';
-import type { RankingKind, TourContent } from '../types/travel';
+import type { RankingKind, TourContent, AiCourse } from '../types/travel';
 
 /**
  *   홈 → 검색 → 장소 상세
@@ -44,6 +44,24 @@ export type HomeRoute =
       name: 'preferenceEdit';
       city: City;
       initialAnswersOverride?: PreferenceAnswers | null;
+    }
+  | {
+      name: 'courseLoading';
+      city: City;
+      answers: PreferenceAnswers;
+      saveToProfile: boolean;
+    }
+  | {
+      name: 'courseError';
+      city: City;
+      answers: PreferenceAnswers;
+      saveToProfile: boolean;
+      errorMessage: string;
+    }
+  | {
+      name: 'courseResult';
+      course: AiCourse;
+      city: City;
     };
 
 export type HomeStackState = {
