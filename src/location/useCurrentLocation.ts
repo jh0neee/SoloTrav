@@ -73,22 +73,41 @@ type PermissionResult = 'granted' | 'denied' | 'blocked';
  */
 async function requestPermission(): Promise<PermissionResult> {
   if (Platform.OS === 'android') {
-    const result = await PermissionsAndroid.request(
+    const hasFine = await PermissionsAndroid.check(
       PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      {
-        title: '위치 권한이 필요해요',
-        message:
-          '방문을 인증하고 주변 안전 시설과 현위치를 확인하려면 위치 권한이 필요합니다.',
-        buttonPositive: '허용',
-        buttonNegative: '나중에',
-      },
     );
-    if (result === PermissionsAndroid.RESULTS.GRANTED) {
+    const hasCoarse = await PermissionsAndroid.check(
+      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+    );
+    if (hasFine || hasCoarse) {
       return 'granted';
     }
-    return result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN
-      ? 'blocked'
-      : 'denied';
+
+    const results = await PermissionsAndroid.requestMultiple([
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION,
+    ]);
+
+    const fineResult =
+      results[PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION];
+    const coarseResult =
+      results[PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION];
+
+    if (
+      fineResult === PermissionsAndroid.RESULTS.GRANTED ||
+      coarseResult === PermissionsAndroid.RESULTS.GRANTED
+    ) {
+      return 'granted';
+    }
+
+    if (
+      fineResult === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN ||
+      coarseResult === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN
+    ) {
+      return 'blocked';
+    }
+
+    return 'denied';
   }
 
   // iOS — 거절해도 예외를 던지지 않으므로 실제 측위 성공 여부로 판단합니다.

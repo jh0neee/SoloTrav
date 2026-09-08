@@ -218,16 +218,15 @@ function MapSearchOverlay({
   }, []);
 
   const handleSubmit = useCallback(() => {
+    Keyboard.dismiss();
     const text = typedRef.current.trim();
     if (!text) return;
     pushRecent(text);
-    // 디바운스가 아직 안 끝났으면 먼저 검색부터 확정하고, 결과는 사용자가 고르게 둡니다.
+    // 디바운스가 아직 안 끝났으면 먼저 검색부터 확정합니다.
     if (text !== trimmed) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       setQuery(text);
-      return;
     }
-    Keyboard.dismiss();
     if (pois.length) onSubmit(pois, text);
   }, [trimmed, pois, onSubmit]);
 
@@ -303,7 +302,10 @@ function MapSearchOverlay({
       <ScrollView
         style={styles.list}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: (insets.bottom || 16) + 48 },
+        ]}
       >
         {/* 입력 전 — 최근 검색어 + 앱 등록 장소 */}
         {trimmed.length === 0 && (
@@ -446,7 +448,8 @@ const styles = StyleSheet.create({
     // RN 0.86 에서 StyleSheet.absoluteFillObject 가 제거되어 absoluteFill 을 씁니다.
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.background,
-    zIndex: 20,
+    zIndex: 100,
+    elevation: 10,
   },
   searchRow: {
     flexDirection: 'row',

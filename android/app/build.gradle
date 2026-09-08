@@ -90,8 +90,8 @@ android {
         applicationId "com.solotravelmatemobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 4
+        versionName "0.0.3"
 
         // 카카오 로그인 — 키는 gradle.properties 의 KAKAO_NATIVE_APP_KEY 한 곳에서만 관리합니다.
         //  · manifestPlaceholders : AndroidManifest 의 리다이렉트 스킴 kakao{키}://oauth

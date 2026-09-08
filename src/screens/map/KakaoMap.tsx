@@ -127,6 +127,17 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
     webRef.current?.injectJavaScript(`${code}; true;`);
   }, []);
 
+  // 브릿지 메시지가 누락되거나 지연되어도 무한 스피너에 갇히지 않도록 안전 타이머 설정
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!readyRef.current) {
+        readyRef.current = true;
+        setReady(true);
+      }
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, []);
+
   useImperativeHandle(ref, () => ({
     moveToMyLocation: () =>
       run('window.__moveToMyLocation && window.__moveToMyLocation()'),

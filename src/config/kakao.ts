@@ -23,7 +23,7 @@ import { KAKAO_LOGIN_REST_API_KEY} from '@env';
 export const KAKAO_JS_KEY =KAKAO_LOGIN_REST_API_KEY;
 
 /** WebView 에 HTML 을 주입할 때 쓰는 baseUrl. 카카오 Web 플랫폼에 등록한 값과 같아야 합니다. */
-export const KAKAO_WEBVIEW_ORIGIN = 'http://localhost';
+export const KAKAO_WEBVIEW_ORIGIN = 'https://solo-trav.netlify.app';
 
 /** 키를 아직 안 넣었는지 검사 — 안내 화면을 띄우는 데 씁니다. */
 export const isKakaoKeyConfigured =

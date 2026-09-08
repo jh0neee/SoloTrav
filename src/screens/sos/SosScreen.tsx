@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SirenIcon, XIcon } from 'phosphor-react-native';
 import { colors } from '../../theme/colors';
 import { useCurrentLocation } from '../../location/useCurrentLocation';
+import { getNearestCity } from '../../data/cities';
 import { sosApi, type SafetyFacility } from '../../api/sos';
 import SafetyFacilityCard from './SafetyFacilityCard';
 
@@ -75,11 +76,18 @@ function SosScreen({ visible, onClose }: Props) {
     setLoading(true);
     setError(null);
 
+    // 현재 GPS 좌표로부터 가장 가까운 시군구(예: '충청북도 단양군')를 로컬에서 판별
+    const city = getNearestCity(coords.lat, coords.lng);
+    const regionName = `${city.sido} ${city.sigungu}`;
+
     sosApi
       .safetyFacilities(
         {
-          latitude: coords.lat,
-          longitude: coords.lng,
+          regionName,
+          currentCoords: {
+            latitude: coords.lat,
+            longitude: coords.lng,
+          },
           limit: FACILITY_LIMIT,
         },
         controller.signal,

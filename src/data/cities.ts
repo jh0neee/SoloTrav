@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 도시 데이터 (충북 시군).
  * - type: 지도 칩 색상 및 범례 구분
  * - pos: 지도 컨테이너 내 위치(%) — 절대배치에 사용
@@ -251,3 +251,39 @@ export const getCityBySigungu = (sigungu: string) =>
 /** 법정동 시군구 코드(예: '800')로 도시를 찾습니다. */
 export const getCityByDistrictCode = (districtCode: string) =>
   CITIES.find(city => city.districtCode === districtCode) ?? null;
+
+/** 두 좌표 간 거리 계산 (Haversine 공식, 단위: m) */
+export function getDistanceMeters(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number,
+): number {
+  const R = 6371e3;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
+
+/** 현재 좌표와 가장 가까운 시·군을 로컬에서 찾습니다. */
+export function getNearestCity(lat: number, lng: number): City {
+  let nearest = CITIES[0];
+  let minDistance = Infinity;
+
+  for (const city of CITIES) {
+    const dist = getDistanceMeters(lat, lng, city.center.lat, city.center.lng);
+    if (dist < minDistance) {
+      minDistance = dist;
+      nearest = city;
+    }
+  }
+
+  return nearest;
+}

@@ -30,6 +30,7 @@ build/
 .gradle
 local.properties
 key.properties
+android/key.properties
 *.iml
 *.hprof
 .cxx/

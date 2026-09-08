@@ -11,6 +11,7 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   Linking,
   Pressable,
   ScrollView,
@@ -60,6 +61,8 @@ import { useSafetyPlaces, type MapBounds } from '../../map/useSafetyPlaces';
 import type { SafetyMapMarker } from './kakaoMapHtml';
 import SafetyFilterSheet, { SAFETY_FILTERS } from './SafetyFilterSheet';
 import type { TabScreenProps } from '../../navigation/tabs';
+import { getNearestCity } from '../../data/cities';
+import { useTabBarVisibility } from '../../navigation/TabBarVisibilityContext';
 
 /** 지도에서 제공하는 관광정보의 고정 서비스 범위 */
 const MAP_REGION_NAME = '충청북도';
@@ -163,6 +166,57 @@ function MapScreen({ onBack }: TabScreenProps) {
   const [festivalRange, setFestivalRange] = useState<FestivalRange>('now');
   const isFestival = category === 'festival';
 
+  // 비상벨 화면 — 하단 탭바까지 덮는 전체 화면으로 열립니다.
+  const [sosOpen, setSosOpen] = useState(false);
+
+  // 검색 상태 — 오버레이 표시 / 지도에 찍힌 결과 / 그중 선택된 항목
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchPoi[]>([]);
+  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
+
+  const { setTabBarHidden } = useTabBarVisibility();
+
+  // 검색 오버레이나 SOS가 열리면 하단 탭바를 숨깁니다.
+  useEffect(() => {
+    setTabBarHidden(searchOpen || sosOpen);
+    return () => setTabBarHidden(false);
+  }, [searchOpen, sosOpen, setTabBarHidden]);
+
+  // 안드로이드 하드웨어 뒤로가기 버튼 처리
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (sosOpen) {
+          setSosOpen(false);
+          return true;
+        }
+        if (searchOpen) {
+          setSearchOpen(false);
+          return true;
+        }
+        if (safetyFilterOpen) {
+          setSafetyFilterOpen(false);
+          return true;
+        }
+        if (selectedId || selectedPoiId) {
+          setSelectedId(null);
+          setSelectedPoiId(null);
+          return true;
+        }
+        return false;
+      },
+    );
+    return () => subscription.remove();
+  }, [sosOpen, searchOpen, safetyFilterOpen, selectedId, selectedPoiId]);
+
+  /** 현재 조회 중심점에 가장 가까운 충북 시군구 (예: 괴산군, 단양군 등) */
+  const currentCity = useMemo(
+    () => getNearestCity(queryCenter.lat, queryCenter.lng),
+    [queryCenter.lat, queryCenter.lng],
+  );
+
   /*
    * 축제는 다른 API 를 씁니다.
    * 관광정보 조회(locationBasedList)로는 contentTypeId=15 결과가 거의 0건이고,
@@ -175,7 +229,7 @@ function MapScreen({ onBack }: TabScreenProps) {
     retry: retryTour,
   } = useNearbyPlaces(
     queryCenter,
-    MAP_REGION_NAME,
+    currentCity.sigungu,
     category,
     !isFestival,
     undefined,
@@ -194,25 +248,32 @@ function MapScreen({ onBack }: TabScreenProps) {
   const placesError = isFestival ? festivalError : tourError;
   const retryPlaces = isFestival ? retryFestivals : retryTour;
 
+  // 검색 결과에서 직접 고른 관광지 (현재 지역 목록에 아직 없어도 지도에 즉시 표시)
+  const [selectedSearchPlace, setSelectedSearchPlace] =
+    useState<MappableTourContent | null>(null);
+
+  const allMapPlaces = useMemo(() => {
+    if (
+      selectedSearchPlace &&
+      !places.some(p => p.contentId === selectedSearchPlace.contentId)
+    ) {
+      return [selectedSearchPlace, ...places];
+    }
+    return places;
+  }, [places, selectedSearchPlace]);
+
   /**
    * 상단 안전 배지 — 가장 가까운 마커의 주소에서 지역을 읽습니다.
    * 목록이 거리순이라 "지금 보고 있는 곳에서 가장 가까운 지역"이 나옵니다.
    */
   const safetyBadge = useRegionSafety(places);
 
-  // 비상벨 화면 — 하단 탭바까지 덮는 전체 화면으로 열립니다.
-  const [sosOpen, setSosOpen] = useState(false);
-
-  // 검색 상태 — 오버레이 표시 / 지도에 찍힌 결과 / 그중 선택된 항목
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<SearchPoi[]>([]);
-  const [selectedPoiId, setSelectedPoiId] = useState<string | null>(null);
-
-  const selectedPlace = useMemo(
-    () => places.find(place => place.contentId === selectedId) ?? null,
-    [places, selectedId],
-  );
+  const selectedPlace = useMemo(() => {
+    if (selectedSearchPlace && selectedSearchPlace.contentId === selectedId) {
+      return selectedSearchPlace;
+    }
+    return places.find(place => place.contentId === selectedId) ?? null;
+  }, [places, selectedId, selectedSearchPlace]);
 
   /** 이동뿐 아니라 확대·축소로 마지막 조회 화면과 달라져도 재검색할 수 있습니다. */
   const canResearch = hasViewportChanged(mapBounds, queryBounds);
@@ -388,6 +449,7 @@ function MapScreen({ onBack }: TabScreenProps) {
    */
   const handleSelectPlace = useCallback((place: MappableTourContent) => {
     const center = { lat: place.lat, lng: place.lng };
+    setSelectedSearchPlace(place);
     setSearchQuery(place.title);
     setSearchResults([]);
     setSelectedPoiId(null);
@@ -430,28 +492,21 @@ function MapScreen({ onBack }: TabScreenProps) {
 
   return (
     <View style={styles.container}>
-      {locationStatus === 'locating' ? (
-        <View style={styles.locationLoading}>
-          <ActivityIndicator color={colors.goldDeep} />
-          <Text style={styles.locationLoadingText}>현위치를 확인하고 있어요</Text>
-        </View>
-      ) : (
-        <KakaoMap
-          ref={mapRef}
-          places={places}
-          category={category}
-          selectedId={selectedId}
-          safetyPlaces={safetyMarkers}
-          selectedSafetyId={selectedSafetyId}
-          myLocation={myLocation}
-          centerOnMyLocation={locationStatus === 'granted'}
-          onMarkerPress={handleMarkerPress}
-          onSafetyMarkerPress={handleSafetyMarkerPress}
-          onSearchMarkerPress={handleSearchMarkerPress}
-          onMapPress={handleMapPress}
-          onCenterChanged={handleViewportChanged}
-        />
-      )}
+      <KakaoMap
+        ref={mapRef}
+        places={allMapPlaces}
+        category={category}
+        selectedId={selectedId}
+        safetyPlaces={safetyMarkers}
+        selectedSafetyId={selectedSafetyId}
+        myLocation={myLocation}
+        centerOnMyLocation={locationStatus === 'granted'}
+        onMarkerPress={handleMarkerPress}
+        onSafetyMarkerPress={handleSafetyMarkerPress}
+        onSearchMarkerPress={handleSearchMarkerPress}
+        onMapPress={handleMapPress}
+        onCenterChanged={handleViewportChanged}
+      />
 
       {/* 상단 검색바 + 필터칩 — pointerEvents="box-none" 이라야 빈 곳으로 지도 조작이 통과합니다 */}
       <View

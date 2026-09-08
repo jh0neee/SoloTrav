@@ -136,10 +136,9 @@ export const ENDPOINTS = {
     `/travel/ai-courses/${encodeURIComponent(requestId)}/stream`,
 
   // SOS
-  /** 현위치 기준 가장 가까운 안전 시설 조회 */
+  /** 선택한 지역의 안전 시설(여성안심지킴이집) 조회 — 사용자 좌표는 보내지 않고 regionName으로 조회 */
   safetyFacilities: (params: {
-    latitude: string;
-    longitude: string;
+    regionName: string;
     limit?: number;
   }) => withQuery(`/sos/safety-facilities`, params),
 
