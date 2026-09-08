@@ -67,6 +67,10 @@ import SafetyDetailScreen, {
 } from './safety/SafetyDetailScreen';
 import { useMyView } from '../navigation/useMyView';
 import { TAB_CONTENT_BOTTOM_GAP } from '../navigation/layout';
+import {
+  CURRENT_APP_VERSION,
+  checkAndPromptAppUpdate,
+} from '../services/appUpdateService';
 
 type IconComponent = React.ComponentType<{ color: string; size?: number }>;
 
@@ -418,6 +422,27 @@ function MyScreen() {
               openLegalDocument('개인정보 처리방침', PRIVACY_POLICY_URL)
             }
           />
+        </View>
+      </Section>
+
+      {/* ── 앱 정보 ── */}
+      <Section title="앱 정보">
+        <View style={styles.card}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="앱 버전 및 업데이트 확인"
+            onPress={() => checkAndPromptAppUpdate({ showUpToDateAlert: true })}
+            style={({ pressed }) => [
+              styles.policyRow,
+              pressed && styles.policyRowPressed,
+            ]}
+          >
+            <Text style={styles.policyLabel}>앱 버전 및 업데이트</Text>
+            <View style={styles.versionRightBox}>
+              <Text style={styles.versionText}>v{CURRENT_APP_VERSION}</Text>
+              <Chevron direction="right" color={colors.textSecondary} size={16} />
+            </View>
+          </Pressable>
         </View>
       </Section>
 
@@ -1692,6 +1717,16 @@ const styles = StyleSheet.create({
   },
   accountBtnDisabled: {
     opacity: 0.5,
+  },
+  versionRightBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  versionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
   },
 });
 

@@ -5,13 +5,19 @@
  * @format
  */
 
+import React, { useEffect } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RootNavigator from './src/navigation/RootNavigator';
 import { AuthProvider } from './src/auth/AuthContext';
 import { colors } from './src/theme/colors';
+import { checkAndPromptAppUpdate } from './src/services/appUpdateService';
 
 function App() {
+  useEffect(() => {
+    // 앱 첫 실행 시 최신 버전 업데이트 여부 체크
+    checkAndPromptAppUpdate({ isInitialLaunch: true });
+  }, []);
   return (
     <SafeAreaProvider>
       {/*
