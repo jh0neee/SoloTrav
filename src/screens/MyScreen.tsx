@@ -34,6 +34,7 @@ import FavoriteCoursesSection from './favorites/FavoriteCoursesSection';
 import FavoriteCourseDetailScreen from './favorites/FavoriteCourseDetailScreen';
 import BlockedUsersScreen from './my/BlockedUsersScreen';
 import MyReportsScreen from './my/MyReportsScreen';
+import AppVersionScreen from './my/AppVersionScreen';
 import { favoriteStore } from '../favorites/favoriteStore';
 import { blockStore } from '../blocks/blockStore';
 import {
@@ -235,6 +236,10 @@ function MyScreen() {
     return <MyReportsScreen onBack={() => setView('root')} />;
   }
 
+  if (view === 'version') {
+    return <AppVersionScreen onBack={() => setView('root')} />;
+  }
+
   if (badgeView === 'detail' && selectedBadge) {
     return (
       <BadgeDetailScreen
@@ -430,8 +435,8 @@ function MyScreen() {
         <View style={styles.card}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="앱 버전 및 업데이트 확인"
-            onPress={() => checkAndPromptAppUpdate({ showUpToDateAlert: true })}
+            accessibilityLabel="앱 버전 및 업데이트 페이지 이동"
+            onPress={() => setView('version')}
             style={({ pressed }) => [
               styles.policyRow,
               pressed && styles.policyRowPressed,
