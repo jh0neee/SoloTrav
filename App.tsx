@@ -6,18 +6,30 @@
  * @format
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import RootNavigator from './src/navigation/RootNavigator';
 import { AuthProvider } from './src/auth/AuthContext';
 import { colors } from './src/theme/colors';
 import { checkAndPromptAppUpdate } from './src/services/appUpdateService';
+import { hasSeenPermissionGuide } from './src/config/permissionGuide';
+import PermissionGuideModal from './src/components/PermissionGuideModal';
 
 function App() {
+  const [showPermissionGuide, setShowPermissionGuide] = useState(false);
+
   useEffect(() => {
     // 앱 첫 실행 시 최신 버전 업데이트 여부 체크
     checkAndPromptAppUpdate({ isInitialLaunch: true });
+
+    // 접근권한 사전 안내 팝업 확인 여부 체크
+    (async () => {
+      const seen = await hasSeenPermissionGuide();
+      if (!seen) {
+        setShowPermissionGuide(true);
+      }
+    })();
   }, []);
   return (
     <SafeAreaProvider>
@@ -34,6 +46,10 @@ function App() {
             translucent
           />
           <RootNavigator />
+          <PermissionGuideModal
+            visible={showPermissionGuide}
+            onClose={() => setShowPermissionGuide(false)}
+          />
         </View>
       </AuthProvider>
     </SafeAreaProvider>

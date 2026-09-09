@@ -35,6 +35,7 @@ import FavoriteCourseDetailScreen from './favorites/FavoriteCourseDetailScreen';
 import BlockedUsersScreen from './my/BlockedUsersScreen';
 import MyReportsScreen from './my/MyReportsScreen';
 import AppVersionScreen from './my/AppVersionScreen';
+import PermissionGuideScreen from './my/PermissionGuideScreen';
 import { favoriteStore } from '../favorites/favoriteStore';
 import { blockStore } from '../blocks/blockStore';
 import {
@@ -68,10 +69,7 @@ import SafetyDetailScreen, {
 } from './safety/SafetyDetailScreen';
 import { useMyView } from '../navigation/useMyView';
 import { TAB_CONTENT_BOTTOM_GAP } from '../navigation/layout';
-import {
-  CURRENT_APP_VERSION,
-  checkAndPromptAppUpdate,
-} from '../services/appUpdateService';
+import { CURRENT_APP_VERSION } from '../services/appUpdateService';
 
 type IconComponent = React.ComponentType<{ color: string; size?: number }>;
 
@@ -238,6 +236,10 @@ function MyScreen() {
 
   if (view === 'version') {
     return <AppVersionScreen onBack={() => setView('root')} />;
+  }
+
+  if (view === 'permissions') {
+    return <PermissionGuideScreen onBack={() => setView('root')} />;
   }
 
   if (badgeView === 'detail' && selectedBadge) {
@@ -426,6 +428,11 @@ function MyScreen() {
             onPress={() =>
               openLegalDocument('개인정보 처리방침', PRIVACY_POLICY_URL)
             }
+          />
+          <View style={styles.divider} />
+          <PolicyRow
+            label="앱 접근권한 안내"
+            onPress={() => setView('permissions')}
           />
         </View>
       </Section>

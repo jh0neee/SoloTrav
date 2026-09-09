@@ -10,7 +10,14 @@
 import { useEffect, useState } from 'react';
 import { BackHandler } from 'react-native';
 
-export type MyView = 'root' | 'preference' | 'courses' | 'blocks' | 'reports' | 'version';
+export type MyView =
+  | 'root'
+  | 'preference'
+  | 'courses'
+  | 'blocks'
+  | 'reports'
+  | 'version'
+  | 'permissions';
 
 /** useState 와 같은 모양 — 교체 구현도 이 모양을 지켜야 합니다. */
 export type MyViewState = [MyView, (view: MyView) => void];

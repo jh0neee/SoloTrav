@@ -52,6 +52,8 @@ import {
   UserIcon as PhUser,
   WarningCircleIcon as PhWarningCircle,
   ArrowClockwiseIcon as PhArrowClockwise,
+  CameraIcon as PhCamera,
+  ImageSquareIcon as PhImageSquare,
   type IconWeight,
 } from 'phosphor-react-native';
 
@@ -266,6 +268,16 @@ export function RefreshIcon({ color, size = 18 }: IconProps) {
 /** 홈 아이콘 */
 export function HomeIcon({ color, size = 20 }: IconProps) {
   return <PhHouse color={color} size={size} weight={WEIGHT} />;
+}
+
+/** 카메라 아이콘 */
+export function CameraIcon({ color, size = 20 }: IconProps) {
+  return <PhCamera color={color} size={size} weight={WEIGHT} />;
+}
+
+/** 사진 / 갤러리 아이콘 */
+export function ImageIcon({ color, size = 20 }: IconProps) {
+  return <PhImageSquare color={color} size={size} weight={WEIGHT} />;
 }
 
 
