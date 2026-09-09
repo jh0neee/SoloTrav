@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.0.5",
+  "latestVersion": "0.0.6",
   "minVersion": "0.0.1",
   "releaseNotes": "앱 버전 및 업데이트 화면 추가, 지도 및 안정성 개선",
   "forceUpdate": false,
