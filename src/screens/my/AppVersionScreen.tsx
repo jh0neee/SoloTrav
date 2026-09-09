@@ -88,7 +88,7 @@ export default function AppVersionScreen({ onBack }: Props) {
           <View style={styles.appIconWrapper}>
             <SparkIcon color={colors.primaryStrong} size={36} />
           </View>
-          <Text style={styles.appName}>Solo Travel Mate</Text>
+          <Text style={styles.appName}>혼행등대</Text>
           <Text style={styles.appSub}>혼자 떠나는 여행을 위한 든든한 동반자</Text>
           <View style={styles.currentVersionBadge}>
             <Text style={styles.currentVersionText}>

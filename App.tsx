@@ -1,5 +1,6 @@
 /**
  * Solo Travel Mate
+ * 혼행등대
  * 혼자 여행하는 사람을 위한 안전한 여행 가이드
  *
  * @format

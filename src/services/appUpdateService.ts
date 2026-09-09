@@ -7,7 +7,7 @@
 import { Alert, Linking, Platform } from 'react-native';
 
 // 현재 앱의 설치 버전 (package.json 및 build.gradle의 versionName과 일치)
-export const CURRENT_APP_VERSION = '0.0.6';
+export const CURRENT_APP_VERSION = '0.0.7';
 export const APP_PACKAGE_NAME = 'com.solotravelmatemobile';
 export const APP_STORE_ID = ''; // iOS App Store 출시 시 App ID 입력 (예: '1234567890')
 
@@ -61,34 +61,52 @@ export function compareVersions(v1: string, v2: string): number {
 }
 
 /**
- * 원격 버전 정보 조회
+ * 원격 버전 설정 JSON 파일 URL 후보군
+ * main 브랜치 우선 조회 후, 실패 시 feature 브랜치 등으로 fallback 합니다.
+ */
+export const UPDATE_CONFIG_URLS = [
+  'https://raw.githubusercontent.com/jh0neee/SoloTrav/main/app-version.json',
+  'https://raw.githubusercontent.com/jh0neee/SoloTrav/feature/sjihyeon/app-version.json',
+];
+
+/**
+ * 원격 버전 정보 조회 (CDN 캐시 방지 적용)
  */
 export async function fetchRemoteVersionConfig(
-  configUrl: string = DEFAULT_UPDATE_CONFIG_URL,
+  customUrl?: string,
 ): Promise<AppVersionConfig | null> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+  const targetUrls = customUrl ? [customUrl] : UPDATE_CONFIG_URLS;
 
-    const response = await fetch(configUrl, {
-      signal: controller.signal,
-      headers: {
-        'Cache-Control': 'no-cache',
-      },
-    });
+  for (const baseUrl of targetUrls) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    clearTimeout(timeoutId);
+      // GitHub CDN의 5분 캐시를 우회하기 위해 timestamp 쿼리 파라미터 추가
+      const cacheBustUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
 
-    if (!response.ok) {
-      return null;
+      const response = await fetch(cacheBustUrl, {
+        signal: controller.signal,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          Pragma: 'no-cache',
+        },
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data: AppVersionConfig = await response.json();
+        if (data && data.latestVersion) {
+          return data;
+        }
+      }
+    } catch {
+      // 다음 URL로 fallback 시도
     }
-
-    const data: AppVersionConfig = await response.json();
-    return data;
-  } catch {
-    // 네트워크 오류, 타임아웃 등의 경우 조용히 null 반환
-    return null;
   }
+
+  return null;
 }
 
 /**
