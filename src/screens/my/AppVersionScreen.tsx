@@ -83,102 +83,108 @@ export default function AppVersionScreen({ onBack }: Props) {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── 앱 아이콘 및 현재 버전 정보 ── */}
-        <View style={styles.appHero}>
-          <View style={styles.appIconWrapper}>
-            <SparkIcon color={colors.primaryStrong} size={36} />
-          </View>
-          <Text style={styles.appName}>혼행등대</Text>
-          <Text style={styles.appSub}>혼자 떠나는 여행을 위한 든든한 동반자</Text>
-          <View style={styles.currentVersionBadge}>
-            <Text style={styles.currentVersionText}>
-              현재 버전 v{CURRENT_APP_VERSION}
-            </Text>
-          </View>
-        </View>
-
-        {/* ── 버전 상태 카드 ── */}
-        {loading ? (
-          <View style={styles.statusCard}>
-            <ActivityIndicator color={colors.primary} size="small" />
-            <Text style={styles.loadingText}>최신 버전 확인 중...</Text>
-          </View>
-        ) : error || !versionStatus ? (
-          <View style={styles.statusCard}>
-            <Text style={styles.errorTitle}>버전 정보를 가져올 수 없습니다</Text>
-            <Text style={styles.errorSub}>
-              네트워크 연결을 확인한 뒤 다시 시도해주세요.
-            </Text>
-            <Pressable
-              style={styles.retryButton}
-              onPress={fetchVersion}
-              accessibilityRole="button"
-              accessibilityLabel="다시 시도"
-            >
-              <Text style={styles.retryButtonText}>다시 확인하기</Text>
-            </Pressable>
-          </View>
-        ) : versionStatus.needsUpdate ? (
-          /* 새 버전이 출시된 경우 */
-          <View style={[styles.statusCard, styles.updateAvailableCard]}>
-            <View style={styles.updateCardHeader}>
-              <View style={styles.updateBadge}>
-                <Text style={styles.updateBadgeText}>업데이트 가능</Text>
-              </View>
-              <Text style={styles.latestVersionTitle}>
-                새로운 v{versionStatus.latestVersion} 버전이 출시되었습니다!
+        {/* ── 앱 정보 및 업데이트 상태 ── */}
+        <View
+          style={[
+            styles.versionCard,
+            versionStatus?.needsUpdate && styles.updateAvailableCard,
+          ]}
+        >
+          <View style={styles.appHero}>
+            <View style={styles.appIconWrapper}>
+              <SparkIcon color={colors.primaryStrong} size={36} />
+            </View>
+            <Text style={styles.appName}>혼행등대</Text>
+            <Text style={styles.appSub}>혼자 떠나는 여행을 위한 든든한 동반자</Text>
+            <View style={styles.currentVersionBadge}>
+              <Text style={styles.currentVersionText}>
+                현재 버전 v{CURRENT_APP_VERSION}
               </Text>
             </View>
+          </View>
 
-            {versionStatus.releaseNotes ? (
-              <View style={styles.notesBox}>
-                <Text style={styles.notesLabel}>주요 업데이트 내용</Text>
-                <Text style={styles.notesContent}>
-                  {versionStatus.releaseNotes}
+          <View style={styles.statusDivider} />
+
+          {loading ? (
+            <View style={styles.statusSection}>
+              <ActivityIndicator color={colors.primary} size="small" />
+              <Text style={styles.loadingText}>최신 버전 확인 중...</Text>
+            </View>
+          ) : error || !versionStatus ? (
+            <View style={styles.statusSection}>
+              <Text style={styles.errorTitle}>버전 정보를 가져올 수 없습니다</Text>
+              <Text style={styles.errorSub}>
+                네트워크 연결을 확인한 뒤 다시 시도해주세요.
+              </Text>
+              <Pressable
+                style={styles.retryButton}
+                onPress={fetchVersion}
+                accessibilityRole="button"
+                accessibilityLabel="다시 시도"
+              >
+                <Text style={styles.retryButtonText}>다시 확인하기</Text>
+              </Pressable>
+            </View>
+          ) : versionStatus.needsUpdate ? (
+            <View style={[styles.statusSection, styles.updateStatusSection]}>
+              <View style={styles.updateCardHeader}>
+                <View style={styles.updateBadge}>
+                  <Text style={styles.updateBadgeText}>업데이트 가능</Text>
+                </View>
+                <Text style={styles.latestVersionTitle}>
+                  새로운 v{versionStatus.latestVersion} 버전이 출시되었습니다!
                 </Text>
               </View>
-            ) : null}
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.updateActionButton,
-                pressed && styles.buttonPressed,
-              ]}
-              onPress={() => openAppStore(versionStatus.storeUrl)}
-              accessibilityRole="button"
-              accessibilityLabel="지금 업데이트하기"
-            >
-              <Text style={styles.updateActionButtonText}>
-                지금 업데이트하기
-              </Text>
-            </Pressable>
-          </View>
-        ) : (
-          /* 최신 버전인 경우 */
-          <View style={[styles.statusCard, styles.upToDateCard]}>
-            <View style={styles.checkIconWrapper}>
-              <ShieldIcon color={colors.safeText} size={28} />
+              {versionStatus.releaseNotes ? (
+                <View style={styles.notesBox}>
+                  <Text style={styles.notesLabel}>주요 업데이트 내용</Text>
+                  <Text style={styles.notesContent}>
+                    {versionStatus.releaseNotes}
+                  </Text>
+                </View>
+              ) : null}
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.updateActionButton,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={() => openAppStore(versionStatus.storeUrl)}
+                accessibilityRole="button"
+                accessibilityLabel="지금 업데이트하기"
+              >
+                <Text style={styles.updateActionButtonText}>
+                  지금 업데이트하기
+                </Text>
+              </Pressable>
             </View>
-            <Text style={styles.upToDateTitle}>
-              현재 최신 버전을 사용하고 있습니다
-            </Text>
-            <Text style={styles.upToDateSub}>
-              안전하고 새로운 기능을 모두 정상적으로 이용하실 수 있습니다.
-            </Text>
+          ) : (
+            <View style={[styles.statusSection, styles.upToDateCard]}>
+              <View style={styles.checkIconWrapper}>
+                <ShieldIcon color={colors.safeText} size={28} />
+              </View>
+              <Text style={styles.upToDateTitle}>
+                현재 최신 버전을 사용하고 있습니다
+              </Text>
+              <Text style={styles.upToDateSub}>
+                안전하고 새로운 기능을 모두 정상적으로 이용하실 수 있습니다.
+              </Text>
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.refreshCheckButton,
-                pressed && styles.buttonPressed,
-              ]}
-              onPress={fetchVersion}
-              accessibilityRole="button"
-              accessibilityLabel="업데이트 다시 확인"
-            >
-              <Text style={styles.refreshCheckButtonText}>업데이트 다시 확인</Text>
-            </Pressable>
-          </View>
-        )}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.refreshCheckButton,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={fetchVersion}
+                accessibilityRole="button"
+                accessibilityLabel="업데이트 다시 확인"
+              >
+                <Text style={styles.refreshCheckButtonText}>업데이트 다시 확인</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
 
         {/* ── 상세 메타 정보 ── */}
         <View style={styles.metaSection}>
@@ -235,14 +241,18 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 18,
   },
-  appHero: {
-    alignItems: 'center',
+  versionCard: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
-    paddingVertical: 28,
-    paddingHorizontal: 20,
     borderWidth: 1,
     borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  appHero: {
+    alignItems: 'center',
+    paddingTop: 28,
+    paddingBottom: 22,
+    paddingHorizontal: 20,
   },
   appIconWrapper: {
     width: 68,
@@ -278,13 +288,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  statusCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
+  statusDivider: {
+    height: 1,
+    marginHorizontal: 20,
+    backgroundColor: colors.border,
+  },
+  statusSection: {
     padding: 22,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
   },
   loadingText: {
     marginTop: 10,
@@ -319,9 +330,10 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   updateAvailableCard: {
-    alignItems: 'stretch',
     borderColor: colors.primaryBorder,
-    backgroundColor: '#ffffff',
+  },
+  updateStatusSection: {
+    alignItems: 'stretch',
   },
   updateCardHeader: {
     alignItems: 'center',
@@ -447,4 +459,3 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
 });
-
