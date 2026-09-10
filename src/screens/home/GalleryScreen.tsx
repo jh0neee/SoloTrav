@@ -23,9 +23,13 @@ import type { GalleryPhoto } from '../../types/travel';
 
 const GAP = 10;
 const SIDE = 16;
-const SCREEN_WIDTH = Dimensions.get('window').width;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_WIDTH = (SCREEN_WIDTH - SIDE * 2 - GAP) / 2;
 const VIEWER_WIDTH = SCREEN_WIDTH - SIDE * 2;
+const VIEWER_IMAGE_HEIGHT = Math.round(
+  Math.min(Math.max(SCREEN_HEIGHT * 0.32, 220), 300),
+);
+
 
 const FILTERS = [
   { id: 'all', label: '충북 전체', keyword: '충청북도' },
@@ -203,7 +207,14 @@ function GalleryScreen({ onBack, initialAlbumTitle }: Props) {
             accessibilityLabel="사진 닫기"
           />
           {selectedAlbum && selectedPhoto ? (
-            <View style={[styles.modalCard, { marginTop: insets.top + 28 }]}>
+            <View
+              style={[
+                styles.modalCard,
+                {
+                  marginTop: insets.top + 16,
+                  marginBottom: Math.max(insets.bottom, 12) + 16,
+                },
+              ]}>
               <View style={styles.viewerHeader}>
                 <Pressable
                   style={styles.viewerClose}
@@ -249,7 +260,10 @@ function GalleryScreen({ onBack, initialAlbumTitle }: Props) {
                 )}
               />
 
-              <ScrollView style={styles.modalBody}>
+              <ScrollView
+                style={styles.modalBody}
+                contentContainerStyle={styles.modalBodyContent}
+                showsVerticalScrollIndicator={false}>
                 <Text style={styles.modalTitle}>{selectedAlbum.title}</Text>
                 <Text style={styles.modalMeta}>
                   {[selectedPhoto.location, selectedPhoto.monthLabel]
@@ -383,13 +397,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  viewerPage: { width: VIEWER_WIDTH },
+  viewerPage: {
+    width: VIEWER_WIDTH,
+    height: VIEWER_IMAGE_HEIGHT,
+    backgroundColor: '#111622',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   modalImage: {
     width: VIEWER_WIDTH,
-    height: 300,
-    backgroundColor: colors.darkCard,
+    height: VIEWER_IMAGE_HEIGHT,
+    backgroundColor: '#111622',
   },
-  modalBody: { padding: 18 },
+  modalBody: { flex: 1 },
+  modalBodyContent: { padding: 18, paddingBottom: 20 },
   modalTitle: { fontSize: 19, fontWeight: '700', color: colors.textPrimary },
   modalMeta: { marginTop: 6, fontSize: 13, color: colors.textSecondary },
   modalPhotographer: { marginTop: 4, fontSize: 12, color: colors.textSecondary },
@@ -402,7 +423,7 @@ const styles = StyleSheet.create({
   },
   tagText: { fontSize: 12, color: colors.textPrimary },
   swipeHint: {
-    paddingVertical: 14,
+    paddingVertical: 12,
     textAlign: 'center',
     borderTopWidth: 1,
     borderTopColor: colors.border,
