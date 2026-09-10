@@ -1,12 +1,16 @@
 /**
- * 앱 버전 및 업데이트 상세 화면
+ * 앱 버전 및 업데이트 정보 화면
  * 
- * - 현재 설치된 앱 버전과 원격 스토어 최신 버전을 비교하여 보여줍니다.
- * - 새 버전이 있을 경우 업데이트 안내 카드 및 스토어 바로가기 버튼을 제공합니다.
+ * - 상단: 공식 로고 및 타이틀
+ * - 버전 카드: 현재 버전 / 최신 버전 비교 및 업데이트 액션
+ * - 최근 업데이트 카드: 최신 릴리즈 요약 및 전체 내역 보기 모달
+ * - 하단: 오픈소스 라이선스 모달 및 이용약관 / 개인정보 처리방침 링크
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,14 +19,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../../theme/colors';
-import { Chevron, SparkIcon, ShieldIcon } from '../../components/icons/UiIcons';
+import { Chevron } from '../../components/icons/UiIcons';
 import {
-  APP_PACKAGE_NAME,
   CURRENT_APP_VERSION,
   checkVersionStatus,
   openAppStore,
   type VersionCheckResult,
 } from '../../services/appUpdateService';
+import { RELEASE_NOTES } from '../../data/releaseNotes';
+import { PRIVACY_POLICY_URL, TERMS_OF_SERVICE_URL } from '../../config/legal';
+import ReleaseHistoryModal from '../../components/ReleaseHistoryModal';
+import OpenSourceLicenseModal from '../../components/OpenSourceLicenseModal';
 
 type Props = {
   onBack: () => void;
@@ -33,6 +40,11 @@ export default function AppVersionScreen({ onBack }: Props) {
   const [versionStatus, setVersionStatus] = useState<VersionCheckResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  const [historyModalVisible, setHistoryModalVisible] = useState(false);
+  const [licenseModalVisible, setLicenseModalVisible] = useState(false);
+
+  const latestRelease = RELEASE_NOTES[0];
 
   const fetchVersion = useCallback(async () => {
     setLoading(true);
@@ -54,6 +66,10 @@ export default function AppVersionScreen({ onBack }: Props) {
   useEffect(() => {
     fetchVersion();
   }, [fetchVersion]);
+
+  const handleOpenLegalUrl = (url: string) => {
+    Linking.openURL(url).catch(() => {});
+  };
 
   return (
     <View style={styles.container}>
@@ -83,131 +99,183 @@ export default function AppVersionScreen({ onBack }: Props) {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── 앱 정보 및 업데이트 상태 ── */}
-        <View
-          style={[
-            styles.versionCard,
-            versionStatus?.needsUpdate && styles.updateAvailableCard,
-          ]}
-        >
-          <View style={styles.appHero}>
-            <View style={styles.appIconWrapper}>
-              <SparkIcon color={colors.primaryStrong} size={36} />
+        {/* ── 상단 앱 히어로 ── */}
+        <View style={styles.appHero}>
+          <Image
+            source={require('../../assets/app_icon.png')}
+            style={styles.appLauncherIcon}
+            resizeMode="contain"
+          />
+          <Text style={styles.appName}>혼행등대</Text>
+          <Text style={styles.appSub}>혼자 떠나는 여행을 위한 든든한 동반자</Text>
+        </View>
+
+        {/* ── 1. 버전 정보 카드 ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>버전 정보</Text>
+          </View>
+
+          <View style={styles.versionRowsContainer}>
+            <View style={styles.versionRow}>
+              <Text style={styles.versionRowLabel}>현재 설치 버전</Text>
+              <Text style={styles.versionRowValue}>v{CURRENT_APP_VERSION}</Text>
             </View>
-            <Text style={styles.appName}>혼행등대</Text>
-            <Text style={styles.appSub}>혼자 떠나는 여행을 위한 든든한 동반자</Text>
-            <View style={styles.currentVersionBadge}>
-              <Text style={styles.currentVersionText}>
-                현재 버전 v{CURRENT_APP_VERSION}
+
+            <View style={styles.rowDivider} />
+
+            <View style={styles.versionRow}>
+              <Text style={styles.versionRowLabel}>최신 출시 버전</Text>
+              <Text style={styles.versionRowValue}>
+                v{versionStatus?.latestVersion ?? CURRENT_APP_VERSION}
               </Text>
             </View>
           </View>
 
-          <View style={styles.statusDivider} />
+          <View style={styles.cardActionDivider} />
 
+          {/* 상태별 액션 영역 */}
           {loading ? (
-            <View style={styles.statusSection}>
+            <View style={styles.statusBox}>
               <ActivityIndicator color={colors.primary} size="small" />
               <Text style={styles.loadingText}>최신 버전 확인 중...</Text>
             </View>
           ) : error || !versionStatus ? (
-            <View style={styles.statusSection}>
-              <Text style={styles.errorTitle}>버전 정보를 가져올 수 없습니다</Text>
-              <Text style={styles.errorSub}>
-                네트워크 연결을 확인한 뒤 다시 시도해주세요.
-              </Text>
+            <View style={styles.statusBox}>
+              <Text style={styles.errorText}>버전 정보를 가져올 수 없습니다</Text>
               <Pressable
-                style={styles.retryButton}
+                style={({ pressed }) => [
+                  styles.smallRetryButton,
+                  pressed && styles.buttonPressed,
+                ]}
                 onPress={fetchVersion}
-                accessibilityRole="button"
-                accessibilityLabel="다시 시도"
               >
-                <Text style={styles.retryButtonText}>다시 확인하기</Text>
+                <Text style={styles.smallRetryButtonText}>다시 확인</Text>
               </Pressable>
             </View>
           ) : versionStatus.needsUpdate ? (
-            <View style={[styles.statusSection, styles.updateStatusSection]}>
-              <View style={styles.updateCardHeader}>
-                <View style={styles.updateBadge}>
-                  <Text style={styles.updateBadgeText}>업데이트 가능</Text>
-                </View>
-                <Text style={styles.latestVersionTitle}>
-                  새로운 v{versionStatus.latestVersion} 버전이 출시되었습니다!
+            <View style={styles.updateAvailableBox}>
+              <View style={styles.updateNoticeRow}>
+                <View style={styles.updateDot} />
+                <Text style={styles.updateNoticeText}>
+                  새로운 버전(v{versionStatus.latestVersion})이 있습니다.
                 </Text>
               </View>
-
-              {versionStatus.releaseNotes ? (
-                <View style={styles.notesBox}>
-                  <Text style={styles.notesLabel}>주요 업데이트 내용</Text>
-                  <Text style={styles.notesContent}>
-                    {versionStatus.releaseNotes}
-                  </Text>
-                </View>
-              ) : null}
-
               <Pressable
                 style={({ pressed }) => [
-                  styles.updateActionButton,
+                  styles.primaryActionButton,
                   pressed && styles.buttonPressed,
                 ]}
                 onPress={() => openAppStore(versionStatus.storeUrl)}
-                accessibilityRole="button"
-                accessibilityLabel="지금 업데이트하기"
               >
-                <Text style={styles.updateActionButtonText}>
+                <Text style={styles.primaryActionButtonText}>
                   지금 업데이트하기
                 </Text>
               </Pressable>
             </View>
           ) : (
-            <View style={[styles.statusSection, styles.upToDateCard]}>
-              <View style={styles.checkIconWrapper}>
-                <ShieldIcon color={colors.safeText} size={28} />
-              </View>
-              <Text style={styles.upToDateTitle}>
-                현재 최신 버전을 사용하고 있습니다
-              </Text>
-              <Text style={styles.upToDateSub}>
-                안전하고 새로운 기능을 모두 정상적으로 이용하실 수 있습니다.
-              </Text>
-
+            <View style={styles.upToDateBox}>
+              <Text style={styles.upToDateText}>최신 버전을 사용 중입니다</Text>
               <Pressable
                 style={({ pressed }) => [
-                  styles.refreshCheckButton,
+                  styles.smallCheckButton,
                   pressed && styles.buttonPressed,
                 ]}
                 onPress={fetchVersion}
-                accessibilityRole="button"
-                accessibilityLabel="업데이트 다시 확인"
               >
-                <Text style={styles.refreshCheckButtonText}>업데이트 다시 확인</Text>
+                <Text style={styles.smallCheckButtonText}>업데이트 다시 확인</Text>
               </Pressable>
             </View>
           )}
         </View>
 
-        {/* ── 상세 메타 정보 ── */}
-        <View style={styles.metaSection}>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>패키지명</Text>
-            <Text style={styles.metaValue}>{APP_PACKAGE_NAME}</Text>
+        {/* ── 2. 최근 업데이트 내역 카드 ── */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.updateCardTitleRow}>
+              <Text style={styles.cardTitle}>최근 업데이트</Text>
+              <Text style={styles.updateVersionTag}>{latestRelease.version}</Text>
+            </View>
+            <Text style={styles.updateDateText}>{latestRelease.date}</Text>
           </View>
-          <View style={styles.metaDivider} />
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>설치 버전</Text>
-            <Text style={styles.metaValue}>v{CURRENT_APP_VERSION}</Text>
-          </View>
-          {versionStatus?.latestVersion ? (
-            <>
-              <View style={styles.metaDivider} />
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>최신 출시 버전</Text>
-                <Text style={styles.metaValue}>v{versionStatus.latestVersion}</Text>
+
+          <View style={styles.releaseList}>
+            {latestRelease.items.map((item, idx) => (
+              <View key={idx} style={styles.releaseItemRow}>
+                <Text style={styles.releaseBullet}>•</Text>
+                <Text style={styles.releaseItemText}>{item}</Text>
               </View>
-            </>
-          ) : null}
+            ))}
+          </View>
+
+          <View style={styles.cardActionDivider} />
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.viewAllHistoryButton,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => setHistoryModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="전체 업데이트 내역 보기"
+          >
+            <Text style={styles.viewAllHistoryButtonText}>
+              전체 업데이트 내역 보기
+            </Text>
+            <Chevron direction="right" color={colors.textSecondary} size={16} />
+          </Pressable>
+        </View>
+
+        {/* ── 3. 오픈소스 라이선스 버튼 카드 ── */}
+        <View style={styles.card}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.licenseRow,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => setLicenseModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="오픈소스 라이선스 고지 확인"
+          >
+            <Text style={styles.licenseLabel}>오픈소스 라이선스</Text>
+            <Chevron direction="right" color={colors.textSecondary} size={16} />
+          </Pressable>
+        </View>
+
+        {/* ── 4. 하단 푸터 (약관 링크 & 저작권) ── */}
+        <View style={styles.footerSection}>
+          <View style={styles.footerLegalLinks}>
+            <Pressable
+              onPress={() => handleOpenLegalUrl(TERMS_OF_SERVICE_URL)}
+              hitSlop={8}
+            >
+              <Text style={styles.footerLinkText}>이용약관</Text>
+            </Pressable>
+            <Text style={styles.footerDivider}>|</Text>
+            <Pressable
+              onPress={() => handleOpenLegalUrl(PRIVACY_POLICY_URL)}
+              hitSlop={8}
+            >
+              <Text style={styles.footerLinkText}>개인정보 처리방침</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.copyrightText}>
+            © 2026 SoloTrav. All rights reserved.
+          </Text>
         </View>
       </ScrollView>
+
+      {/* ── 전체 업데이트 내역 모달 ── */}
+      <ReleaseHistoryModal
+        visible={historyModalVisible}
+        onClose={() => setHistoryModalVisible(false)}
+      />
+
+      {/* ── 오픈소스 라이선스 모달 ── */}
+      <OpenSourceLicenseModal
+        visible={licenseModalVisible}
+        onClose={() => setLicenseModalVisible(false)}
+      />
     </View>
   );
 }
@@ -239,28 +307,16 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    gap: 18,
-  },
-  versionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
+    gap: 16,
   },
   appHero: {
     alignItems: 'center',
-    paddingTop: 28,
-    paddingBottom: 22,
-    paddingHorizontal: 20,
+    paddingVertical: 18,
   },
-  appIconWrapper: {
+  appLauncherIcon: {
     width: 68,
     height: 68,
-    borderRadius: 20,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 18,
     marginBottom: 14,
   },
   appName: {
@@ -274,188 +330,216 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
   },
-  currentVersionBadge: {
-    marginTop: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  currentVersionText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  statusDivider: {
-    height: 1,
-    marginHorizontal: 20,
-    backgroundColor: colors.border,
-  },
-  statusSection: {
-    padding: 22,
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 14,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  errorTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
-  errorSub: {
-    marginTop: 6,
-    fontSize: 13,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  retryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textPrimary,
-  },
-  updateAvailableCard: {
-    borderColor: colors.primaryBorder,
-  },
-  updateStatusSection: {
-    alignItems: 'stretch',
-  },
-  updateCardHeader: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  updateBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: colors.primarySoft,
-  },
-  updateBadgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.primaryStrong,
-  },
-  latestVersionTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    textAlign: 'center',
-    letterSpacing: -0.3,
-  },
-  notesBox: {
-    marginTop: 14,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  notesLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  notesContent: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.textPrimary,
-  },
-  updateActionButton: {
-    marginTop: 18,
-    backgroundColor: colors.primary,
-    paddingVertical: 15,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  updateActionButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  upToDateCard: {
-    alignItems: 'center',
-  },
-  checkIconWrapper: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.safeBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  upToDateTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    textAlign: 'center',
-  },
-  upToDateSub: {
-    marginTop: 6,
-    fontSize: 13,
-    lineHeight: 18,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  refreshCheckButton: {
-    marginTop: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  refreshCheckButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  buttonPressed: {
-    opacity: 0.75,
-  },
-  metaSection: {
+  card: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    padding: 16,
     borderWidth: 1,
     borderColor: colors.border,
+    padding: 18,
   },
-  metaRow: {
+  cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 24,
+    marginBottom: 14,
   },
-  metaLabel: {
+  cardTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  versionRowsContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  versionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  versionRowLabel: {
     fontSize: 13,
     color: colors.textSecondary,
   },
-  metaValue: {
+  versionRowValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  rowDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  cardActionDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginTop: 14,
+    marginBottom: 12,
+  },
+  statusBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    gap: 8,
+  },
+  loadingText: {
     fontSize: 13,
+    color: colors.textSecondary,
+  },
+  errorText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  smallRetryButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  smallRetryButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  updateAvailableBox: {
+    gap: 10,
+  },
+  updateNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  updateDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
+  updateNoticeText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primaryStrong,
+  },
+  primaryActionButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryActionButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  upToDateBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  upToDateText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.safeText,
+  },
+  smallCheckButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  smallCheckButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  updateCardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  updateVersionTag: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  updateDateText: {
+    fontSize: 12,
+    color: colors.textTertiary,
+  },
+  releaseList: {
+    gap: 8,
+  },
+  releaseItemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  releaseBullet: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textSecondary,
+  },
+  releaseItemText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: colors.textPrimary,
+  },
+  viewAllHistoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  viewAllHistoryButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  licenseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  licenseLabel: {
+    fontSize: 14,
     fontWeight: '600',
     color: colors.textPrimary,
   },
-  metaDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 10,
+  footerSection: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  footerLegalLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  footerLinkText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textDecorationLine: 'underline',
+  },
+  footerDivider: {
+    fontSize: 11,
+    color: colors.borderStrong,
+  },
+  copyrightText: {
+    fontSize: 11,
+    color: colors.textTertiary,
+  },
+  buttonPressed: {
+    opacity: 0.7,
   },
 });

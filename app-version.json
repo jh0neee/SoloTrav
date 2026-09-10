@@ -1,5 +1,5 @@
 {
-  "latestVersion": "0.0.9",
+  "latestVersion": "0.0.10",
   "minVersion": "0.0.1",
   "releaseNotes": "앱 버전 정보 카드 통합 및 안정성 개선",
   "forceUpdate": false,
