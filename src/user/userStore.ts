@@ -19,8 +19,8 @@ import { userStorage } from '../storage/userStorage';
 import { tokenStorage } from '../storage/tokenStorage';
 import type { AuthUser } from '../types/auth';
 
-/** 서버가 닉네임을 안 내려줄 때 쓰는 표시용 기본값 */
-export const FALLBACK_NAME = '여행자';
+/** 닉네임이 없을 때(게스트·서버 미제공) 쓰는 표시용 기본값 */
+export const FALLBACK_NAME = '혼행자';
 
 let cached: AuthUser | null = null;
 let loaded = false;
@@ -102,7 +102,7 @@ export type MyProfile = {
   user: AuthUser | null;
   isLoggedIn: boolean;
   isGuest: boolean;
-  /** 닉네임이 없으면 '여행자' */
+  /** 게스트이거나 닉네임이 없으면 FALLBACK_NAME('혼행자') */
   displayName: string;
   /** 아바타에 넣을 한 글자 */
   initial: string;
@@ -114,7 +114,7 @@ export type MyProfile = {
 function derive(user: AuthUser | null): MyProfile {
   const isGuest = user?.id === 'guest';
   const displayName = isGuest
-    ? '게스트'
+    ? FALLBACK_NAME
     : user?.nickname?.trim() || FALLBACK_NAME;
   return {
     user,

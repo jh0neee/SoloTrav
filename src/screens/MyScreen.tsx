@@ -315,7 +315,7 @@ function MyScreen() {
           </View>
           <View style={styles.heroTexts}>
             <Text style={styles.heroName} numberOfLines={1}>
-              {isGuest ? '게스트 (둘러보기 모드)' : profile.displayName}
+              {isGuest ? '혼행자 (둘러보기 모드)' : profile.displayName}
             </Text>
             <Text style={styles.heroMeta} numberOfLines={1}>
               {isGuest

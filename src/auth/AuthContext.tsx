@@ -145,7 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const enterGuestMode = useCallback(() => {
     userStore.save({
       id: 'guest',
-      nickname: '게스트',
+      nickname: '혼행자',
       email: null,
       profileImageUrl: null,
     });

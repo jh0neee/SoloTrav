@@ -19,6 +19,7 @@ import { colors } from '../../theme/colors';
 import type { CourseDay, CourseStop, TravelCourse } from '../../types/assistant';
 import { favoriteStore } from '../../favorites/favoriteStore';
 import { HeartIcon } from '../../components/icons/UiIcons';
+import { useAuth } from '../../auth/AuthContext';
 
 /** 12000 → '1.2만원' 처럼 짧게. 만원 미만은 그대로 원 단위로 씁니다. */
 function formatCost(amount: number): string {
@@ -164,9 +165,22 @@ function NoteBox({
 function CourseCard({ course, requestId }: { course: TravelCourse; requestId: string | null }) {
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const { isGuest, logout } = useAuth();
 
   const save = async () => {
     if (!requestId || isSaving || saved) return;
+    // 관심 코스는 서버에 계정 단위로 저장되므로 게스트는 로그인으로 유도합니다.
+    if (isGuest) {
+      Alert.alert(
+        '로그인이 필요한 기능입니다',
+        '관심 코스 저장은 로그인 후 이용할 수 있습니다.',
+        [
+          { text: '둘러보기 계속', style: 'cancel' },
+          { text: '로그인하기', onPress: logout },
+        ],
+      );
+      return;
+    }
     setIsSaving(true);
     try {
       await favoriteStore.register(requestId);

@@ -36,12 +36,14 @@ import {
   usePreferences,
 } from '../preferences/preferenceStore';
 import { useHomeStack } from './useHomeStack';
+import { useAuth } from '../auth/AuthContext';
 
 function HomeStack({ onOpenMy }: { onOpenMy?: () => void }) {
   const { current, push, pop } = useHomeStack();
   // 취향은 서버가 원본이라 화면 로컬 state 로 들고 있지 않습니다.
   // (탭을 옮기거나 앱을 껐다 켜도 유지되어야 합니다)
   const preferences = usePreferences();
+  const { isGuest } = useAuth();
   const [courseModalCity, setCourseModalCity] = useState<City | null>(null);
 
   const renderScreen = () => {
@@ -149,6 +151,17 @@ function HomeStack({ onOpenMy }: { onOpenMy?: () => void }) {
           />
         );
       case 'courseLoading':
+        // 게스트는 서버가 코스를 만들어 주지 않으므로 호출 없이 바로 로그인 유도 화면으로
+        if (isGuest) {
+          return (
+            <CourseErrorScreen
+              city={current.city}
+              onRetry={() => push({ name: 'home' })}
+              onEditPreference={() => push({ name: 'home' })}
+              onGoHome={() => push({ name: 'home' })}
+            />
+          );
+        }
         return (
           <CourseLoadingScreen
             city={current.city}

@@ -148,10 +148,10 @@ function HomeScreen({
 
       {/* ── 충북 지역 지도 ── */}
       <View style={styles.section}>
-        <SectionHead kicker="EXPLORE" title="지역별로 둘러보기" />
+        <SectionHead kicker="AI COURSE" title="동네 고르면, 코스는 AI가" />
 
         <Text style={styles.spotlightIntro}>
-          지도를 눌러 마음에 드는 동네를 먼저 살펴보세요
+          지도에서 동네를 누르면 취향에 맞춘 일정을 만들어드려요
         </Text>
 
         <View style={styles.spotlightMapCard}>
@@ -468,6 +468,17 @@ function PreferencePromptCard({
             </Text>
           </View>
         </View>
+        {tags && tags.length > 0 ? (
+          <View style={styles.preferenceTags}>
+            {tags.map(tag => (
+              <View key={tag} style={styles.preferenceTag}>
+                <Text style={styles.preferenceTagText} numberOfLines={1}>
+                  #{tag}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
         <View style={[styles.promptFooter, styles.configuredFooter]}>
           <Text style={styles.promptTime}>마이페이지에서 언제든 관리</Text>
           <View style={styles.promptBtn}>
@@ -725,6 +736,26 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
     lineHeight: 18,
+  },
+  preferenceTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 10,
+  },
+  preferenceTag: {
+    maxWidth: '100%',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+  },
+  preferenceTagText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   configuredFooter: {
     marginTop: 10,

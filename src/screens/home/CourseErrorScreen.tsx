@@ -2,6 +2,9 @@
  * AI 코스 생성 실패 전용 화면.
  * 일시적 네트워크 오류나 백엔드 생성 실패 시 호출되며,
  * 재시도, 취향 수정, 홈으로 돌아가기 기능을 제공합니다.
+ *
+ * 둘러보기(게스트 모드)에서는 서버가 코스를 만들어 주지 않으므로
+ * 오류 대신 "로그인하면 취향 기반 코스를 받을 수 있다"는 안내로 유도합니다.
  */
 import React, { useEffect } from 'react';
 import {
@@ -12,8 +15,14 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Chevron, RefreshIcon, WarningCircle } from '../../components/icons/UiIcons';
+import {
+  Chevron,
+  RefreshIcon,
+  SparkIcon,
+  WarningCircle,
+} from '../../components/icons/UiIcons';
 import { colors } from '../../theme/colors';
+import { useAuth } from '../../auth/AuthContext';
 import type { City } from '../../data/cities';
 import { useTabBarVisibility } from '../../navigation/TabBarVisibilityContext';
 
@@ -34,6 +43,7 @@ export default function CourseErrorScreen({
 }: Props) {
   const insets = useSafeAreaInsets();
   const { setTabBarHidden } = useTabBarVisibility();
+  const { isGuest, logout } = useAuth();
 
   // 1. 하단 탭바 숨김 처리
   useEffect(() => {
@@ -54,6 +64,81 @@ export default function CourseErrorScreen({
     errorMessage && errorMessage.trim().length > 0
       ? errorMessage
       : '일시적인 네트워크 지연이나 응답 지연이 발생했습니다.';
+
+  // 게스트 모드: 로그인 화면으로 보내는 안내 화면으로 대체
+  // (logout 은 게스트 세션을 비우고 status 를 unauthenticated 로 돌려 로그인 화면이 뜹니다)
+  if (isGuest) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+        <View style={styles.topHeader}>
+          <TouchableOpacity
+            style={styles.headerBackBtn}
+            activeOpacity={0.7}
+            onPress={onGoHome}
+            accessibilityRole="button"
+            accessibilityLabel="홈으로 가기">
+            <Chevron direction="left" color={colors.textPrimary} size={22} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{city.name} 여행 코스</Text>
+          <View style={styles.headerRightPlaceholder} />
+        </View>
+
+        <View style={styles.centerContent}>
+          <View style={styles.iconWrapper}>
+            <View style={[styles.glowBg, styles.glowBgGuest]} />
+            <View style={[styles.iconCircle, styles.iconCircleGuest]}>
+              <SparkIcon color={colors.primary} size={40} filled />
+            </View>
+          </View>
+
+          <View style={[styles.badge, styles.badgeGuest]}>
+            <Text style={[styles.badgeText, styles.badgeTextGuest]}>
+              로그인하면 열려요
+            </Text>
+          </View>
+
+          <Text style={styles.title}>
+            {city.name} 맞춤 코스는{'\n'}로그인 후 받아볼 수 있어요
+          </Text>
+          <Text style={styles.subtitle}>
+            로그인하면 샛별이가 등록한 취향을 바탕으로{'\n'}
+            나만의 {city.name} 일정을 설계해 드려요.
+          </Text>
+
+          <View style={styles.benefitBox}>
+            {[
+              '취향에 딱 맞는 AI 추천 코스',
+              '만든 코스와 여행 기록 저장',
+              '여행 배지 수집',
+            ].map(item => (
+              <View key={item} style={styles.benefitRow}>
+                <SparkIcon color={colors.primary} size={14} filled />
+                <Text style={styles.benefitText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.bottomActions}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            activeOpacity={0.85}
+            onPress={logout}
+            accessibilityRole="button"
+            accessibilityLabel="로그인하고 맞춤 코스 받기">
+            <Text style={styles.primaryButtonText}>로그인하고 맞춤 코스 받기</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.textButton}
+            activeOpacity={0.7}
+            onPress={onGoHome}>
+            <Text style={styles.textButtonText}>계속 둘러보기</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -184,6 +269,39 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(239, 68, 68, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  glowBgGuest: {
+    backgroundColor: colors.primarySoft,
+  },
+  iconCircleGuest: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primaryBorder,
+  },
+  badgeGuest: {
+    backgroundColor: colors.primarySoft,
+  },
+  badgeTextGuest: {
+    color: colors.primaryStrong,
+  },
+  benefitBox: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 8,
+  },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  benefitText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
   },
   badge: {
     backgroundColor: colors.surface,
