@@ -176,6 +176,13 @@ function MapScreen({ onBack }: TabScreenProps) {
       '도움이 필요할 때'
     );
   }, [safetyTypes]);
+  const safetyErrorLabel = useMemo(() => {
+    const labels = safety.errors.map(
+      type =>
+        SAFETY_FILTERS.find(item => item.key === type)?.label ?? '안전시설',
+    );
+    return `${labels.join('·')} 정보를 불러오지 못했어요`;
+  }, [safety.errors]);
 
   // 측위가 끝나면 조회 기준점을 실제 현위치로 한 번 옮깁니다.
   useEffect(() => {
@@ -635,16 +642,6 @@ function MapScreen({ onBack }: TabScreenProps) {
           {safety.loading && (
             <ActivityIndicator size="small" color={colors.textSecondary} />
           )}
-          {!!safety.errors.length && !safety.loading && (
-            <Pressable
-              onPress={safety.retry}
-              accessibilityRole="button"
-              accessibilityLabel="안전 장소 다시 불러오기"
-              style={styles.safetyRetry}
-            >
-              <Text style={styles.safetyRetryText}>일부 실패 · 재시도</Text>
-            </Pressable>
-          )}
           {!!safety.hasMoreTypes.length && !safety.loading && (
             <View style={styles.safetyLimitNotice}>
               <Text style={styles.safetyLimitNoticeText}>
@@ -787,17 +784,44 @@ function MapScreen({ onBack }: TabScreenProps) {
           </View>
         )}
 
+      {!!safety.errors.length &&
+        !safety.loading &&
+        !selectedPlace &&
+        !selectedPoi &&
+        !selectedSafetyPlace && (
+          <View
+            style={[styles.safetyErrorBanner, { bottom: insets.bottom + 24 }]}
+            accessibilityLiveRegion="polite"
+          >
+            <Text style={styles.safetyErrorText} numberOfLines={2}>
+              {safetyErrorLabel}
+            </Text>
+            <Pressable
+              onPress={safety.retry}
+              accessibilityRole="button"
+              accessibilityLabel={`${safetyErrorLabel}, 다시 시도`}
+              hitSlop={8}
+              style={styles.safetyErrorAction}
+            >
+              <Text style={styles.safetyErrorActionText}>다시 시도</Text>
+            </Pressable>
+          </View>
+        )}
+
       {/* 검색 결과가 있는데 아무것도 안 골랐을 때의 요약 배너 */}
-      {searchResults.length > 0 && !selectedPoi && !selectedPlace && (
-        <View
-          style={[styles.resultBanner, { bottom: insets.bottom + 24 }]}
-          pointerEvents="none"
-        >
-          <Text style={styles.resultBannerText}>
-            "{searchQuery}" 검색 결과 {searchResults.length}곳
-          </Text>
-        </View>
-      )}
+      {searchResults.length > 0 &&
+        !selectedPoi &&
+        !selectedPlace &&
+        !safety.errors.length && (
+          <View
+            style={[styles.resultBanner, { bottom: insets.bottom + 24 }]}
+            pointerEvents="none"
+          >
+            <Text style={styles.resultBannerText}>
+              "{searchQuery}" 검색 결과 {searchResults.length}곳
+            </Text>
+          </View>
+        )}
 
       <PoiCard
         poi={selectedPoi}
@@ -1011,17 +1035,6 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 4,
   },
-  safetyRetry: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 14,
-    backgroundColor: colors.background,
-  },
-  safetyRetryText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.primary,
-  },
   safetyLimitNotice: {
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -1206,6 +1219,45 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.inkText,
+  },
+  safetyErrorBanner: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    minHeight: 52,
+    paddingLeft: 16,
+    paddingRight: 8,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.background,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  safetyErrorText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  safetyErrorAction: {
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 12,
+    backgroundColor: colors.primarySoft,
+  },
+  safetyErrorActionText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primaryStrong,
   },
 
   // 축제 기간 칩 — 카테고리 칩 바로 아래 줄

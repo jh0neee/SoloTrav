@@ -22,6 +22,7 @@ const ALL_TYPES: SafetyPlaceType[] = [
   'streetlight',
 ];
 const MAP_TYPES: SafetyPlaceType[] = ['cctv', 'emergencyBell'];
+const AUTO_RETRY_DELAYS_MS = [500, 1_200];
 
 type SafetyCacheEntry = {
   items: SafetyPlace[];
@@ -44,11 +45,11 @@ export function useSafetyPlaces(
   /** 조회할 충북 시군 — 사용자 좌표 대신 시군명·코드로 서버를 좁힙니다. */
   city: City,
   active: SafetyPlaceType[],
-  /** 조회를 확정한 지도 경계. CCTV는 이 범위만 서버에서 가져옵니다. */
+  /** 조회를 확정한 지도 경계. 지도형 안전시설은 이 범위만 서버에서 가져옵니다. */
   queryBounds: MapBounds | null = null,
   visibleBounds: MapBounds | null = queryBounds,
 ) {
-  /** CCTV는 지도 경계, 나머지 시설은 지역을 캐시 키로 사용합니다. */
+  /** 지도형 안전시설은 지도 경계, 나머지 시설은 지역을 캐시 키로 사용합니다. */
   const [cache, setCache] = useState<Record<string, SafetyCacheEntry>>({});
   const [loadingTypes, setLoadingTypes] = useState<SafetyPlaceType[]>([]);
   const [errors, setErrors] = useState<SafetyPlaceType[]>([]);
@@ -82,15 +83,38 @@ export function useSafetyPlaces(
     setErrors([]);
     Promise.allSettled(
       typesToLoad.map(async type => {
-        if (MAP_TYPES.includes(type) && isValidBounds(queryBounds)) {
-          return safetyPlaceApi.map(
-            type as 'cctv' | 'emergencyBell',
-            queryBounds,
-            controller.signal,
-          );
+        for (
+          let attempt = 0;
+          attempt <= AUTO_RETRY_DELAYS_MS.length;
+          attempt += 1
+        ) {
+          try {
+            if (MAP_TYPES.includes(type) && isValidBounds(queryBounds)) {
+              return await safetyPlaceApi.map(
+                type as 'cctv' | 'emergencyBell',
+                queryBounds,
+                controller.signal,
+              );
+            }
+            const items = await safetyPlaceApi.list(
+              type,
+              city,
+              controller.signal,
+            );
+            return { items, hasMore: false };
+          } catch (error) {
+            if (
+              controller.signal.aborted ||
+              attempt === AUTO_RETRY_DELAYS_MS.length
+            ) {
+              throw error;
+            }
+            await new Promise<void>(resolve =>
+              setTimeout(resolve, AUTO_RETRY_DELAYS_MS[attempt]),
+            );
+          }
         }
-        const items = await safetyPlaceApi.list(type, city, controller.signal);
-        return { items, hasMore: false };
+        throw new Error('안전시설을 불러오지 못했습니다.');
       }),
     ).then(results => {
       if (controller.signal.aborted) return;
