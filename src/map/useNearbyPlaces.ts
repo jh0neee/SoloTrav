@@ -63,6 +63,9 @@ export function useNearbyPlaces(
 
   // 좌표는 서버 요청이 아니라 내려받은 지역 후보의 기기 내 필터링에만 씁니다.
   const { lat, lng } = center;
+  const districtCodesKey = (
+    city.tourismDistrictCodes ?? [city.districtCode]
+  ).join(',');
 
   const mounted = useRef(true);
   useEffect(() => {
@@ -84,13 +87,13 @@ export function useNearbyPlaces(
     setState({ places: [], loading: true, error: null, totalCount: 0 });
 
     async function loadRegion() {
-      const cacheKey = city.municipalityCode;
+      const cacheKey = `${city.municipalityCode}:${districtCodesKey}`;
       const cached = regionCache.get(cacheKey);
       if (reloadKey === 0 && cached && cached.expiresAt > Date.now()) {
         return { items: cached.items, totalCount: cached.items.length };
       }
 
-      const loadAllTourism = async () => {
+      const loadDistrictTourism = async (districtCode: string) => {
         const items: MappableTourContent[] = [];
         let pageNo = 1;
         let totalCount = 0;
@@ -100,7 +103,7 @@ export function useNearbyPlaces(
           const page = await travelApi.listSpotsByRegion(
             {
               regionCode: city.regionCode,
-              districtCode: city.districtCode,
+              districtCode,
               page: pageNo,
               size: REGION_PAGE_SIZE,
               // 대표이미지가 없어도 마커는 찍어야 하고, 페이지를 넘기는 동안
@@ -121,7 +124,16 @@ export function useNearbyPlaces(
       // 예전에 쓰던 지역명 기반 조회(region-based-list)는 숙박이 빠져 숙박 전용
       // API 로 보완했었습니다. 법정동 코드 조회에는 숙박(contentTypeId=32)이
       // 그대로 들어 있어(충북 11개 시군 건수 전부 일치) 보완 호출을 뺐습니다.
-      const items = await loadAllTourism();
+      // 청주처럼 콘텐츠가 여러 구 코드에 나뉜 도시는 각 구를 함께 조회합니다.
+      // 구 사이에 같은 콘텐츠가 중복 등록돼도 마커는 한 번만 표시합니다.
+      const districtItems = await Promise.all(
+        districtCodesKey.split(',').map(loadDistrictTourism),
+      );
+      const items = Array.from(
+        new Map(
+          districtItems.flat().map(item => [item.contentId, item]),
+        ).values(),
+      );
       regionCache.set(cacheKey, {
         items,
         expiresAt: Date.now() + REGION_CACHE_TTL_MS,
@@ -153,7 +165,7 @@ export function useNearbyPlaces(
   }, [
     enabled,
     city.regionCode,
-    city.districtCode,
+    districtCodesKey,
     city.municipalityCode,
     reloadKey,
   ]);
