@@ -9,6 +9,7 @@
  *
  * 지역 코드가 두 종류라 헷갈리기 쉽습니다.
  *  - regionCode/districtCode : **법정동 코드**. 관광정보 조회(lDongRegnCd/lDongSignguCd)에 씁니다.
+ *  - tourismDistrictCodes    : 한 도시의 관광정보가 여러 하위 시군구 코드로 나뉜 경우의 조회 코드 목록.
  *  - municipalityCode        : 기초지자체 관광지 API 의 signguCd. 법정동 코드를 이어붙인 값('43'+'800').
  *  - sido/sigungu            : 지역안전지수는 코드가 아니라 **이름**으로 조회합니다.
  */
@@ -33,6 +34,8 @@ export type City = {
   regionCode: string;
   /** 법정동 시군구 코드 */
   districtCode: string;
+  /** 관광정보가 하위 구 코드로 나뉘는 도시의 실제 조회 코드 목록 */
+  tourismDistrictCodes?: readonly string[];
   /** 기초지자체 관광지 API 의 signguCd (regionCode + districtCode) */
   municipalityCode: string;
   /**
@@ -193,6 +196,9 @@ export const CITIES: City[] = [
     sigungu: '청주시',
     regionCode: '43',
     districtCode: '110',
+    // TourAPI 코드 목록에는 청주시(110)가 있지만 관광 콘텐츠는 4개 구에
+    // 각각 귀속되어 있어, 시 전체 지도에서는 네 코드를 모두 합쳐야 합니다.
+    tourismDistrictCodes: ['111', '112', '113', '114'],
     municipalityCode: '43110',
     cctvLocalGovernmentCode: '5710000',
     center: { lat: 36.6424, lng: 127.489 },
@@ -267,7 +273,11 @@ export const getCityBySigungu = (sigungu: string) =>
 
 /** 법정동 시군구 코드(예: '800')로 도시를 찾습니다. */
 export const getCityByDistrictCode = (districtCode: string) =>
-  CITIES.find(city => city.districtCode === districtCode) ?? null;
+  CITIES.find(
+    city =>
+      city.districtCode === districtCode ||
+      city.tourismDistrictCodes?.includes(districtCode),
+  ) ?? null;
 
 /** 두 좌표 간 거리 계산 (Haversine 공식, 단위: m) */
 export function getDistanceMeters(
