@@ -399,7 +399,15 @@ export function buildKakaoMapHtml({
       clusterLabel + ' ' + group.length + '곳 확대해서 보기'
     );
     onMarkerActivate(el, function () {
-      map.setLevel(Math.max(MIN_LEVEL, map.getLevel() - 2), {
+      var currentLevel = map.getLevel();
+      var nextLevel = Math.max(MIN_LEVEL, currentLevel - 2);
+      // 최대 확대에서도 동일 좌표로 남는 시설은 더 이상 분리할 수 없으므로
+      // 무한 확대 대신 대표 시설 정보를 엽니다.
+      if (nextLevel === currentLevel) {
+        send({ type: 'safetyMarkerPress', id: group[0].id });
+        return;
+      }
+      map.setLevel(nextLevel, {
         anchor: center,
         animate: true
       });
@@ -422,7 +430,9 @@ export function buildKakaoMapHtml({
     safetyOverlays = {};
     if (!map || !SAFETY_PLACES.length) return;
 
-    if (SAFETY_PLACES.length > 1) {
+    // 축소된 지도에서는 클러스터로 모으고, 레벨 2 이하로 확대하면
+    // 개별 마커로 전환해 같은 숫자 클러스터가 끝까지 남지 않게 합니다.
+    if (map.getLevel() >= 3 && SAFETY_PLACES.length > 1) {
       var projection = map.getProjection();
       var groups = {};
       var cellSize = SAFETY_PLACES.length > 100 ? 80 : 56;

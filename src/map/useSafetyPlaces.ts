@@ -46,6 +46,8 @@ const REQUEST_CONCURRENCY = 2;
 type SafetyCacheEntry = {
   items: SafetyPlace[];
   hasMore: boolean;
+  /** map 조회로 받은 경우 이 결과가 완전히 포함하는 지도 범위 */
+  bounds?: MapBounds;
 };
 
 function boundsKey(bounds: MapBounds | null) {
@@ -57,6 +59,37 @@ function boundsKey(bounds: MapBounds | null) {
 
 function isValidBounds(bounds: MapBounds | null): bounds is MapBounds {
   return !!bounds && bounds.north > bounds.south && bounds.east > bounds.west;
+}
+
+function containsBounds(outer: MapBounds, inner: MapBounds) {
+  return (
+    outer.south <= inner.south &&
+    outer.north >= inner.north &&
+    outer.west <= inner.west &&
+    outer.east >= inner.east
+  );
+}
+
+function reusableCache(
+  cache: Record<string, SafetyCacheEntry>,
+  type: SafetyPlaceType,
+  exactKey: string,
+  queryBounds: MapBounds | null,
+) {
+  const exact = cache[exactKey];
+  if (exact) return exact;
+  if (!isMapType(type) || !isValidBounds(queryBounds)) return undefined;
+
+  const previous = cache[`last|${type}`];
+  // 이전 결과가 잘린 페이지면 하위 범위도 완전하다고 볼 수 없습니다.
+  if (
+    previous?.bounds &&
+    !previous.hasMore &&
+    containsBounds(previous.bounds, queryBounds)
+  ) {
+    return previous;
+  }
+  return undefined;
 }
 
 export function useSafetyPlaces(
@@ -91,7 +124,9 @@ export function useSafetyPlaces(
       setErrors([]);
       return;
     }
-    const typesToLoad = requested.filter(type => !cache[cacheKey(type)]);
+    const typesToLoad = requested.filter(
+      type => !reusableCache(cache, type, cacheKey(type), queryBounds),
+    );
     if (!typesToLoad.length) {
       setLoadingTypes([]);
       setErrors([]);
@@ -156,17 +191,21 @@ export function useSafetyPlaces(
       setCache(previous => {
         const next = { ...previous };
         const nextKey = cacheKey(type);
+        const stored =
+          isMapType(type) && isValidBounds(queryBounds)
+            ? { ...result, bounds: queryBounds }
+            : result;
         if (isMapType(type)) {
           Object.keys(next).forEach(existingKey => {
             if (existingKey.startsWith(`${type}|`) && existingKey !== nextKey) {
               delete next[existingKey];
             }
           });
-          if (result.items.length) {
-            next[`last|${type}`] = result;
+          if (stored.items.length) {
+            next[`last|${type}`] = stored;
           }
         }
-        next[nextKey] = result;
+        next[nextKey] = stored;
         return next;
       });
     };
@@ -224,21 +263,27 @@ export function useSafetyPlaces(
     () =>
       active
         .flatMap(type => {
-          const exact = cache[cacheKey(type)];
+          const exact = reusableCache(
+            cache,
+            type,
+            cacheKey(type),
+            queryBounds,
+          );
           if (exact?.items.length || !isMapType(type)) {
             return exact?.items ?? [];
           }
           return cache[`last|${type}`]?.items ?? exact?.items ?? [];
         })
         .filter(place => isVisible(place, center)),
-    [active, cache, cacheKey, center, isVisible],
+    [active, cache, cacheKey, center, isVisible, queryBounds],
   );
   const hasMoreTypes = useMemo(
     () =>
       ALL_TYPES.filter(
-        type => cache[cacheKey(type)]?.hasMore,
+        type =>
+          reusableCache(cache, type, cacheKey(type), queryBounds)?.hasMore,
       ) as SafetyPlaceType[],
-    [cache, cacheKey],
+    [cache, cacheKey, queryBounds],
   );
   const retry = useCallback(() => setReloadKey(value => value + 1), []);
   return {
