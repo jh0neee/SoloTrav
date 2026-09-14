@@ -10,6 +10,7 @@
 import { useEffect, useState } from 'react';
 import { parseRegion, safetyApi, type SafetyBadge } from '../api/safetyApi';
 import type { MappableTourContent } from '../types/travel';
+import { startMapApiLog } from './mapApiLogger';
 
 export function useRegionSafety(places: MappableTourContent[]) {
   const [badge, setBadge] = useState<SafetyBadge | null>(null);
@@ -27,18 +28,30 @@ export function useRegionSafety(places: MappableTourContent[]) {
     }
 
     const controller = new AbortController();
+    const request = startMapApiLog('travel/regional-safety/sido', {
+      sido,
+      sigungu: sigungu || null,
+    });
     safetyApi
       .badge({ sido, sigungu: sigungu || null }, controller.signal)
       .then(result => {
         if (controller.signal.aborted) return;
+        request.success({ found: result !== null, result });
         setBadge(result);
       })
-      .catch(() => {
+      .catch(error => {
         // 배지는 보조 정보라 실패해도 조용히 숨깁니다.
-        if (!controller.signal.aborted) setBadge(null);
+        if (controller.signal.aborted) request.cancelled();
+        else {
+          request.failure(error);
+          setBadge(null);
+        }
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      request.cancelled({ reason: 'region-changed' });
+    };
   }, [sido, sigungu]);
 
   return badge;

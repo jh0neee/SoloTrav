@@ -6,12 +6,17 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_RADIUS, REGION_PAGE_SIZE, travelApi } from '../api/travelApi';
+import {
+  referenceTourPlaceApi,
+  type ReferenceTourCategory,
+} from '../api/referenceTourPlaceApi';
 import type { City } from '../data/cities';
 import type { TourCategory } from '../types/tourPlace';
 import {
   isMappableTourContent,
   type MappableTourContent,
 } from '../types/travel';
+import { mapApiSample, startMapApiLog } from './mapApiLogger';
 
 export type Coords = { lat: number; lng: number };
 export type ViewportBounds = {
@@ -45,6 +50,63 @@ const INITIAL: State = {
   totalCount: 0,
 };
 
+function normalizedName(value: string) {
+  return value.toLowerCase().replace(/\(주\)|주식회사|[^0-9a-z가-힣]/g, '');
+}
+
+function normalizedAddress(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/^충청북도/, '충북')
+    .replace(/[^0-9a-z가-힣]/g, '');
+}
+
+function normalizedPhone(value: string | null) {
+  return (value ?? '').replace(/\D/g, '');
+}
+
+function isSamePlace(a: MappableTourContent, b: MappableTourContent) {
+  const phoneA = normalizedPhone(a.tel);
+  const phoneB = normalizedPhone(b.tel);
+  if (phoneA.length >= 8 && phoneA === phoneB) return true;
+
+  const nameA = normalizedName(a.title);
+  const nameB = normalizedName(b.title);
+  const namesMatch =
+    nameA === nameB ||
+    (Math.min(nameA.length, nameB.length) >= 4 &&
+      (nameA.includes(nameB) || nameB.includes(nameA)));
+  if (!namesMatch) return false;
+
+  const addressA = normalizedAddress(a.address);
+  const addressB = normalizedAddress(b.address);
+  if (addressA && addressA === addressB) return true;
+  return roughDistance(a, b) <= 80;
+}
+
+function mergePlaces(
+  tourPlaces: MappableTourContent[],
+  referencePlaces: MappableTourContent[],
+) {
+  const merged = [...tourPlaces];
+  referencePlaces.forEach(reference => {
+    const duplicateIndex = merged.findIndex(place =>
+      isSamePlace(place, reference),
+    );
+    if (duplicateIndex < 0) {
+      merged.push(reference);
+      return;
+    }
+    const tour = merged[duplicateIndex];
+    merged[duplicateIndex] = {
+      ...tour,
+      address: tour.address || reference.address,
+      tel: tour.tel ?? reference.tel,
+    };
+  });
+  return merged;
+}
+
 export function useNearbyPlaces(
   center: Coords,
   /** 조회할 충북 시군 — 법정동 코드로 관광정보를 받습니다. */
@@ -57,6 +119,7 @@ export function useNearbyPlaces(
   bounds: ViewportBounds | null = null,
 ) {
   const [state, setState] = useState<State>(INITIAL);
+  const [referenceState, setReferenceState] = useState<State>(INITIAL);
   /** 재시도 버튼이 같은 좌표로도 다시 요청하게 만드는 카운터 */
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -99,8 +162,7 @@ export function useNearbyPlaces(
         let totalPages = 1;
 
         do {
-          const page = await travelApi.listSpotsByRegion(
-            {
+          const params = {
               regionCode: city.regionCode,
               districtCode,
               page: pageNo,
@@ -108,9 +170,27 @@ export function useNearbyPlaces(
               // 대표이미지가 없어도 마커는 찍어야 하고, 페이지를 넘기는 동안
               // 순서가 흔들리지 않도록 제목순(A)으로 받습니다.
               arrange: 'A',
-            },
-            controller.signal,
-          );
+            } as const;
+          const request = startMapApiLog('tour/area-based-list', {
+            city: city.sigungu,
+            ...params,
+          });
+          let page;
+          try {
+            page = await travelApi.listSpotsByRegion(
+              params,
+              controller.signal,
+            );
+            request.success({
+              count: page.items.length,
+              totalCount: page.totalCount,
+              sample: mapApiSample(page.items),
+            });
+          } catch (error) {
+            if (controller.signal.aborted) request.cancelled();
+            else request.failure(error);
+            throw error;
+          }
           items.push(...page.items.filter(isMappableTourContent));
           totalCount = page.totalCount;
           totalPages = Math.max(1, Math.ceil(totalCount / REGION_PAGE_SIZE));
@@ -125,9 +205,29 @@ export function useNearbyPlaces(
       // 그대로 들어 있어(충북 11개 시군 건수 전부 일치) 보완 호출을 뺐습니다.
       // 청주처럼 콘텐츠가 여러 구 코드에 나뉜 도시는 각 구를 함께 조회합니다.
       // 구 사이에 같은 콘텐츠가 중복 등록돼도 마커는 한 번만 표시합니다.
-      const districtItems = await Promise.all(
-        districtCodesKey.split(',').map(loadDistrictTourism),
+      // 청주는 4개 구를 나란히 조회합니다. 한 구가 일시적으로 실패해도
+      // 나머지 구의 관광지는 표시하고, 모든 구가 실패했을 때만 재시도 안내를 보여줍니다.
+      const districtResults = await Promise.all(
+        districtCodesKey.split(',').map(async districtCode => {
+          try {
+            return { items: await loadDistrictTourism(districtCode) };
+          } catch (error) {
+            return { items: null, error };
+          }
+        }),
       );
+      const districtItems = districtResults
+        .filter(
+          (result): result is { items: MappableTourContent[] } =>
+            result.items !== null,
+        )
+        .map(result => result.items);
+      if (!districtItems.length) {
+        const firstError = districtResults.find(result => result.error)?.error;
+        throw firstError instanceof Error
+          ? firstError
+          : new Error('지역 관광정보를 불러오지 못했어요.');
+      }
       const items = Array.from(
         new Map(
           districtItems.flat().map(item => [item.contentId, item]),
@@ -169,28 +269,91 @@ export function useNearbyPlaces(
     reloadKey,
   ]);
 
+  const referenceCategory: ReferenceTourCategory | null =
+    category === 'food' || category === 'stay' ? category : null;
+
+  useEffect(() => {
+    if (!enabled || !referenceCategory || !bounds) {
+      setReferenceState(INITIAL);
+      return;
+    }
+    const controller = new AbortController();
+    setReferenceState(current => ({
+      ...current,
+      loading: true,
+      error: null,
+    }));
+    const request = startMapApiLog(`reference/${referenceCategory}/map`, {
+      bounds,
+      page: 1,
+      limit: 200,
+    });
+    referenceTourPlaceApi
+      .map(referenceCategory, bounds, controller.signal)
+      .then(items => {
+        if (controller.signal.aborted || !mounted.current) return;
+        request.success({ count: items.length, sample: mapApiSample(items) });
+        setReferenceState({
+          places: items,
+          loading: false,
+          error: null,
+          totalCount: items.length,
+        });
+      })
+      .catch((error: Error) => {
+        if (controller.signal.aborted || !mounted.current) {
+          request.cancelled();
+          return;
+        }
+        request.failure(error);
+        setReferenceState(current => ({
+          ...current,
+          loading: false,
+          error: error.message || '공공데이터를 불러오지 못했어요.',
+        }));
+      });
+    return () => {
+      controller.abort();
+      request.cancelled({ reason: 'bounds-category-or-retry-changed' });
+    };
+  }, [enabled, referenceCategory, bounds, reloadKey]);
+
   /**
    * 서버가 준 지역 후보 중 현재 조회 중심 반경에 들어오는 항목만 표시합니다.
    * 정확한 지도 중심 좌표는 이 계산에서만 사용되고 네트워크로 전송되지 않습니다.
    */
-  const places = useMemo(
-    () =>
-      state.places
-        .filter(place => place.category === category)
-        .map(place => ({
-          ...place,
-          distance: roughDistance({ lat, lng }, place),
-        }))
-        .filter(place =>
-          bounds ? isInsideBounds(place, bounds) : place.distance <= radius,
-        )
-        .sort((a, b) => a.distance - b.distance),
-    [state.places, category, lat, lng, radius, bounds],
-  );
+  const places = useMemo(() => {
+    const tourPlaces = state.places.filter(
+      place => place.category === category,
+    );
+    const referencePlaces = referenceCategory ? referenceState.places : [];
+    return mergePlaces(tourPlaces, referencePlaces)
+      .map(place => ({
+        ...place,
+        distance: roughDistance({ lat, lng }, place),
+      }))
+      .filter(place =>
+        bounds ? isInsideBounds(place, bounds) : place.distance <= radius,
+      )
+      .sort((a, b) => a.distance - b.distance);
+  }, [
+    state.places,
+    referenceState.places,
+    referenceCategory,
+    category,
+    lat,
+    lng,
+    radius,
+    bounds,
+  ]);
 
   const retry = useCallback(() => setReloadKey(key => key + 1), []);
 
-  return { ...state, places, totalCount: places.length, retry };
+  const loading =
+    (state.loading || referenceState.loading) && places.length === 0;
+  const error =
+    places.length || loading ? null : state.error ?? referenceState.error;
+  return { ...state, places, loading, error, totalCount: places.length, retry };
 }
 
 /** 날짜변경선을 걸친 화면까지 고려한 지도 경계 포함 여부입니다. */

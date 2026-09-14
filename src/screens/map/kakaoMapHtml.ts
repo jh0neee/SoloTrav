@@ -305,7 +305,6 @@ export function buildKakaoMapHtml({
         anchor: center,
         animate: true
       });
-      map.panTo(center);
     });
     var overlay = new kakao.maps.CustomOverlay({
       map: map,
@@ -404,7 +403,6 @@ export function buildKakaoMapHtml({
         anchor: center,
         animate: true
       });
-      map.panTo(center);
     });
     var overlay = new kakao.maps.CustomOverlay({
       map: map,

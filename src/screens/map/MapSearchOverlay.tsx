@@ -42,6 +42,7 @@ import {
 } from '../../types/travel';
 import type { SearchPoi, SearchStatus } from './searchTypes';
 import { formatDistance } from './searchTypes';
+import { mapApiSample, startMapApiLog } from '../../map/mapApiLogger';
 
 const DEBOUNCE_MS = 350;
 const MAX_RECENT = 8;
@@ -113,7 +114,11 @@ function MapSearchOverlay({
 
   // 열릴 때마다 입력 상태를 비웁니다. (오버레이가 통째로 언마운트되므로 입력칸은 자동으로 빕니다)
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      Keyboard.dismiss();
+      inputRef.current?.blur();
+      return;
+    }
     typedRef.current = '';
     seedTextRef.current = '';
     latestQuery.current = '';
@@ -159,16 +164,40 @@ function MapSearchOverlay({
 
     let alive = true;
     setLoading(true);
-    onSearch(trimmed).then(result => {
-      // 이미 다음 글자를 친 뒤라면 늦게 온 응답은 버립니다.
-      if (!alive || latestQuery.current !== trimmed) return;
-      setPois(result.items);
-      setStatus(result.status);
-      setLoading(false);
+    const request = startMapApiLog('kakao/keyword-search', {
+      query: trimmed,
+      regionFilter: '충청북도',
     });
+    onSearch(trimmed)
+      .then(result => {
+        // 이미 다음 글자를 친 뒤라면 늦게 온 응답은 버립니다.
+        if (!alive || latestQuery.current !== trimmed) {
+          request.cancelled({ reason: 'stale-query' });
+          return;
+        }
+        request.success({
+          status: result.status,
+          count: result.items.length,
+          sample: mapApiSample(result.items),
+        });
+        setPois(result.items);
+        setStatus(result.status);
+        setLoading(false);
+      })
+      .catch(error => {
+        if (!alive || latestQuery.current !== trimmed) {
+          request.cancelled({ reason: 'stale-query' });
+          return;
+        }
+        request.failure(error);
+        setPois([]);
+        setStatus('ERROR');
+        setLoading(false);
+      });
 
     return () => {
       alive = false;
+      request.cancelled({ reason: 'effect-cleanup' });
     };
   }, [visible, trimmed, onSearch]);
 
@@ -177,6 +206,12 @@ function MapSearchOverlay({
     if (!visible || trimmed.length < 2) return;
 
     const controller = new AbortController();
+    const request = startMapApiLog('tour/search-keyword', {
+      keyword: trimmed,
+      regionCode: '43',
+      size: TOUR_HIT_LIMIT,
+      arrange: 'O',
+    });
     travelApi
       .searchSpots(
         {
@@ -190,13 +225,26 @@ function MapSearchOverlay({
       .then(page => {
         if (controller.signal.aborted || latestQuery.current !== trimmed)
           return;
-        setTourHits(page.items.filter(isMappableTourContent));
+        const items = page.items.filter(isMappableTourContent);
+        request.success({
+          count: items.length,
+          totalCount: page.totalCount,
+          sample: mapApiSample(items),
+        });
+        setTourHits(items);
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setTourHits([]);
+      .catch(error => {
+        if (controller.signal.aborted) request.cancelled();
+        else {
+          request.failure(error);
+          setTourHits([]);
+        }
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      request.cancelled({ reason: 'effect-cleanup' });
+    };
   }, [visible, trimmed]);
 
   /** 최근 검색어를 눌렀을 때 — 입력칸을 리마운트해 값을 채웁니다. */
@@ -217,6 +265,12 @@ function MapSearchOverlay({
     setQuery('');
   }, []);
 
+  const handleClose = useCallback(() => {
+    Keyboard.dismiss();
+    inputRef.current?.blur();
+    onClose();
+  }, [onClose]);
+
   const handleSubmit = useCallback(() => {
     Keyboard.dismiss();
     const text = typedRef.current.trim();
@@ -232,6 +286,8 @@ function MapSearchOverlay({
 
   const handlePlace = useCallback(
     (place: MappableTourContent) => {
+      Keyboard.dismiss();
+      inputRef.current?.blur();
       pushRecent(place.title);
       onSelectPlace(place);
     },
@@ -240,6 +296,8 @@ function MapSearchOverlay({
 
   const handlePoi = useCallback(
     (poi: SearchPoi) => {
+      Keyboard.dismiss();
+      inputRef.current?.blur();
       pushRecent(trimmed || poi.name);
       onSelectPoi(poi, pois, trimmed);
     },
@@ -260,7 +318,7 @@ function MapSearchOverlay({
       <View style={styles.searchRow}>
         <Pressable
           style={styles.backButton}
-          onPress={onClose}
+          onPress={handleClose}
           accessibilityRole="button"
           accessibilityLabel="검색 닫기"
         >
@@ -302,6 +360,7 @@ function MapSearchOverlay({
       <ScrollView
         style={styles.list}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={[
           styles.listContent,
           { paddingBottom: (insets.bottom || 16) + 48 },

@@ -32,6 +32,7 @@ type Props = {
   images: string[];
   facts: PlaceDetailFact[];
   overview: string | null;
+  enableCheckIn?: boolean;
   footer?: React.ReactNode;
   onImagePress?: (images: string[], index: number) => void;
   /** 화면 컨테이너에 따라 마지막 콘텐츠 아래 간격만 조절합니다. */
@@ -53,6 +54,7 @@ export default function PlaceDetailContent({
   images,
   facts,
   overview,
+  enableCheckIn = true,
   footer,
   onImagePress,
   bottomPadding = TAB_CONTENT_BOTTOM_GAP,
@@ -108,12 +110,14 @@ export default function PlaceDetailContent({
         ) : null}
 
         <View style={styles.actionRow}>
-          <VisitCheckInButton
-            contentId={contentId}
-            contentTypeId={contentTypeId}
-            lat={lat}
-            lng={lng}
-          />
+          {enableCheckIn ? (
+            <VisitCheckInButton
+              contentId={contentId}
+              contentTypeId={contentTypeId}
+              lat={lat}
+              lng={lng}
+            />
+          ) : null}
           {phone ? (
             <Pressable
               style={[styles.actionBtn, styles.phoneBtn]}

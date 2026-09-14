@@ -16,6 +16,7 @@ import type {
 } from '../../types/travel';
 import PhotoViewer, { type ViewerPhoto } from './PhotoViewer';
 import { TAB_CONTENT_BOTTOM_GAP } from '../../navigation/layout';
+import { mapApiSample, startMapApiLog } from '../../map/mapApiLogger';
 
 type Props = {
   place: MappableTourContent | null;
@@ -101,6 +102,7 @@ function SheetBody({ place }: { place: MappableTourContent }) {
         images={images}
         facts={facts}
         overview={detail?.overview ?? null}
+        enableCheckIn={!place.contentId.startsWith('reference:')}
         onImagePress={openViewer}
         bottomPadding={0}
         footer={
@@ -129,23 +131,43 @@ function usePlaceDetail(place: MappableTourContent) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (place.contentId.startsWith('reference:')) {
+      setDetail(null);
+      setLoading(false);
+      return;
+    }
     const controller = new AbortController();
     setDetail(null);
     setLoading(true);
+    const request = startMapApiLog('tour/detail', {
+      contentId: place.contentId,
+      contentTypeId: place.contentTypeId,
+      title: place.title,
+    });
 
     travelApi
       .getSpotDetail(place.contentId, place.contentTypeId, controller.signal)
       .then(result => {
-        if (!controller.signal.aborted) setDetail(result);
+        if (!controller.signal.aborted) {
+          request.success({ found: result !== null, result });
+          setDetail(result);
+        }
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setDetail(null);
+      .catch(error => {
+        if (controller.signal.aborted) request.cancelled();
+        else {
+          request.failure(error);
+          setDetail(null);
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      request.cancelled({ reason: 'place-changed-or-closed' });
+    };
   }, [place.contentId, place.contentTypeId]);
 
   return { detail, loading };
@@ -155,7 +177,9 @@ function usePlaceDetail(place: MappableTourContent) {
 function usePlaceGallery(place: MappableTourContent) {
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const region = parseRegion(place.address);
-  const keyword = region?.sigungu ?? region?.sido ?? '';
+  const keyword = place.contentId.startsWith('reference:')
+    ? ''
+    : region?.sigungu ?? region?.sido ?? '';
 
   useEffect(() => {
     if (!keyword) {
@@ -164,15 +188,32 @@ function usePlaceGallery(place: MappableTourContent) {
     }
     const controller = new AbortController();
     setPhotos([]);
+    const request = startMapApiLog('gallery/search', {
+      keyword,
+      placeTitle: place.title,
+    });
     galleryApi
       .search(keyword, undefined, controller.signal)
       .then(result => {
-        if (!controller.signal.aborted) setPhotos(result);
+        if (!controller.signal.aborted) {
+          request.success({
+            count: result.length,
+            sample: mapApiSample(result),
+          });
+          setPhotos(result);
+        }
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setPhotos([]);
+      .catch(error => {
+        if (controller.signal.aborted) request.cancelled();
+        else {
+          request.failure(error);
+          setPhotos([]);
+        }
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      request.cancelled({ reason: 'place-changed-or-closed' });
+    };
   }, [keyword]);
 
   return photos;

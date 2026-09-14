@@ -18,6 +18,7 @@ import {
   type Coords,
   type ViewportBounds,
 } from './useNearbyPlaces';
+import { mapApiSample, startMapApiLog } from './mapApiLogger';
 
 /** 상단 날짜 칩 */
 export type FestivalRange = 'now' | 'weekend' | 'all';
@@ -74,11 +75,25 @@ let inFlight: {
 
 function loadFestivals(baseYmd: string): Promise<MappableTourContent[]> {
   if (cache?.key === baseYmd) {
+    if (__DEV__)
+      console.log('[MapAPI] 캐시 tour/search-festival', {
+        baseYmd,
+        count: cache.items.length,
+      });
     return Promise.resolve(cache.items);
   }
   if (inFlight?.key === baseYmd) {
+    if (__DEV__)
+      console.log('[MapAPI] 진행 중 요청 재사용 tour/search-festival', {
+        baseYmd,
+      });
     return inFlight.promise;
   }
+  const request = startMapApiLog('tour/search-festival', {
+    from: baseYmd,
+    regionCode: '43',
+    size: 300,
+  });
   const promise = travelApi
     .listFestivals({ from: baseYmd, regionCode: '43', size: 300 })
     .then(results => {
@@ -91,7 +106,12 @@ function loadFestivals(baseYmd: string): Promise<MappableTourContent[]> {
         ...new Map(mappable.map(item => [item.contentId, item])).values(),
       ];
       cache = { key: baseYmd, items };
+      request.success({ count: items.length, sample: mapApiSample(items) });
       return items;
+    })
+    .catch(error => {
+      request.failure(error);
+      throw error;
     })
     .finally(() => {
       inFlight = null;

@@ -77,9 +77,6 @@ const REFERENCE_MAP_RESOURCES: Record<
  * 서버 total 이 잘못 와도 여기서 멈춥니다.
  */
 const MAX_PAGES = 40;
-/** 공개 SOS API 의 limit 상한 */
-const SOS_LIMIT = 50;
-
 function value(raw: Raw, keys: string[]): unknown {
   for (const key of keys) {
     const found = raw[key];
@@ -435,15 +432,9 @@ async function fetchRaw(
         signal,
       );
     case 'femaleHouse': {
-      // 목록 API(/female-safety-houses)는 지역 필터가 없어 전국 앞부분만 옵니다.
-      // 같은 데이터를 regionName 으로 거르는 공개 SOS API 를 씁니다.
-      const { data } = await apiClient.get(
-        ENDPOINTS.safetyFacilities({
-          regionName: `${city.sido} ${city.sigungu}`,
-          limit: SOS_LIMIT,
-        }),
-        { signal },
-      );
+      const { data } = await apiClient.get(ENDPOINTS.femaleSafetyHouses(), {
+        signal,
+      });
       return rows(data);
     }
   }

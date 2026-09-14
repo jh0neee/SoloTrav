@@ -7,6 +7,7 @@ import {
 } from '../api/safetyPlaceApi';
 import { roughDistance, type Coords } from './useNearbyPlaces';
 import type { City } from '../data/cities';
+import { mapApiSample, startMapApiLog } from './mapApiLogger';
 
 const RADIUS_M = 10_000;
 export type MapBounds = {
@@ -39,7 +40,8 @@ const MAP_TYPES: ReferencePlaceMapType[] = [
 function isMapType(type: SafetyPlaceType): type is ReferencePlaceMapType {
   return MAP_TYPES.includes(type as ReferencePlaceMapType);
 }
-const AUTO_RETRY_DELAYS_MS = [500, 1_200];
+const AUTO_RETRY_DELAYS_MS = [700];
+const REQUEST_CONCURRENCY = 2;
 
 type SafetyCacheEntry = {
   items: SafetyPlace[];
@@ -98,68 +100,106 @@ export function useSafetyPlaces(
     const controller = new AbortController();
     setLoadingTypes(typesToLoad);
     setErrors([]);
-    Promise.allSettled(
-      typesToLoad.map(async type => {
-        for (
-          let attempt = 0;
-          attempt <= AUTO_RETRY_DELAYS_MS.length;
-          attempt += 1
-        ) {
-          try {
-            if (isMapType(type) && isValidBounds(queryBounds)) {
-              return await safetyPlaceApi.map(
-                type,
-                queryBounds,
-                controller.signal,
-              );
-            }
-            const items = await safetyPlaceApi.list(
+    const loadType = async (type: SafetyPlaceType) => {
+      for (
+        let attempt = 0;
+        attempt <= AUTO_RETRY_DELAYS_MS.length;
+        attempt += 1
+      ) {
+        const request = startMapApiLog(`safety/${type}`, {
+          mode: isMapType(type) && isValidBounds(queryBounds) ? 'map' : 'list',
+          city: city.sigungu,
+          bounds:
+            isMapType(type) && isValidBounds(queryBounds)
+              ? queryBounds
+              : undefined,
+          attempt: attempt + 1,
+        });
+        try {
+          if (isMapType(type) && isValidBounds(queryBounds)) {
+            const result = await safetyPlaceApi.map(
               type,
-              city,
+              queryBounds,
               controller.signal,
             );
-            return { items, hasMore: false };
-          } catch (error) {
-            if (
-              controller.signal.aborted ||
-              attempt === AUTO_RETRY_DELAYS_MS.length
-            ) {
-              throw error;
-            }
-            await new Promise<void>(resolve =>
-              setTimeout(resolve, AUTO_RETRY_DELAYS_MS[attempt]),
-            );
+            request.success({
+              count: result.items.length,
+              hasMore: result.hasMore,
+              sample: mapApiSample(result.items),
+            });
+            return result;
           }
+          const items = await safetyPlaceApi.list(
+            type,
+            city,
+            controller.signal,
+          );
+          request.success({ count: items.length, sample: mapApiSample(items) });
+          return { items, hasMore: false };
+        } catch (error) {
+          if (controller.signal.aborted) request.cancelled();
+          else request.failure(error);
+          if (
+            controller.signal.aborted ||
+            attempt === AUTO_RETRY_DELAYS_MS.length
+          ) {
+            throw error;
+          }
+          await new Promise<void>(resolve =>
+            setTimeout(resolve, AUTO_RETRY_DELAYS_MS[attempt]),
+          );
         }
-        throw new Error('안전시설을 불러오지 못했습니다.');
-      }),
-    ).then(results => {
-      if (controller.signal.aborted) return;
+      }
+      throw new Error('안전시설을 불러오지 못했습니다.');
+    };
+    const storeResult = (type: SafetyPlaceType, result: SafetyCacheEntry) => {
       setCache(previous => {
         const next = { ...previous };
-        results.forEach((result, index) => {
-          const type = typesToLoad[index];
-          if (result.status === 'fulfilled') {
-            const nextKey = cacheKey(type);
-            if (isMapType(type)) {
-              Object.keys(next).forEach(existingKey => {
-                if (
-                  existingKey.startsWith(`${type}|`) &&
-                  existingKey !== nextKey
-                ) {
-                  delete next[existingKey];
-                }
-              });
+        const nextKey = cacheKey(type);
+        if (isMapType(type)) {
+          Object.keys(next).forEach(existingKey => {
+            if (existingKey.startsWith(`${type}|`) && existingKey !== nextKey) {
+              delete next[existingKey];
             }
-            next[nextKey] = result.value;
+          });
+          if (result.items.length) {
+            next[`last|${type}`] = result;
           }
-        });
+        }
+        next[nextKey] = result;
         return next;
       });
-      setErrors(
-        typesToLoad.filter((_, index) => results[index].status === 'rejected'),
-      );
-      setLoadingTypes([]);
+    };
+    let nextIndex = 0;
+    const runWorker = async () => {
+      while (!controller.signal.aborted) {
+        const index = nextIndex;
+        nextIndex += 1;
+        if (index >= typesToLoad.length) return;
+        const type = typesToLoad[index];
+        try {
+          const result = await loadType(type);
+          if (controller.signal.aborted) return;
+          storeResult(type, result);
+        } catch {
+          if (controller.signal.aborted) return;
+          setErrors(current =>
+            current.includes(type) ? current : [...current, type],
+          );
+        } finally {
+          if (!controller.signal.aborted) {
+            setLoadingTypes(current => current.filter(item => item !== type));
+          }
+        }
+      }
+    };
+    Promise.all(
+      Array.from(
+        { length: Math.min(REQUEST_CONCURRENCY, typesToLoad.length) },
+        runWorker,
+      ),
+    ).catch(() => {
+      // 시설별 오류는 각 worker에서 errors 상태에 반영합니다.
     });
     return () => controller.abort();
   }, [key, city.municipalityCode, cacheKey, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -183,7 +223,13 @@ export function useSafetyPlaces(
   const places = useMemo(
     () =>
       active
-        .flatMap(type => cache[cacheKey(type)]?.items ?? [])
+        .flatMap(type => {
+          const exact = cache[cacheKey(type)];
+          if (exact?.items.length || !isMapType(type)) {
+            return exact?.items ?? [];
+          }
+          return cache[`last|${type}`]?.items ?? exact?.items ?? [];
+        })
         .filter(place => isVisible(place, center)),
     [active, cache, cacheKey, center, isVisible],
   );

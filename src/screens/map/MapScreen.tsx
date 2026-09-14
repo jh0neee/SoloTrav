@@ -60,7 +60,7 @@ import ConvenienceFilterSheet, {
   CONVENIENCE_FILTER,
 } from './ConvenienceFilterSheet';
 import type { TabScreenProps } from '../../navigation/tabs';
-import { getNearestCity } from '../../data/cities';
+import { CITIES, getNearestCity } from '../../data/cities';
 import { useTabBarVisibility } from '../../navigation/TabBarVisibilityContext';
 
 type IconComponent = React.ComponentType<{ color: string; size?: number }>;
@@ -78,6 +78,32 @@ const CATEGORIES: TourCategory[] = [
   'festival',
 ];
 const FACILITY_FILTERS = [...SAFETY_FILTERS, CONVENIENCE_FILTER];
+
+function findRegionSearchResult(query: string): SearchPoi | null {
+  const normalized = query
+    .replace(/\s/g, '')
+    .replace(/^충청북도/, '')
+    .replace(/^충북/, '');
+  const city = CITIES.find(item =>
+    [item.name, item.sigungu].some(name => {
+      const withoutSuffix = name.replace(/[시군]$/, '');
+      return normalized === name || normalized === withoutSuffix;
+    }),
+  );
+  if (!city) return null;
+  return {
+    id: `region:${city.id}`,
+    name: city.sigungu,
+    address: `${city.sido} ${city.sigungu}`,
+    roadAddress: '',
+    category: '지역 둘러보기',
+    phone: '',
+    url: '',
+    distance: null,
+    lat: city.center.lat,
+    lng: city.center.lng,
+  };
+}
 
 /**
  * 칩에 보이는 혼행 관점 라벨. 데이터 분류(TOUR_CATEGORY_LABEL)는 그대로 두고
@@ -113,6 +139,7 @@ const CATEGORY_ICON: Record<TourCategory, IconComponent> = {
 function MapScreen({ onBack }: TabScreenProps) {
   const insets = useSafeAreaInsets();
   const mapRef = useRef<KakaoMapHandle>(null);
+  const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 현위치 — 지도 파란 점과 비상벨의 안전시설 조회가 같은 좌표를 씁니다.
   const {
@@ -135,6 +162,8 @@ function MapScreen({ onBack }: TabScreenProps) {
   const [draftToiletEnabled, setDraftToiletEnabled] = useState(false);
   const [convenienceFilterOpen, setConvenienceFilterOpen] = useState(false);
   const [selectedSafetyId, setSelectedSafetyId] = useState<string | null>(null);
+  /** 검색으로 여행지를 고른 후 늦게 도착한 현위치가 지도를 다시 돌리지 않게 합니다. */
+  const [hasChosenDestination, setHasChosenDestination] = useState(false);
 
   /** 지도 이동이 끝난 시점의 조회 중심점입니다. */
   const [queryCenter, setQueryCenter] = useState<Coords>(myLocation);
@@ -195,11 +224,11 @@ function MapScreen({ onBack }: TabScreenProps) {
 
   // 측위가 끝나면 조회 기준점을 실제 현위치로 한 번 옮깁니다.
   useEffect(() => {
-    if (locationStatus !== 'granted') return;
+    if (locationStatus !== 'granted' || hasChosenDestination) return;
     setQueryCenter(myLocation);
     setMapCenter(myLocation);
     setQueryBounds(null);
-  }, [locationStatus, myLocation]);
+  }, [locationStatus, myLocation, hasChosenDestination]);
 
   /** 축제 레이어의 기간 필터 (축제 칩을 골랐을 때만 보입니다) */
   const [festivalRange, setFestivalRange] = useState<FestivalRange>('now');
@@ -398,10 +427,21 @@ function MapScreen({ onBack }: TabScreenProps) {
       setMapCenter(center);
       if (bounds) {
         setMapBounds(bounds);
-        // idle 시점만 전달되므로 현재 화면의 관광·안전시설을 자동 갱신합니다.
-        setQueryCenter(center);
-        setQueryBounds(bounds);
+        if (viewportTimerRef.current) {
+          clearTimeout(viewportTimerRef.current);
+        }
+        viewportTimerRef.current = setTimeout(() => {
+          setQueryCenter(center);
+          setQueryBounds(bounds);
+        }, 450);
       }
+    },
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
     },
     [],
   );
@@ -469,12 +509,15 @@ function MapScreen({ onBack }: TabScreenProps) {
       items: [],
       status: 'ERROR' as const,
     };
+    const region = findRegionSearchResult(query);
+    const items = result.items.filter(item => {
+      const address = item.roadAddress || item.address;
+      return /^(충청북도|충북)(\s|$)/.test(address.trim());
+    });
     return {
       ...result,
-      items: result.items.filter(item => {
-        const address = item.roadAddress || item.address;
-        return /^(충청북도|충북)(\s|$)/.test(address.trim());
-      }),
+      items: region ? [region, ...items] : items,
+      status: region || items.length ? ('OK' as const) : result.status,
     };
   }, []);
 
@@ -494,8 +537,33 @@ function MapScreen({ onBack }: TabScreenProps) {
   );
 
   const handleSelectPoi = useCallback(
-    (poi: SearchPoi, all: SearchPoi[], query: string) =>
-      applyResults(all.length ? all : [poi], query || poi.name, poi.id),
+    (poi: SearchPoi, all: SearchPoi[], query: string) => {
+      if (poi.id.startsWith('region:')) {
+        const cityId = poi.id.slice('region:'.length);
+        const city = CITIES.find(item => item.id === cityId);
+        if (city) {
+          const center = city.center;
+          setHasChosenDestination(true);
+          setSearchQuery(city.name);
+          setSearchResults([]);
+          setSelectedPoiId(null);
+          setSelectedSearchPlace(null);
+          setSelectedId(null);
+          setSearchOpen(false);
+          setTourCategoryEnabled(true);
+          setCategory('attraction');
+          setQueryCenter(center);
+          setQueryBounds(null);
+          setMapCenter(center);
+          mapRef.current?.clearSearchMarkers();
+          // 도시 결과는 핀 하나가 아니라 해당 지역을 탐색하는 진입점입니다.
+          mapRef.current?.moveTo(center.lat, center.lng, 7);
+          return;
+        }
+      }
+      setHasChosenDestination(true);
+      applyResults(all.length ? all : [poi], query || poi.name, poi.id);
+    },
     [applyResults],
   );
 
@@ -510,6 +578,7 @@ function MapScreen({ onBack }: TabScreenProps) {
    */
   const handleSelectPlace = useCallback((place: MappableTourContent) => {
     const center = { lat: place.lat, lng: place.lng };
+    setHasChosenDestination(true);
     setSelectedSearchPlace(place);
     setSearchQuery(place.title);
     setSearchResults([]);
@@ -543,6 +612,10 @@ function MapScreen({ onBack }: TabScreenProps) {
     setSearchQuery('');
     setSearchResults([]);
     setSelectedPoiId(null);
+    setSelectedSearchPlace(null);
+    setSelectedId(null);
+    setSearchOpen(false);
+    mapRef.current?.selectSearchMarker(null);
     mapRef.current?.clearSearchMarkers();
   }, []);
 
@@ -561,7 +634,9 @@ function MapScreen({ onBack }: TabScreenProps) {
         safetyPlaces={safetyMarkers}
         selectedSafetyId={selectedSafetyId}
         myLocation={myLocation}
-        centerOnMyLocation={locationStatus === 'granted'}
+        centerOnMyLocation={
+          locationStatus === 'granted' && !hasChosenDestination
+        }
         onMarkerPress={handleMarkerPress}
         onSafetyMarkerPress={handleSafetyMarkerPress}
         onSearchMarkerPress={handleSearchMarkerPress}
@@ -600,7 +675,10 @@ function MapScreen({ onBack }: TabScreenProps) {
             {searchQuery ? (
               // 검색 중일 때는 안전 등급 자리에 검색 해제 버튼을 둡니다.
               <Pressable
-                onPress={clearSearch}
+                onPress={event => {
+                  event.stopPropagation();
+                  clearSearch();
+                }}
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel="검색 결과 지우기"
@@ -780,7 +858,9 @@ function MapScreen({ onBack }: TabScreenProps) {
           accessibilityRole="button"
           accessibilityLabel="주변 정보 다시 불러오기"
         >
-          <Text style={styles.researchText}>불러오지 못했어요 · 다시 시도</Text>
+          <Text style={styles.researchText}>
+            주변 관광정보를 불러오지 못했어요 · 다시 시도
+          </Text>
         </Pressable>
       )}
 

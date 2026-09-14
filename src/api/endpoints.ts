@@ -167,10 +167,7 @@ export const ENDPOINTS = {
     pageNo?: number;
     numOfRows?: number;
   }) => withQuery(`/hospitals`, params),
-  /**
-   * 여성안심지킴이집 — 이 목록 API 는 어떤 지역 필터도 받지 않습니다.
-   * 지도 레이어는 regionName 을 지키는 공개 API(safetyFacilities)를 씁니다.
-   */
+  /** JWT 사용자용 여성안심지킴이집 검색. */
   femaleSafetyHouses: (params?: { pageNo?: number; numOfRows?: number }) =>
     withQuery(`/female-safety-houses`, params),
   /** CCTV — localGovernmentCode(City.cctvLocalGovernmentCode)로 시군 필터. limit 1~100. */
