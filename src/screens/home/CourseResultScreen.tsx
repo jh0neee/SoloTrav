@@ -116,11 +116,11 @@ export default function CourseResultScreen({
         await favoriteApi.register(course.requestId);
       }
       setIsSaved(true);
-      Alert.alert('코스 저장 완료', '나만의 맞춤 코스가 저장되었습니다!');
+      Alert.alert('코스 저장 완료', '나만의 혼행 코스가 저장되었습니다!');
     } catch (err) {
       console.warn('[CourseResultScreen] Favorite API save fallback:', err);
       setIsSaved(true);
-      Alert.alert('코스 저장 완료', '나만의 맞춤 코스가 저장되었습니다.');
+      Alert.alert('코스 저장 완료', '나만의 혼행 코스가 저장되었습니다.');
     } finally {
       setIsSaving(false);
     }
@@ -144,7 +144,7 @@ export default function CourseResultScreen({
         >
           <Chevron direction="left" color={colors.textPrimary} size={22} />
         </Pressable>
-        <Text style={styles.headerTitle}>{city.name} AI 맞춤 코스</Text>
+        <Text style={styles.headerTitle}>혼자 떠나는 {city.name} 코스</Text>
         <Pressable
           onPress={onGoHome}
           style={styles.headerRightBtn}
@@ -171,6 +171,7 @@ export default function CourseResultScreen({
             </View>
           </View>
 
+          <Text style={styles.heroKicker}>내 혼행 스타일을 반영한 코스예요</Text>
           <Text style={styles.heroTitle}>{course.title}</Text>
           <Text style={styles.heroSummary}>{course.summary}</Text>
 
@@ -227,7 +228,7 @@ export default function CourseResultScreen({
                 ? activeDay.title && activeDay.title !== `${activeDay.day}일차`
                   ? `${activeDay.day}일차 · ${activeDay.title}`
                   : `${activeDay.day}일차 동선`
-                : '추천 여행 동선'}
+                : '혼자 걷는 추천 동선'}
             </Text>
             {/* <Text style={styles.sectionSub}>시간순 혼행 동선</Text> */}
           </View>
@@ -413,6 +414,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: colors.textSecondary,
+  },
+  heroKicker: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primaryStrong,
+    marginBottom: 6,
   },
   heroTitle: {
     fontSize: 22,

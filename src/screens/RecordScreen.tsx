@@ -45,7 +45,7 @@ const ALL_TAGS = '전체';
 
 const SCOPES: { key: RecordScope; label: string }[] = [
   { key: 'all', label: '전체' },
-  { key: 'mine', label: '내 기록' },
+  { key: 'mine', label: '내 혼행' },
 ];
 
 function RecordScreen() {
@@ -178,9 +178,9 @@ function RecordScreen() {
         <View>
           <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
             <View style={styles.headerTexts}>
-              <Text style={styles.kicker}>혼행 피드</Text>
+              <Text style={styles.kicker}>혼행자들의 진짜 후기</Text>
               <Text style={styles.title}>
-                {scope === 'mine' ? '내가 다녀온 곳' : '다들 어디 다녀왔을까'}
+                {scope === 'mine' ? '내가 혼자 다녀온 곳' : '혼자 다녀온 사람들의 이야기'}
               </Text>
             </View>
             <Pressable
@@ -189,7 +189,7 @@ function RecordScreen() {
               accessibilityRole="button"
               accessibilityLabel="기록 쓰기"
             >
-              <Text style={styles.writeText}>+ 기록</Text>
+              <Text style={styles.writeText}>+ 혼행 기록</Text>
             </Pressable>
           </View>
 
@@ -287,7 +287,7 @@ function ListPlaceholder({
     return (
       <View style={styles.empty}>
         <Text style={styles.emptyText}>
-          {'게스트 모드로 둘러보는 중입니다.\n로그인 후 내가 다녀온 여행 기록을 관리해보세요.'}
+          {'게스트 모드로 둘러보는 중입니다.\n로그인 후 내가 혼자 다녀온 기록을 남기고 관리해보세요.'}
         </Text>
         <Pressable
           style={styles.emptyCta}
@@ -336,8 +336,8 @@ function ListPlaceholder({
     <View style={styles.empty}>
       <Text style={styles.emptyText}>
         {scope === 'mine'
-          ? '아직 남긴 기록이 없어요.\n다녀온 곳을 기록해보세요.'
-          : '아직 올라온 기록이 없어요.\n첫 기록을 남겨보세요.'}
+          ? '아직 남긴 혼행 기록이 없어요.\n혼자 다녀온 곳을 기록해보세요.'
+          : '아직 올라온 혼행 후기가 없어요.\n첫 후기를 남겨보세요.'}
       </Text>
       <Pressable
         style={styles.emptyCta}

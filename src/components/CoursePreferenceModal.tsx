@@ -63,8 +63,8 @@ export function CoursePreferenceModal({
             {/* 상단 헤더 */}
             <View style={styles.header}>
               <View style={styles.titleArea}>
-                <Text style={styles.kicker}>{cityName} 여행 코스</Text>
-                <Text style={styles.title}>어떻게 코스를 준비할까요?</Text>
+                <Text style={styles.kicker}>{cityName} 혼행 코스</Text>
+                <Text style={styles.title}>이번 혼행 코스, 어떻게 준비할까요?</Text>
               </View>
               <Pressable
                 onPress={() => {
@@ -114,13 +114,13 @@ export function CoursePreferenceModal({
                 </View>
                 <View style={styles.optionTextBox}>
                   <View style={styles.optionHeaderRow}>
-                    <Text style={styles.optionTitlePrimary}>내 취향 그대로 빠른 코스</Text>
+                    <Text style={styles.optionTitlePrimary}>내 혼행 스타일 그대로 빠른 코스</Text>
                     <View style={styles.badgeRecommend}>
                       <Text style={styles.badgeRecommendText}>추천</Text>
                     </View>
                   </View>
                   <Text style={styles.optionDesc}>
-                    기존 취향을 유지하고 기간 · 예산 · 메모만 빠르게 선택해요
+                    저장된 스타일을 유지하고 기간 · 예산 · 메모만 빠르게 선택해요
                   </Text>
                 </View>
                 <Chevron direction="right" color={colors.primary} size={16} />
@@ -142,9 +142,9 @@ export function CoursePreferenceModal({
                   <Text style={styles.optionEmoji}>✏️</Text>
                 </View>
                 <View style={styles.optionTextBox}>
-                  <Text style={styles.optionTitle}>기존 취향 바탕으로 일부 수정</Text>
+                  <Text style={styles.optionTitle}>내 스타일 바탕으로 일부 수정</Text>
                   <Text style={styles.optionDesc}>
-                    내 취향 답변을 불러와서 원하는 항목만 변경해요
+                    저장된 답변을 불러와서 이번 혼행에 맞게 일부만 바꿔요
                   </Text>
                 </View>
                 <Chevron direction="right" color={colors.textSecondary} size={16} />
@@ -166,9 +166,9 @@ export function CoursePreferenceModal({
                   <Text style={styles.optionEmoji}>📄</Text>
                 </View>
                 <View style={styles.optionTextBox}>
-                  <Text style={styles.optionTitle}>새로운 취향으로 처음부터 작성</Text>
+                  <Text style={styles.optionTitle}>이번 혼행만을 위해 처음부터 작성</Text>
                   <Text style={styles.optionDesc}>
-                    이번 여행을 위해 백지 상태에서 새로 설정해요
+                    이번 혼행을 위해 백지 상태에서 새로 설정해요
                   </Text>
                 </View>
                 <Chevron direction="right" color={colors.textSecondary} size={16} />

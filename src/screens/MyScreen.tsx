@@ -319,12 +319,12 @@ function MyScreen() {
             </Text>
             <Text style={styles.heroMeta} numberOfLines={1}>
               {isGuest
-                ? '로그인하고 여행 기록과 배지를 저장해보세요'
+                ? '로그인하고 혼행 기록과 흔적을 남겨보세요'
                 : profile.email ?? '카카오 계정 연결됨'}
             </Text>
             {!isGuest && records.mine.status === 'ready' ? (
               <Text style={styles.heroActivity}>
-                내가 쓴 후기 {records.mine.records.length}개
+                내 혼행 후기 {records.mine.records.length}개
               </Text>
             ) : null}
           </View>
@@ -333,7 +333,7 @@ function MyScreen() {
 
       {/* ── 나의 여행 취향 ── */}
       <Section
-        title="나의 여행 취향"
+        title="나의 혼행 스타일"
         actionLabel={preferences.answers ? '수정' : undefined}
         onAction={() => setView('preference')}
       >
@@ -345,12 +345,12 @@ function MyScreen() {
       </Section>
 
       {/* ── 관심 코스 ── */}
-      <Section title="관심 코스">
+      <Section title="찜해둔 혼행 코스">
         <FavoriteCoursesSection onSelectCourse={setSelectedFavorite} />
       </Section>
 
       {/* ── 나의 배지 ── */}
-      <Section title="나의 혼행 배지">
+      <Section title="내가 떠난 혼행의 흔적" hint="혼자 여행을 이어갈수록 배지가 쌓여요">
         <BadgeSummaryBar
           earnedCount={earnedBadgeCount}
           totalCount={visibleBadges.length}
@@ -363,7 +363,7 @@ function MyScreen() {
       </Section>
 
       {/* ── 안전 설정 ── */}
-      <Section title="안전 설정">
+      <Section title="혼자일 때를 위한 안전 설정">
         <View style={styles.card}>
           {SAFETY_SETTINGS.map((setting, index) => {
             const Icon = SAFETY_ICONS[setting.icon];

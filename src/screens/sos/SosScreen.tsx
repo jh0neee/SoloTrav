@@ -176,12 +176,12 @@ function SosScreen({ visible, onClose }: Props) {
             <Text style={styles.headline}>
               {sirenOn
                 ? '사이렌이 울리고 있어요'
-                : '버튼을 누르면 큰 소리로 사이렌이 울려요'}
+                : '혼자 여행 중 불안한 순간에'}
             </Text>
             <Text style={styles.subhead}>
               {sirenOn
                 ? '다시 누르면 꺼져요'
-                : '주변에 위험을 알리고 주의를 끌 수 있어요'}
+                : '위급할 때 버튼을 눌러 주변에 위험을 알리고 도움을 요청하세요'}
             </Text>
           </View>
 

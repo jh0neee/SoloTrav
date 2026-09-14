@@ -188,7 +188,7 @@ function PreferencePromptScreen({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
         {mode === 'course' && city ? (
-          <Text style={styles.cityContext}>{city.name} 여행 코스</Text>
+          <Text style={styles.cityContext}>{city.name} 혼행 코스</Text>
         ) : null}
         {/* 질문 */}
         <View style={styles.titleRow}>
@@ -266,7 +266,7 @@ function PreferencePromptScreen({
                     styles.ctaText,
                     (!canNext || isSaving) && styles.ctaTextOff,
                   ]}>
-                  {isSaving ? '저장 중...' : '내 취향에도 저장하고 코스 만들기'}
+                  {isSaving ? '저장 중...' : '내 혼행 스타일로 저장하고 코스 만들기'}
                 </Text>
               </Pressable>
               <Pressable
@@ -287,7 +287,7 @@ function PreferencePromptScreen({
                     styles.ctaSecondaryText,
                     (!canNext || isSaving) && styles.ctaSecondaryTextOff,
                   ]}>
-                  이번 여행에만 적용하고 코스 만들기
+                  이번 혼행에만 적용하고 코스 만들기
                 </Text>
               </Pressable>
             </View>

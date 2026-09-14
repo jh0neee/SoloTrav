@@ -62,7 +62,7 @@ export const SAFETY_FILTERS: Array<{
   {
     key: 'food',
     label: '음식업소',
-    description: '가까운 충북 음식업소를 확인해요',
+    description: '가까운 음식업소에서 혼밥 장소를 찾아봐요',
     glyph: '식',
     color: '#e06a3b',
     Icon: ForkKnifeIcon,
@@ -97,9 +97,9 @@ export default function SafetyFilterSheet({
       snapPoints={[0.66]}
       header={
         <View style={styles.header}>
-          <Text style={styles.title}>안전시설</Text>
+          <Text style={styles.title}>도움이 필요할 때</Text>
           <Text style={styles.subtitle}>
-            현재 지도 화면에 보이는 장소 수예요
+            혼자 여행할 때 필요한 안전시설 · 현재 지도 화면에 보이는 장소 수예요
           </Text>
         </View>
       }

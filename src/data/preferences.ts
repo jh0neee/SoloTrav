@@ -71,8 +71,8 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   {
     id: 'basic',
     category: 'trip',
-    title: '어떤 여행을 준비 중이세요?',
-    subtitle: '기본 정보부터 알려주세요. 나중에 언제든 바꿀 수 있어요.',
+    title: '어떤 혼행을 준비 중이세요?',
+    subtitle: '혼자 떠날 여행의 기본 정보부터 알려주세요. 나중에 언제든 바꿀 수 있어요.',
     fields: [
       {
         id: 'duration',
@@ -93,8 +93,8 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   {
     id: 'move',
     category: 'mobility',
-    title: '이동은 어떻게 하실 건가요?',
-    subtitle: '동선을 짜는 데 가장 큰 기준이 돼요.',
+    title: '혼자 이동은 어떻게 하실 건가요?',
+    subtitle: '혼자 다니는 동선을 짜는 데 가장 큰 기준이 돼요.',
     fields: [
       {
         id: 'transport',
@@ -127,30 +127,30 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   {
     id: 'tempo',
     category: 'tempo',
-    title: '여행의 온도를 알려주세요',
-    subtitle: '하루를 얼마나 촘촘하게 채울지 정해볼게요.',
+    title: '어떤 혼행을 하고 싶나요?',
+    subtitle: '혼자만의 하루를 얼마나 촘촘하게 채울지 정해볼게요.',
     fields: [
       {
         id: 'pace',
-        label: '여행 페이스',
+        label: '혼행 페이스',
         type: 'cards-single',
         required: true,
         options: [
-          { value: '느긋하게', desc: '하루 2~3곳, 한 곳에 오래 머물기' },
-          { value: '균형있게', desc: '하루 4~5곳, 적당한 리듬으로' },
-          { value: '알차게', desc: '하루 6곳 이상, 부지런히' },
+          { value: '느긋하게', desc: '천천히 쉬는 혼행 · 하루 2~3곳, 한 곳에 오래' },
+          { value: '균형있게', desc: '적당한 리듬의 혼행 · 하루 4~5곳' },
+          { value: '알차게', desc: '알차게 돌아보는 혼행 · 하루 6곳 이상' },
         ],
       },
       {
         id: 'dayNight',
-        label: '낮과 밤, 언제 집중하세요?',
+        label: '혼자 다니기 좋은 시간대는 언제예요?',
         type: 'chips-single',
         required: true,
         options: ['아침 일찍부터', '낮 중심', '해질녘·야경', '늦은 밤까지'],
       },
       {
         id: 'planStyle',
-        label: '계획 스타일',
+        label: '혼행 계획 스타일',
         type: 'chips-single',
         options: ['촘촘한 계획형', '반반이 좋아요', '즉흥적으로'],
       },
@@ -159,8 +159,8 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   {
     id: 'avoid',
     category: 'avoid',
-    title: '이것만은 정말 피하고 싶은 게 있나요?',
-    subtitle: '고른 조건은 코스에서 빼드릴게요.',
+    title: '혼자 다닐 때 이것만은 피하고 싶다면?',
+    subtitle: '고른 조건은 혼행 코스에서 빼드릴게요.',
     fields: [
       {
         id: 'avoid',
@@ -184,7 +184,7 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
       },
       {
         id: 'nightSafety',
-        label: '밤 시간대는 어떻게 할까요?',
+        label: '혼자인 밤 시간대는 어떻게 할까요?',
         type: 'cards-single',
         required: true,
         options: [
@@ -198,8 +198,8 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   {
     id: 'activity',
     category: 'activity',
-    title: '어떤 활동이 끌리세요?',
-    subtitle: '끌리는 걸 모두 골라주세요. 많이 고를수록 정확해져요.',
+    title: '혼자서 어떤 활동이 끌리세요?',
+    subtitle: '혼자여도 즐거운 걸 모두 골라주세요. 많이 고를수록 정확해져요.',
     fields: [
       {
         id: 'activities',
@@ -236,12 +236,12 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   {
     id: 'food',
     category: 'food',
-    title: '맛집은 어떤 스타일이세요?',
+    title: '혼밥은 어떤 스타일이세요?',
     subtitle: '혼자서도 편하게 먹을 수 있는 곳으로 골라드려요.',
     fields: [
       {
         id: 'foodStyle',
-        label: '끌리는 맛집 스타일',
+        label: '끌리는 혼밥 스타일',
         hint: '복수 선택',
         type: 'chips-multi',
         required: true,
@@ -290,8 +290,8 @@ export const PREFERENCE_STEPS: PreferenceStep[] = [
   {
     id: 'stay',
     category: 'stay',
-    title: '숙소는 무엇이 중요하세요?',
-    subtitle: '안전등급과 함께 조건에 맞는 곳을 찾아드려요.',
+    title: '혼자 묵을 숙소, 무엇이 중요하세요?',
+    subtitle: '안전등급과 함께 혼자 묵기 편한 곳을 찾아드려요.',
     fields: [
       {
         id: 'stayType',

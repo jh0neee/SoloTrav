@@ -184,7 +184,7 @@ export default function FavoriteCoursesSection({ onSelectCourse }: Props) {
   if (favorites.length === 0) {
     return (
       <View style={styles.emptyCard}>
-        <Text style={styles.emptyTitle}>아직 관심 코스가 없어요</Text>
+        <Text style={styles.emptyTitle}>아직 찜해둔 혼행 코스가 없어요</Text>
         <Text style={styles.emptyDescription}>
           AI가 추천한 여행 코스에서 하트를 누르면{'\n'}이곳에서 편하게 모아볼 수 있어요.
         </Text>
@@ -222,7 +222,7 @@ export default function FavoriteCoursesSection({ onSelectCourse }: Props) {
                 <View style={styles.infoArea}>
                   <View style={styles.titleLine}>
                     <Text style={styles.rowTitle} numberOfLines={1}>
-                      {item.title ?? 'AI 추천 여행 코스'}
+                      {item.title ?? '나만의 혼행 코스'}
                     </Text>
                     <View style={styles.miniTag}>
                       <Text style={styles.miniTagText}>
@@ -318,7 +318,7 @@ export default function FavoriteCoursesSection({ onSelectCourse }: Props) {
                 <View style={styles.dragHandle} />
                 <View style={styles.sheetHeader}>
                   <View style={styles.sheetTitleGroup}>
-                    <Text style={styles.sheetTitle}>관심 코스 목록</Text>
+                    <Text style={styles.sheetTitle}>찜해둔 혼행 코스</Text>
                     <View style={styles.countBadge}>
                       <Text style={styles.countBadgeText}>{favorites.length}</Text>
                     </View>
@@ -362,7 +362,7 @@ export default function FavoriteCoursesSection({ onSelectCourse }: Props) {
                         <View style={styles.infoArea}>
                           <View style={styles.titleLine}>
                             <Text style={styles.rowTitle} numberOfLines={1}>
-                              {item.title ?? 'AI 추천 여행 코스'}
+                              {item.title ?? '나만의 혼행 코스'}
                             </Text>
                             <View style={styles.miniTag}>
                               <Text style={styles.miniTagText}>

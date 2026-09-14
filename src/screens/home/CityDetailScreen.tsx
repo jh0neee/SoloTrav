@@ -74,7 +74,7 @@ function CityDetailScreen({
         >
           <Chevron direction="left" color={colors.textPrimary} size={22} />
         </Pressable>
-        <Text style={styles.headerTitle}>{city.name} 상세</Text>
+        <Text style={styles.headerTitle}>{city.name} 혼자 가기 전 체크</Text>
       </View>
 
       <ScrollView
@@ -161,23 +161,51 @@ function CityDetailScreen({
             )}
           </View>
 
+          {/* 혼자 가기 전 체크 — 이미 받아온 안전지수·관광정보 개수·축제를 출발 전 체크리스트처럼 묶습니다 */}
           <View style={styles.block}>
             <View style={styles.blockHead}>
-              <Text style={styles.blockTitle}>이 동네에 있는 것</Text>
+              <Text style={styles.blockTitle}>혼자 가기 전 체크</Text>
               <Text style={styles.blockNote}>한국관광공사 등록 기준</Text>
             </View>
-            <View style={styles.countRow}>
-              <CountBox label="관광지" value={counts.data?.attraction} />
-              <CountBox label="문화시설" value={counts.data?.culture} />
-              <CountBox label="음식점" value={counts.data?.food} />
-              <CountBox label="숙박" value={counts.data?.stay} />
+            <View style={styles.checkList}>
+              <CheckRow
+                label="혼행 안전지수"
+                value={`${citySafety.score}점`}
+                note={citySafety.status}
+                noteColor={safetyStatusColor(citySafety.status)}
+              />
+              <CheckRow
+                label="혼자 둘러볼 관광지"
+                value={formatPlaceCount(counts.data?.attraction)}
+              />
+              <CheckRow
+                label="혼밥 장소 찾아볼 음식점"
+                value={formatPlaceCount(counts.data?.food)}
+              />
+              <CheckRow
+                label="혼자 즐길 문화시설"
+                value={formatPlaceCount(counts.data?.culture)}
+              />
+              <CheckRow
+                label="혼자 묵을 숙박"
+                value={formatPlaceCount(counts.data?.stay)}
+              />
+              <CheckRow
+                label="진행·예정 축제"
+                value={
+                  festivals.data ? `${festivals.data.length}개` : '—'
+                }
+              />
             </View>
+            <Text style={styles.safetyCaption}>
+              혼자 여행할 때 필요한 정보를 출발 전에 미리 확인하세요.
+            </Text>
           </View>
 
           {intro.data && intro.data.attractions.length > 0 ? (
             <View style={styles.block}>
               <View style={styles.blockHead}>
-                <Text style={styles.blockTitle}>많이 찾는 곳</Text>
+                <Text style={styles.blockTitle}>혼자 가도 심심하지 않은 곳</Text>
                 <Text style={styles.blockNote}>방문 상위 순</Text>
               </View>
               <View style={styles.hubRow}>
@@ -206,14 +234,14 @@ function CityDetailScreen({
             }}
             accessibilityRole="button"
           >
-            <Text style={styles.ctaText}>{city.name} (으)로 코스 만들기</Text>
+            <Text style={styles.ctaText}>{city.name} 혼행 코스 만들기</Text>
             <Chevron direction="right" color="#ffffff" size={18} />
           </Pressable>
         </View>
 
         {festivals.data && festivals.data.length > 0 ? (
           <View style={styles.exploreSection}>
-            <Text style={styles.exploreTitle}>{city.name}에서 열리는 축제</Text>
+            <Text style={styles.exploreTitle}>혼자 가도 즐기기 좋은 {city.name} 축제</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -231,7 +259,7 @@ function CityDetailScreen({
         ) : null}
 
         <View style={styles.exploreSection}>
-          <Text style={styles.exploreTitle}>{city.name} 둘러보기</Text>
+          <Text style={styles.exploreTitle}>{city.name} 혼자 둘러보기 좋은 곳 탐색</Text>
           <SectionState
             status={intro.status}
             error={intro.error}
@@ -281,13 +309,34 @@ function CityDetailScreen({
   );
 }
 
-function CountBox({ label, value }: { label: string; value?: number }) {
+function formatPlaceCount(value?: number): string {
+  return value === undefined ? '—' : `${value.toLocaleString()}곳`;
+}
+
+/** 체크리스트 한 줄 — 왼쪽 라벨, 오른쪽 값(+상태 메모) */
+function CheckRow({
+  label,
+  value,
+  note,
+  noteColor,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+  noteColor?: string;
+}) {
   return (
-    <View style={styles.countBox}>
-      <Text style={styles.countValue}>
-        {value === undefined ? '—' : value.toLocaleString()}
-      </Text>
-      <Text style={styles.countLabel}>{label}</Text>
+    <View style={styles.checkRow}>
+      <View style={styles.checkBullet} />
+      <Text style={styles.checkLabel}>{label}</Text>
+      <View style={styles.checkValueWrap}>
+        <Text style={styles.checkValue}>{value}</Text>
+        {note ? (
+          <Text style={[styles.checkNote, noteColor ? { color: noteColor } : null]}>
+            {note}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -360,17 +409,30 @@ const styles = StyleSheet.create({
   },
   soloNote: { fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
   safetyCaption: { fontSize: 11, color: colors.textSecondary, lineHeight: 16 },
-  countRow: { flexDirection: 'row', gap: 8 },
-  countBox: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 3,
-    paddingVertical: 12,
+  checkList: {
     borderRadius: 13,
     backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
   },
-  countValue: { fontSize: 17, fontWeight: '700', color: colors.textPrimary },
-  countLabel: { fontSize: 11, color: colors.textSecondary },
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 9,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  checkBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
+  checkLabel: { flex: 1, fontSize: 13, color: colors.textPrimary },
+  checkValueWrap: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  checkValue: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
+  checkNote: { fontSize: 11, fontWeight: '600', color: colors.textSecondary },
   hubRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   hubChip: {
     flexDirection: 'row',

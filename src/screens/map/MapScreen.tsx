@@ -83,6 +83,22 @@ const CATEGORIES: TourCategory[] = [
 ];
 
 /**
+ * 칩에 보이는 혼행 관점 라벨. 데이터 분류(TOUR_CATEGORY_LABEL)는 그대로 두고
+ * "무엇을 하러 찾는지" 가 드러나게만 바꿉니다. 혼밥 가능 여부 같은 데이터는 없으므로
+ * '혼밥 장소 찾기' 처럼 탐색 목적 표현만 씁니다.
+ */
+const SOLO_CATEGORY_LABEL: Record<TourCategory, string> = {
+  attraction: '혼자 둘러보기',
+  food: '혼밥 장소 찾기',
+  culture: '혼자 즐기는 문화',
+  stay: '혼자 묵을 곳',
+  festival: '혼자 가도 좋은 축제',
+  course: TOUR_CATEGORY_LABEL.course,
+  leports: TOUR_CATEGORY_LABEL.leports,
+  shopping: TOUR_CATEGORY_LABEL.shopping,
+};
+
+/**
  * 칩 아이콘 — 지도 핀의 글리프와 같은 그림입니다.
  * 바꿀 때는 kakaoMapHtml.ts 의 GLYPHS 도 함께 맞춰 주세요.
  */
@@ -534,7 +550,7 @@ function MapScreen({ onBack }: TabScreenProps) {
               {searchQuery ||
                 (safetyBadge
                   ? `${safetyBadge.regionName} 주변`
-                  : '장소를 검색해 보세요')}
+                  : '혼자 갈 곳을 검색해 보세요')}
             </Text>
             {searchQuery ? (
               // 검색 중일 때는 안전 등급 자리에 검색 해제 버튼을 둡니다.
@@ -566,7 +582,9 @@ function MapScreen({ onBack }: TabScreenProps) {
         >
           <FilterChip
             label={
-              safetyTypes.length ? `안전시설 ${safetyTypes.length}` : '안전시설'
+              safetyTypes.length
+                ? `도움이 필요할 때 ${safetyTypes.length}`
+                : '도움이 필요할 때'
             }
             count={
               safetyTypes.length && !safety.loading
@@ -580,7 +598,7 @@ function MapScreen({ onBack }: TabScreenProps) {
           {CATEGORIES.map(key => (
             <FilterChip
               key={key}
-              label={TOUR_CATEGORY_LABEL[key]}
+              label={SOLO_CATEGORY_LABEL[key]}
               // 선택된 칩만 실제 조회 결과가 있으므로 그때만 개수를 보여 줍니다.
               count={key === category ? places.length : null}
               Icon={CATEGORY_ICON[key]}

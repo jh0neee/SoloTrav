@@ -276,7 +276,7 @@ function MapSearchOverlay({
             defaultValue={seedTextRef.current}
             onChangeText={handleChangeText}
             onSubmitEditing={handleSubmit}
-            placeholder="장소, 주소, 숙소를 검색해 보세요"
+            placeholder="혼자 갈 장소, 주소, 숙소를 검색해 보세요"
             placeholderTextColor={colors.textSecondary}
             returnKeyType="search"
             autoFocus

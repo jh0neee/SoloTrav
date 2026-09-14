@@ -111,8 +111,8 @@ export function CoursePreferenceEditScreen({
           <Chevron direction="left" color={colors.textPrimary} size={22} />
         </Pressable>
         <View style={styles.headerTitleWrap}>
-          <Text style={styles.headerCity}>{city.name} 여행 코스</Text>
-          <Text style={styles.headerTitle}>취향 요약 및 수정</Text>
+          <Text style={styles.headerCity}>{city.name} 혼행 코스</Text>
+          <Text style={styles.headerTitle}>내 혼행 스타일 확인 및 수정</Text>
         </View>
         <View style={styles.headerRightSpace} />
       </View>
@@ -124,10 +124,10 @@ export function CoursePreferenceEditScreen({
         {/* 안내 배너 */}
         <View style={styles.guideBanner}>
           <Text style={styles.guideTitle}>
-            💡 저장된 취향을 미리 채워두었어요
+            💡 저장된 혼행 스타일을 미리 채워두었어요
           </Text>
           <Text style={styles.guideDesc}>
-            이번 여행에서 바꾸고 싶은 항목만 가볍게 터치해 변경해보세요.
+            이번 혼행에서 바꾸고 싶은 항목만 가볍게 터치해 변경해보세요.
           </Text>
         </View>
 
@@ -181,7 +181,7 @@ export function CoursePreferenceEditScreen({
               pressed && !isSaving && styles.ctaPressed,
             ]}>
             <Text style={[styles.ctaText, isSaving && styles.ctaTextOff]}>
-              {isSaving ? '코스 생성 중...' : '이 취향 조건으로 다시 만들기'}
+              {isSaving ? '코스 생성 중...' : '이 스타일로 혼행 코스 다시 만들기'}
             </Text>
           </Pressable>
 
@@ -202,7 +202,7 @@ export function CoursePreferenceEditScreen({
                 styles.ctaSecondaryText,
                 isSaving && styles.ctaSecondaryTextOff,
               ]}>
-              내 취향에도 저장하고 다시 만들기
+              내 혼행 스타일로 저장하고 다시 만들기
             </Text>
           </Pressable>
         </View>

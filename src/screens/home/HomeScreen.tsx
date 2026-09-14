@@ -121,7 +121,7 @@ function HomeScreen({
 
         {/* <Text style={styles.heroKicker}>오늘 밤도 안전한 길로</Text> */}
         <Text style={styles.heroTitle}>
-          {profile.displayName}님,{'\n'}어디로 혼자 떠나볼까요?
+          {profile.displayName}님,{'\n'}이번 혼행, 어디로 떠나볼까요?
         </Text>
 
         {/* 검색 input (누르면 검색 화면으로 이동) */}
@@ -129,11 +129,11 @@ function HomeScreen({
           style={styles.searchBox}
           onPress={onOpenSearch}
           accessibilityRole="search"
-          accessibilityLabel="가고 싶은 도시 또는 키워드 검색"
+          accessibilityLabel="혼자 가고 싶은 도시나 키워드 검색"
         >
           <SearchIcon color={colors.textSecondary} size={20} />
           <Text style={styles.searchPlaceholder}>
-            가고 싶은 도시 또는 키워드
+            혼자 가고 싶은 도시나 키워드
           </Text>
         </Pressable>
       </View>
@@ -148,10 +148,10 @@ function HomeScreen({
 
       {/* ── 충북 지역 지도 ── */}
       <View style={styles.section}>
-        <SectionHead kicker="AI COURSE" title="동네 고르면, 코스는 AI가" />
+        <SectionHead kicker="SOLO COURSE" title="나만을 위한 혼행 코스" />
 
         <Text style={styles.spotlightIntro}>
-          지도에서 동네를 누르면 취향에 맞춘 일정을 만들어드려요
+          지도에서 동네를 고르면 내 혼행 스타일에 맞춰 코스를 만들어드려요
         </Text>
 
         <View style={styles.spotlightMapCard}>
@@ -195,9 +195,9 @@ function HomeScreen({
                   style={styles.mapDetailButton}
                   onPress={() => onSelectCity(selectedMapCity)}
                   accessibilityRole="button"
-                  accessibilityLabel={`${selectedMapCity.name} 상세 정보 보기`}
+                  accessibilityLabel={`${selectedMapCity.name} 혼자 가기 전 체크 보기`}
                 >
-                  <Text style={styles.mapDetailButtonText}>자세히 보기</Text>
+                  <Text style={styles.mapDetailButtonText}>혼자 가기 전 체크</Text>
                   <Chevron
                     direction="right"
                     color={colors.primary}
@@ -207,7 +207,7 @@ function HomeScreen({
               </>
             ) : (
               <Text style={styles.mapSelectionEmpty}>
-                지도에서 지역을 선택해보세요
+                혼자 가고 싶은 동네를 지도에서 골라보세요
               </Text>
             )}
           </View>
@@ -216,7 +216,7 @@ function HomeScreen({
 
       {/* ── 혼행 랭킹 ── */}
       <View style={styles.section}>
-        <SectionHead kicker="RANKING" title="혼행 랭킹" />
+        <SectionHead kicker="RANKING" title="혼자 가기 좋은 곳 랭킹" />
 
         <View style={styles.rankTabs}>
           {RANKING_KINDS.map(kind => {
@@ -294,7 +294,7 @@ function HomeScreen({
       </View>
       {/* ── 지금 열리는 축제 ── */}
       <View style={styles.section}>
-        <SectionHead kicker="FESTIVAL" title="지금 충북에서 열리는 축제" />
+        <SectionHead kicker="FESTIVAL" title="혼자 가도 즐기기 좋은 축제" />
 
         <SectionState
           status={festivals.status}
@@ -326,7 +326,7 @@ function HomeScreen({
       <View style={styles.section}>
         <SectionHead
           kicker="PHOTO"
-          title="사진으로 먼저 만나는 충북"
+          title="떠나기 전, 사진으로 먼저 만나는 충북"
           moreLabel="더 보기"
           onMore={onOpenGallery}
         />
@@ -422,7 +422,7 @@ function PreferencePromptCard({
       <View style={[styles.promptCard, styles.promptCardLoading]}>
         <ActivityIndicator color={colors.goldDeep} />
         <Text style={styles.promptLoadingText}>
-          여행 취향을 불러오는 중이에요
+          혼행 스타일을 불러오는 중이에요
         </Text>
       </View>
     );
@@ -432,13 +432,13 @@ function PreferencePromptCard({
     return (
       <View style={[styles.promptCard, styles.promptCardLoading]}>
         <Text style={styles.promptLoadingText}>
-          여행 취향을 불러오지 못했어요
+          혼행 스타일을 불러오지 못했어요
         </Text>
         <Pressable
           style={styles.promptRetryButton}
           onPress={onRetry}
           accessibilityRole="button"
-          accessibilityLabel="여행 취향 다시 불러오기"
+          accessibilityLabel="혼행 스타일 다시 불러오기"
         >
           <Text style={styles.promptRetryText}>다시 시도</Text>
         </Pressable>
@@ -456,15 +456,15 @@ function PreferencePromptCard({
         ]}
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel="나의 여행 취향 상세 보기"
+        accessibilityLabel="나의 혼행 스타일 상세 보기"
       >
         <View style={styles.promptTop}>
           <View style={styles.promptTexts}>
             <Text style={styles.configuredTitle}>
-              나만의 여행 취향이 등록되었어요 ✈️
+              나의 혼행 스타일이 등록되었어요 ✈️
             </Text>
             <Text style={styles.configuredSub}>
-              등록된 취향을 바탕으로 딱 맞는 여행지를 추천해드려요
+              이 스타일로 혼자 가기 좋은 곳과 코스를 골라드려요
             </Text>
           </View>
         </View>
@@ -494,9 +494,9 @@ function PreferencePromptCard({
     <View style={[styles.promptCard, styles.promptCardBefore]}>
       <View style={styles.promptTop}>
         <View style={styles.promptTexts}>
-          <Text style={styles.promptKicker}>나만의 여행 취향 찾기</Text>
+          <Text style={styles.promptKicker}>나의 혼행 스타일 알려주기</Text>
           <Text style={styles.promptTitle}>
-            몇 가지 질문에 답하면{`\n`}딱 맞는 여행지를 추천해드려요
+            혼자 여행할 때 어떤 스타일인지 알려주면{`\n`}딱 맞는 혼행 코스를 만들어드려요
           </Text>
         </View>
       </View>
@@ -507,7 +507,7 @@ function PreferencePromptCard({
           onPress={onPress}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="취향 프롬프트 설정하기"
+          accessibilityLabel="혼행 스타일 설정하기"
         >
           <Text style={styles.promptBtnText}>시작하기</Text>
           <Chevron direction="right" color={colors.primaryStrong} size={16} />

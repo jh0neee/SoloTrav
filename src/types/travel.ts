@@ -202,15 +202,19 @@ export type VisitorStat = {
 export const RANKING_KINDS = [
   {
     id: 'safe',
-    label: '안전한 곳',
+    label: '안심되는 곳',
     /** 카드 아래 붙는 설명 */
-    caption: '혼행 안전 점수 순 (치안 40 · 교통 35 · 생활안전 25)',
+    caption: '혼자여도 안심되는 순 · 혼행 안전 점수 (치안 40 · 교통 35 · 생활안전 25)',
   },
-  { id: 'hot', label: '많이 찾는 곳', caption: '주말 여행객 방문이 많은 순' },
+  {
+    id: 'hot',
+    label: '심심하지 않은 곳',
+    caption: '혼자 가도 심심하지 않은 곳 · 주말 여행객 방문이 많은 순',
+  },
   {
     id: 'quiet',
-    label: '여유로운 곳',
-    caption: '사람이 적어 혼자 걷기 좋은 순',
+    label: '조용히 쉬는 곳',
+    caption: '혼자 조용히 쉬기 좋은 곳 · 사람이 적어 혼자 걷기 좋은 순',
   },
 ] as const;
 

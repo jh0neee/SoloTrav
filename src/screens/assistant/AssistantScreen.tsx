@@ -47,7 +47,7 @@ const WELCOME_MESSAGES: ChatMessage[] = [
   {
     id: 'welcome-hello',
     role: 'assistant',
-    text: '안녕하세요, 샛별이예요 ✦ 어떤 여행을 도와드릴까요?',
+    text: '안녕하세요, 혼행 메이트 샛별이예요 ✦ 혼자 여행하며 궁금한 건 뭐든 물어보세요.',
     course: null,
     requestId: null,
     state: 'done',
@@ -56,7 +56,7 @@ const WELCOME_MESSAGES: ChatMessage[] = [
   {
     id: 'welcome-guide',
     role: 'assistant',
-    text: '취향을 알려주시면 안전 데이터까지 함께 살펴서 가장 마음 편한 코스를 만들어드릴게요.',
+    text: '혼자 밥 먹을 곳, 주변 안전시설, 혼자 가기 좋은 곳까지 — 안전 데이터를 함께 살펴서 마음 편한 혼행을 도와드릴게요.',
     course: null,
     requestId: null,
     state: 'done',
@@ -175,13 +175,13 @@ function AssistantScreen() {
         </View>
 
         <View style={styles.headerTexts}>
-          <Text style={styles.headerTitle}>샛별이</Text>
+          <Text style={styles.headerTitle}>혼행 메이트 샛별이</Text>
           <View style={styles.headerStatusRow}>
             <View
               style={[styles.statusDot, !isBusy && styles.statusDotIdle]}
             />
             <Text style={styles.headerSubtitle}>
-              24시 동행 가이드 · {isBusy ? '응답 중' : '대기 중'}
+              혼자 여행할 때 24시 동행 · {isBusy ? '응답 중' : '대기 중'}
             </Text>
           </View>
         </View>
@@ -229,8 +229,8 @@ function AssistantScreen() {
         <View style={styles.preferenceNote}>
           <Text style={styles.preferenceNoteText}>
             {preferenceSummary
-              ? `내 취향 반영 중 · ${preferenceSummary}`
-              : '홈에서 여행 취향을 등록하면 더 정확한 코스를 만들어드려요.'}
+              ? `내 혼행 스타일 반영 중 · ${preferenceSummary}`
+              : '홈에서 혼행 스타일을 등록하면 더 정확한 코스를 만들어드려요.'}
           </Text>
         </View>
 

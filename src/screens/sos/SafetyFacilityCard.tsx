@@ -69,7 +69,7 @@ function SafetyFacilityCard({
         styles.card,
         { backgroundColor: active ? colors.sosActiveCard : colors.sosIdleCard },
       ]}>
-      <Text style={styles.cardTitle}>가장 가까운 안전 시설</Text>
+      <Text style={styles.cardTitle}>지금 도움받을 수 있는 가장 가까운 곳</Text>
 
       {loading ? (
         <View style={styles.stateBox}>

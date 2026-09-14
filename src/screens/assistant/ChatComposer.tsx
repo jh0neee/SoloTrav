@@ -64,7 +64,7 @@ function ChatComposer({ disabled, onSend }: Props) {
           style={styles.input}
           value={draft}
           onChangeText={setDraft}
-          placeholder="샛별이에게 무엇이든 물어보세요"
+          placeholder="혼자 여행하며 궁금한 걸 물어보세요"
           placeholderTextColor={colors.chatInputPlaceholder}
           editable={!disabled}
           multiline

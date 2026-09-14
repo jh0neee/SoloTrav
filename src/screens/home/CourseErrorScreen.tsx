@@ -79,7 +79,7 @@ export default function CourseErrorScreen({
             accessibilityLabel="홈으로 가기">
             <Chevron direction="left" color={colors.textPrimary} size={22} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{city.name} 여행 코스</Text>
+          <Text style={styles.headerTitle}>혼자 떠나는 {city.name} 코스</Text>
           <View style={styles.headerRightPlaceholder} />
         </View>
 
@@ -98,18 +98,18 @@ export default function CourseErrorScreen({
           </View>
 
           <Text style={styles.title}>
-            {city.name} 맞춤 코스는{'\n'}로그인 후 받아볼 수 있어요
+            {city.name} 혼행 코스는{'\n'}로그인 후 받아볼 수 있어요
           </Text>
           <Text style={styles.subtitle}>
-            로그인하면 샛별이가 등록한 취향을 바탕으로{'\n'}
-            나만의 {city.name} 일정을 설계해 드려요.
+            로그인하면 샛별이가 내 혼행 스타일을 바탕으로{'\n'}
+            혼자 떠나는 {city.name} 일정을 설계해 드려요.
           </Text>
 
           <View style={styles.benefitBox}>
             {[
-              '취향에 딱 맞는 AI 추천 코스',
-              '만든 코스와 여행 기록 저장',
-              '여행 배지 수집',
+              '내 혼행 스타일에 딱 맞는 AI 코스',
+              '만든 코스와 혼행 기록 저장',
+              '혼행의 흔적(배지) 모으기',
             ].map(item => (
               <View key={item} style={styles.benefitRow}>
                 <SparkIcon color={colors.primary} size={14} filled />
@@ -152,7 +152,7 @@ export default function CourseErrorScreen({
           accessibilityLabel="홈으로 가기">
           <Chevron direction="left" color={colors.textPrimary} size={22} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{city.name} 여행 코스</Text>
+        <Text style={styles.headerTitle}>혼자 떠나는 {city.name} 코스</Text>
         <View style={styles.headerRightPlaceholder} />
       </View>
       {/* 중앙 에러 상태 영역 */}

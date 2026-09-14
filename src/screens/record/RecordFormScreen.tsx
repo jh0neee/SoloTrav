@@ -78,6 +78,16 @@ function parseTags(raw: string): string[] {
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
+/** 혼행 후기에서 자주 쓰는 태그. 공백으로 나뉘지 않게 붙여 씁니다. */
+const SUGGESTED_TAGS = [
+  '혼자다녀왔어요',
+  '뚜벅이여행',
+  '낮방문추천',
+  '야간이동주의',
+  '혼자사진찍기좋음',
+  '혼밥성공',
+];
+
 function RecordFormScreen({
   initial,
   existingImageUrls = [],
@@ -146,7 +156,7 @@ function RecordFormScreen({
           <Chevron direction="left" color={colors.textPrimary} size={22} />
         </Pressable>
         <Text style={styles.topTitle}>
-          {isEditing ? '기록 수정' : '여행 기록'}
+          {isEditing ? '혼행 기록 수정' : '혼행 기록'}
         </Text>
         {/* 좌우 균형을 맞추기 위한 빈 칸 */}
         <View style={styles.backBtn} />
@@ -205,6 +215,22 @@ function RecordFormScreen({
         ) : (
           <Text style={styles.hint}>쉼표나 띄어쓰기로 구분해주세요.</Text>
         )}
+        {/* 혼행 관점 추천 태그 — 누르면 입력칸에 더해집니다 (작성자가 직접 고르는 태그라 데이터 단정이 아닙니다) */}
+        <View style={styles.suggestWrap}>
+          {SUGGESTED_TAGS.filter(tag => !tags.includes(tag)).map(tag => (
+            <Pressable
+              key={tag}
+              style={styles.suggestChip}
+              onPress={() =>
+                setTagText(prev => (prev.trim() ? `${prev.trim()}, ${tag}` : tag))
+              }
+              accessibilityRole="button"
+              accessibilityLabel={`${tag} 태그 추가`}
+            >
+              <Text style={styles.suggestChipText}>+ #{tag}</Text>
+            </Pressable>
+          ))}
+        </View>
 
         <Text style={[styles.label, styles.labelSpaced]}>기록</Text>
         <View style={styles.textArea}>
@@ -215,7 +241,7 @@ function RecordFormScreen({
               setDescription(text.slice(0, DESCRIPTION_MAX))
             }
             multiline
-            placeholder="어디를 다녀왔고 어땠는지 적어주세요"
+            placeholder="혼자 다녀온 곳, 어땠는지 적어주세요"
             placeholderTextColor={colors.textSecondary}
           />
           <Text style={styles.counter}>
@@ -424,6 +450,25 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: colors.goldDeep,
+  },
+  suggestWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  suggestChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  suggestChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
   },
 
   textArea: {

@@ -64,7 +64,7 @@ export default function CourseLoadingScreen({
     `${city.name} 혼행 취향을 꼼꼼히 분석하고 있어요 ✨`,
     '안전한 이동 동선과 추천 명소를 매칭하고 있어요 🗺️',
     '취향에 딱 맞는 맛집과 힐링 스팟을 찾고 있어요 ☕',
-    '거의 다 되었어요! 나만의 맞춤 일정을 완성 중입니다 🚀',
+    '거의 다 되었어요! 나만의 혼행 일정을 완성 중입니다 🚀',
   ];
 
   const [phraseIndex, setPhraseIndex] = useState(0);
@@ -340,7 +340,7 @@ export default function CourseLoadingScreen({
 
           {/* 상단 뱃지 */}
           <View style={styles.badge}>
-            <Text style={styles.badgeText}>{city.name} 맞춤 코스 설계 중</Text>
+            <Text style={styles.badgeText}>{city.name} 혼행 코스 설계 중</Text>
           </View>
 
           {/* 메인 타이틀 자리에 3~4개 안내 문구가 큰 크기로 페이드 순환 */}
