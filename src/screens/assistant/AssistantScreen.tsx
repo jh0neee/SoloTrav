@@ -91,13 +91,30 @@ function AssistantScreen() {
     return () => subscription.remove();
   }, []);
 
+  // 게스트는 서버가 답을 만들어 주지 않습니다. 같은 샘플이 반복되면 오류처럼 보이므로
+  // 보내기 전에 막고 로그인으로 유도합니다.
+  const promptGuestLogin = useCallback(() => {
+    Alert.alert(
+      '로그인이 필요한 기능입니다',
+      '샛별이와 대화하려면 로그인이 필요해요.\n로그인하면 내 혼행 스타일에 맞춘 코스를 실시간으로 만들어드려요.',
+      [
+        { text: '둘러보기 계속', style: 'cancel' },
+        { text: '로그인하기', onPress: logout },
+      ],
+    );
+  }, [logout]);
+
   const handleSend = useCallback(
     (text: string) => {
+      if (isGuest) {
+        promptGuestLogin();
+        return;
+      }
       // 문장에 도시 이름이 있으면 그 지역을, 없으면 저장된 취향의 지역을 함께 보냅니다.
       const regionName = detectRegionName(text, preferences.answers);
       assistantStore.send(text, regionName);
     },
-    [preferences.answers],
+    [isGuest, promptGuestLogin, preferences.answers],
   );
 
   const handleClear = useCallback(() => {
@@ -225,14 +242,39 @@ function AssistantScreen() {
           </View>
         ) : null}
 
-        {/* 취향 반영 안내 — 등록 전이면 등록을 권합니다 */}
-        <View style={styles.preferenceNote}>
-          <Text style={styles.preferenceNoteText}>
-            {preferenceSummary
-              ? `내 혼행 스타일 반영 중 · ${preferenceSummary}`
-              : '홈에서 혼행 스타일을 등록하면 더 정확한 코스를 만들어드려요.'}
-          </Text>
-        </View>
+        {isGuest ? (
+          // 게스트 안내 — 대화가 안 되는 이유와 로그인 진입점을 같이 보여줍니다
+          <View style={styles.guestNote}>
+            <Text style={styles.guestNoteTitle}>
+              샛별이와 대화하려면 로그인이 필요해요
+            </Text>
+            <Text style={styles.guestNoteText}>
+              둘러보기 모드에서는 답변을 만들 수 없어요. 로그인하면 내 혼행
+              스타일에 맞춘 코스를 실시간으로 만들어드려요.
+            </Text>
+            <Pressable
+              onPress={logout}
+              accessibilityRole="button"
+              accessibilityLabel="로그인하고 샛별이와 대화하기"
+              style={({ pressed }) => [
+                styles.guestNoteButton,
+                pressed && styles.guestNoteButtonPressed,
+              ]}>
+              <Text style={styles.guestNoteButtonText}>
+                로그인하고 대화하기
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          /* 취향 반영 안내 — 등록 전이면 등록을 권합니다 */
+          <View style={styles.preferenceNote}>
+            <Text style={styles.preferenceNoteText}>
+              {preferenceSummary
+                ? `내 혼행 스타일 반영 중 · ${preferenceSummary}`
+                : '홈에서 혼행 스타일을 등록하면 더 정확한 코스를 만들어드려요.'}
+            </Text>
+          </View>
+        )}
 
         {messages.map(message => (
           <ChatBubble
@@ -367,6 +409,42 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16,
     color: colors.chatHeaderSub,
+  },
+  guestNote: {
+    alignSelf: 'stretch',
+    marginBottom: 16,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: colors.chatStarterBg,
+    borderWidth: 1,
+    borderColor: colors.chatStarterBorder,
+    gap: 6,
+  },
+  guestNoteTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.chatStarterText,
+  },
+  guestNoteText: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.chatHeaderSub,
+  },
+  guestNoteButton: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: colors.mascot,
+  },
+  guestNoteButtonPressed: {
+    backgroundColor: colors.mascotDeep,
+  },
+  guestNoteButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.mascotFace,
   },
 });
 
