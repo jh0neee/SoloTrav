@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   safetyPlaceApi,
+  type ReferencePlaceMapType,
   type SafetyPlace,
   type SafetyPlaceType,
 } from '../api/safetyPlaceApi';
@@ -19,9 +20,25 @@ const ALL_TYPES: SafetyPlaceType[] = [
   'femaleHouse',
   'cctv',
   'emergencyBell',
+  'clinic',
+  'pharmacy',
+  'affiliatedClinic',
+  'toilet',
   'streetlight',
 ];
-const MAP_TYPES: SafetyPlaceType[] = ['cctv', 'emergencyBell'];
+const MAP_TYPES: ReferencePlaceMapType[] = [
+  'cctv',
+  'emergencyBell',
+  'hospital',
+  'clinic',
+  'pharmacy',
+  'affiliatedClinic',
+  'toilet',
+];
+
+function isMapType(type: SafetyPlaceType): type is ReferencePlaceMapType {
+  return MAP_TYPES.includes(type as ReferencePlaceMapType);
+}
 const AUTO_RETRY_DELAYS_MS = [500, 1_200];
 
 type SafetyCacheEntry = {
@@ -59,7 +76,7 @@ export function useSafetyPlaces(
   const mapBoundsKey = boundsKey(queryBounds);
   const cacheKey = useCallback(
     (type: SafetyPlaceType) =>
-      MAP_TYPES.includes(type)
+      isMapType(type)
         ? `${type}|${mapBoundsKey}`
         : `${city.municipalityCode}|${type}`,
     [city.municipalityCode, mapBoundsKey],
@@ -89,9 +106,9 @@ export function useSafetyPlaces(
           attempt += 1
         ) {
           try {
-            if (MAP_TYPES.includes(type) && isValidBounds(queryBounds)) {
+            if (isMapType(type) && isValidBounds(queryBounds)) {
               return await safetyPlaceApi.map(
-                type as 'cctv' | 'emergencyBell',
+                type,
                 queryBounds,
                 controller.signal,
               );
@@ -124,7 +141,7 @@ export function useSafetyPlaces(
           const type = typesToLoad[index];
           if (result.status === 'fulfilled') {
             const nextKey = cacheKey(type);
-            if (MAP_TYPES.includes(type)) {
+            if (isMapType(type)) {
               Object.keys(next).forEach(existingKey => {
                 if (
                   existingKey.startsWith(`${type}|`) &&

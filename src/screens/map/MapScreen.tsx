@@ -56,7 +56,9 @@ import { type SafetyPlaceType } from '../../api/safetyPlaceApi';
 import { useSafetyPlaces, type MapBounds } from '../../map/useSafetyPlaces';
 import type { SafetyMapMarker } from './kakaoMapHtml';
 import SafetyFilterSheet, { SAFETY_FILTERS } from './SafetyFilterSheet';
-import ConvenienceFilterSheet from './ConvenienceFilterSheet';
+import ConvenienceFilterSheet, {
+  CONVENIENCE_FILTER,
+} from './ConvenienceFilterSheet';
 import type { TabScreenProps } from '../../navigation/tabs';
 import { getNearestCity } from '../../data/cities';
 import { useTabBarVisibility } from '../../navigation/TabBarVisibilityContext';
@@ -75,6 +77,7 @@ const CATEGORIES: TourCategory[] = [
   'stay',
   'festival',
 ];
+const FACILITY_FILTERS = [...SAFETY_FILTERS, CONVENIENCE_FILTER];
 
 /**
  * 칩에 보이는 혼행 관점 라벨. 데이터 분류(TOUR_CATEGORY_LABEL)는 그대로 두고
@@ -128,6 +131,8 @@ function MapScreen({ onBack }: TabScreenProps) {
     [],
   );
   const [safetyFilterOpen, setSafetyFilterOpen] = useState(false);
+  const [toiletEnabled, setToiletEnabled] = useState(false);
+  const [draftToiletEnabled, setDraftToiletEnabled] = useState(false);
   const [convenienceFilterOpen, setConvenienceFilterOpen] = useState(false);
   const [selectedSafetyId, setSelectedSafetyId] = useState<string | null>(null);
 
@@ -143,10 +148,14 @@ function MapScreen({ onBack }: TabScreenProps) {
     () => getNearestCity(queryCenter.lat, queryCenter.lng),
     [queryCenter.lat, queryCenter.lng],
   );
+  const activeFacilityTypes = useMemo<SafetyPlaceType[]>(
+    () => (toiletEnabled ? [...safetyTypes, 'toilet'] : safetyTypes),
+    [safetyTypes, toiletEnabled],
+  );
   const safety = useSafetyPlaces(
     queryCenter,
     currentCity,
-    safetyTypes,
+    activeFacilityTypes,
     queryBounds,
     mapBounds,
   );
@@ -156,8 +165,8 @@ function MapScreen({ onBack }: TabScreenProps) {
   );
   const safetyMarkers = useMemo<SafetyMapMarker[]>(() => {
     const metadata = Object.fromEntries(
-      SAFETY_FILTERS.map(item => [item.key, item]),
-    ) as Record<SafetyPlaceType, (typeof SAFETY_FILTERS)[number]>;
+      FACILITY_FILTERS.map(item => [item.key, item]),
+    ) as Record<SafetyPlaceType, (typeof FACILITY_FILTERS)[number]>;
     return safety.places.map(place => ({
       id: place.id,
       lat: place.lat,
@@ -179,7 +188,7 @@ function MapScreen({ onBack }: TabScreenProps) {
   const safetyErrorLabel = useMemo(() => {
     const labels = safety.errors.map(
       type =>
-        SAFETY_FILTERS.find(item => item.key === type)?.label ?? '안전시설',
+        FACILITY_FILTERS.find(item => item.key === type)?.label ?? '주변 시설',
     );
     return `${labels.join('·')} 정보를 불러오지 못했어요`;
   }, [safety.errors]);
@@ -437,6 +446,14 @@ function MapScreen({ onBack }: TabScreenProps) {
     setSafetyFilterOpen(false);
   }, [draftSafetyTypes, mapCenter, mapBounds]);
 
+  const applyConvenienceFilter = useCallback(() => {
+    setToiletEnabled(draftToiletEnabled);
+    setQueryCenter(mapCenter);
+    setQueryBounds(mapBounds);
+    setSelectedSafetyId(null);
+    setConvenienceFilterOpen(false);
+  }, [draftToiletEnabled, mapCenter, mapBounds]);
+
   const handleSafetyMarkerPress = useCallback((id: string) => {
     setSelectedId(null);
     setSelectedPoiId(null);
@@ -629,11 +646,12 @@ function MapScreen({ onBack }: TabScreenProps) {
             />
           ))}
           <FilterChip
-            label="편의시설"
+            label={toiletEnabled ? CONVENIENCE_FILTER.label : '편의시설'}
             count={null}
             Icon={ToiletIcon}
-            selected={false}
+            selected={toiletEnabled}
             onPress={() => {
+              setDraftToiletEnabled(toiletEnabled);
               setSelectedId(null);
               setSelectedSafetyId(null);
               setConvenienceFilterOpen(true);
@@ -837,7 +855,7 @@ function MapScreen({ onBack }: TabScreenProps) {
           <View style={styles.safetyCardHeader}>
             <Text style={styles.safetyCardKind}>
               {
-                SAFETY_FILTERS.find(
+                FACILITY_FILTERS.find(
                   item => item.key === selectedSafetyPlace.type,
                 )?.label
               }
@@ -895,6 +913,10 @@ function MapScreen({ onBack }: TabScreenProps) {
 
       <ConvenienceFilterSheet
         visible={convenienceFilterOpen}
+        selected={draftToiletEnabled}
+        onToggle={() => setDraftToiletEnabled(current => !current)}
+        onClear={() => setDraftToiletEnabled(false)}
+        onApply={applyConvenienceFilter}
         onClose={() => setConvenienceFilterOpen(false)}
       />
 

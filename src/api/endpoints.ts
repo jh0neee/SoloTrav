@@ -14,6 +14,18 @@ import type {
 
 type QueryValue = string | number | boolean | undefined | null;
 
+export type ReferencePlaceResource =
+  | 'cctvs'
+  | 'emergency-bells'
+  | 'toilets'
+  | 'restaurants'
+  | 'lodgings'
+  | 'hospitals'
+  | 'clinics'
+  | 'pharmacies'
+  | 'travel-agencies'
+  | 'affiliated-clinics';
+
 /** undefined/null 인 값은 빼고 쿼리스트링을 붙입니다. */
 function withQuery(path: string, params?: Record<string, QueryValue>): string {
   if (!params) {
@@ -206,6 +218,43 @@ export const ENDPOINTS = {
     keyword?: string;
     regionName?: string;
   }) => withQuery(`/reference-places/emergency-bells/nearby`, params),
+  /** 공공데이터 장소 공통 목록 조회. */
+  referencePlaces: (
+    resource: ReferencePlaceResource,
+    params?: {
+      page?: number;
+      limit?: number;
+      keyword?: string;
+      regionName?: string;
+    },
+  ) => withQuery(`/reference-places/${resource}`, params),
+  /** 공공데이터 장소 공통 GeoJSON 지도 조회. */
+  referencePlacesMap: (
+    resource: ReferencePlaceResource,
+    params: {
+      north: number;
+      south: number;
+      east: number;
+      west: number;
+      page?: number;
+      limit?: number;
+      keyword?: string;
+      regionName?: string;
+    },
+  ) => withQuery(`/reference-places/${resource}/map`, params),
+  /** 공공데이터 장소 공통 주변 거리순 조회. */
+  referencePlacesNearby: (
+    resource: ReferencePlaceResource,
+    params: {
+      longitude: number;
+      latitude: number;
+      radiusMeters?: number;
+      page?: number;
+      limit?: number;
+      keyword?: string;
+      regionName?: string;
+    },
+  ) => withQuery(`/reference-places/${resource}/nearby`, params),
   /** 스마트 가로등 — sido 필수, sigungu 는 함께 주면 시군까지 좁혀집니다. limit 1~100. */
   smartStreetlights: (params: {
     sido: string;

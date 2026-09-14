@@ -3,9 +3,11 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   BellRingingIcon,
   FirstAidKitIcon,
+  HospitalIcon,
   LampPendantIcon,
   PillIcon,
   ShieldCheckIcon,
+  StethoscopeIcon,
   VideoCameraIcon,
 } from 'phosphor-react-native';
 import BottomSheet from '../../components/BottomSheet';
@@ -62,6 +64,30 @@ export const SAFETY_FILTERS: Array<{
     color: '#dc4c64',
     Icon: FirstAidKitIcon,
   },
+  {
+    key: 'clinic',
+    label: '의원',
+    description: '가까운 동네 의원 위치를 확인해요',
+    markerLabel: '의원',
+    color: '#e11d48',
+    Icon: StethoscopeIcon,
+  },
+  {
+    key: 'pharmacy',
+    label: '약국',
+    description: '가까운 약국 위치를 확인해요',
+    markerLabel: '약국',
+    color: '#16a34a',
+    Icon: PillIcon,
+  },
+  {
+    key: 'affiliatedClinic',
+    label: '부속의료기관',
+    description: '기관 안에서 운영하는 의료시설이에요',
+    markerLabel: '부속의료기관',
+    color: '#0f766e',
+    Icon: HospitalIcon,
+  },
 ];
 
 const SECTIONS: Array<{
@@ -74,28 +100,9 @@ const SECTIONS: Array<{
   },
   {
     title: '의료',
-    keys: ['hospital'],
+    keys: ['hospital', 'clinic', 'pharmacy', 'affiliatedClinic'],
   },
 ];
-
-const UPCOMING_FILTERS = [
-  {
-    key: 'clinic',
-    section: '의료',
-    label: '의원',
-    description: '가까운 동네 의원 위치를 확인해요',
-    color: '#e11d48',
-    Icon: FirstAidKitIcon,
-  },
-  {
-    key: 'pharmacy',
-    section: '의료',
-    label: '약국',
-    description: '가까운 약국 위치를 확인해요',
-    color: '#16a34a',
-    Icon: PillIcon,
-  },
-] as const;
 
 type Props = {
   visible: boolean;
@@ -132,34 +139,17 @@ export default function SafetyFilterSheet({
         {SECTIONS.map(section => (
           <View key={section.title} style={styles.section}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
-            {[
-              ...section.keys.map(key => ({
-                kind: 'available' as const,
-                filter: SAFETY_FILTERS.find(item => item.key === key)!,
-              })),
-              ...UPCOMING_FILTERS.filter(
-                item => item.section === section.title,
-              ).map(filter => ({ kind: 'upcoming' as const, filter })),
-            ].map(({ kind, filter }) => {
-              const available = kind === 'available';
-              const key = filter.key;
-              const safetyKey = available
-                ? (filter.key as SafetyPlaceType)
-                : null;
-              const on = safetyKey !== null && selected.includes(safetyKey);
+            {section.keys.map(key => {
+              const filter = SAFETY_FILTERS.find(item => item.key === key)!;
+              const on = selected.includes(key);
               const { label, description, color, Icon } = filter;
               return (
                 <Pressable
                   key={key}
-                  onPress={safetyKey ? () => onToggle(safetyKey) : undefined}
+                  onPress={() => onToggle(key)}
                   accessibilityRole="checkbox"
-                  accessibilityState={{ checked: on, disabled: !available }}
-                  disabled={!available}
-                  style={[
-                    styles.option,
-                    on && styles.optionOn,
-                    !available && styles.optionDisabled,
-                  ]}
+                  accessibilityState={{ checked: on }}
+                  style={[styles.option, on && styles.optionOn]}
                 >
                   <View
                     style={[styles.icon, { backgroundColor: `${color}18` }]}
@@ -170,16 +160,9 @@ export default function SafetyFilterSheet({
                     <Text style={styles.optionTitle}>{label}</Text>
                     <Text style={styles.optionDescription}>{description}</Text>
                   </View>
-                  {!available ? (
-                    <View style={styles.upcomingBadge}>
-                      <Text style={styles.upcomingText}>연결 예정</Text>
-                    </View>
-                  ) : null}
-                  {available && (
-                    <View style={[styles.check, on && styles.checkOn]}>
-                      {on && <Text style={styles.checkMark}>✓</Text>}
-                    </View>
-                  )}
+                  <View style={[styles.check, on && styles.checkOn]}>
+                    {on && <Text style={styles.checkMark}>✓</Text>}
+                  </View>
                 </Pressable>
               );
             })}
@@ -232,7 +215,6 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primarySoft,
   },
-  optionDisabled: { opacity: 0.62 },
   icon: {
     width: 42,
     height: 42,
@@ -247,14 +229,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
   },
-  upcomingBadge: {
-    marginRight: 2,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 10,
-    backgroundColor: colors.surface,
-  },
-  upcomingText: { fontSize: 10, fontWeight: '700', color: colors.textTertiary },
   check: {
     width: 22,
     height: 22,

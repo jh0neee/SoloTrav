@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import { ENDPOINTS } from './endpoints';
+import { ENDPOINTS, type ReferencePlaceResource } from './endpoints';
 import { toApiError } from './errors';
 import type { City } from '../data/cities';
 
@@ -15,9 +15,22 @@ export type SafetyPlaceType =
   | 'femaleHouse'
   | 'cctv'
   | 'emergencyBell'
+  | 'clinic'
+  | 'pharmacy'
+  | 'affiliatedClinic'
+  | 'toilet'
   | 'streetlight';
 
-type ReferencePlaceMapType = Extract<SafetyPlaceType, 'cctv' | 'emergencyBell'>;
+export type ReferencePlaceMapType = Extract<
+  SafetyPlaceType,
+  | 'cctv'
+  | 'emergencyBell'
+  | 'hospital'
+  | 'clinic'
+  | 'pharmacy'
+  | 'affiliatedClinic'
+  | 'toilet'
+>;
 
 export type SafetyPlace = {
   id: string;
@@ -47,6 +60,18 @@ type Raw = Record<string, unknown>;
 /** 한 페이지 최대 건수 — 서버가 101 이상은 400 으로 거절합니다. */
 const PAGE_SIZE = 100;
 const MAP_PAGE_SIZE = 200;
+const REFERENCE_MAP_RESOURCES: Record<
+  ReferencePlaceMapType,
+  ReferencePlaceResource
+> = {
+  cctv: 'cctvs',
+  emergencyBell: 'emergency-bells',
+  hospital: 'hospitals',
+  clinic: 'clinics',
+  pharmacy: 'pharmacies',
+  affiliatedClinic: 'affiliated-clinics',
+  toilet: 'toilets',
+};
 /**
  * 페이지 순회 상한. 청주 CCTV 가 약 2,900건(29페이지)으로 가장 많습니다.
  * 서버 total 이 잘못 와도 여기서 멈춥니다.
@@ -189,6 +214,10 @@ function normalize(
     femaleHouse: '여성안심지킴이집',
     cctv: 'CCTV',
     emergencyBell: '공공 비상벨',
+    clinic: '의원',
+    pharmacy: '약국',
+    affiliatedClinic: '부속의료기관',
+    toilet: '공중화장실',
     streetlight: '스마트 가로등',
   }[type];
   const roadAddress = text(
@@ -329,6 +358,22 @@ async function fetchAllPages(
   return collected;
 }
 
+function fetchReferencePlacePages(
+  resource: ReferencePlaceResource,
+  city: City,
+  signal?: AbortSignal,
+) {
+  return fetchAllPages(
+    page =>
+      ENDPOINTS.referencePlaces(resource, {
+        page,
+        limit: PAGE_SIZE,
+        regionName: `${city.sido} ${city.sigungu}`,
+      }),
+    signal,
+  );
+}
+
 /**
  * 레이어별 조회. 사용자 좌표는 보내지 않고 시군명·코드로만 좁힙니다.
  * 엔드포인트마다 필터·페이징 규약이 달라 한 곳에 모아 둡니다(endpoints.ts 주석 참고).
@@ -359,6 +404,14 @@ async function fetchRaw(
           }),
         signal,
       );
+    case 'clinic':
+      return fetchReferencePlacePages('clinics', city, signal);
+    case 'pharmacy':
+      return fetchReferencePlacePages('pharmacies', city, signal);
+    case 'affiliatedClinic':
+      return fetchReferencePlacePages('affiliated-clinics', city, signal);
+    case 'toilet':
+      return fetchReferencePlacePages('toilets', city, signal);
     case 'streetlight':
       return fetchAllPages(
         page =>
@@ -403,14 +456,11 @@ export const safetyPlaceApi = {
     signal?: AbortSignal,
   ): Promise<SafetyPlacePage> => {
     try {
-      const path =
-        type === 'cctv'
-          ? ENDPOINTS.cctvsMap({ ...bounds, page: 1, limit: MAP_PAGE_SIZE })
-          : ENDPOINTS.emergencyBellsMap({
-              ...bounds,
-              page: 1,
-              limit: MAP_PAGE_SIZE,
-            });
+      const path = ENDPOINTS.referencePlacesMap(REFERENCE_MAP_RESOURCES[type], {
+        ...bounds,
+        page: 1,
+        limit: MAP_PAGE_SIZE,
+      });
       const { data } = await apiClient.get(path, { signal });
       const items = rows(data)
         .map((item, index) => normalize(item, type, index))
