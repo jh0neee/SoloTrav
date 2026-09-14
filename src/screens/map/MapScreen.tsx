@@ -33,7 +33,7 @@ import {
   ShoppingIcon,
   SportsIcon,
 } from '../../components/icons/UiIcons';
-import { ShieldCheckIcon, SirenIcon } from 'phosphor-react-native';
+import { ShieldCheckIcon, SirenIcon, ToiletIcon } from 'phosphor-react-native';
 import { colors } from '../../theme/colors';
 import KakaoMap, { type KakaoMapHandle } from './KakaoMap';
 import MapSearchOverlay from './MapSearchOverlay';
@@ -41,11 +41,7 @@ import TourPlaceSheet from './TourPlaceSheet';
 import PoiCard from './PoiCard';
 import SosScreen from '../sos/SosScreen';
 import { useCurrentLocation } from '../../location/useCurrentLocation';
-import {
-  hasViewportChanged,
-  useNearbyPlaces,
-  type Coords,
-} from '../../map/useNearbyPlaces';
+import { useNearbyPlaces, type Coords } from '../../map/useNearbyPlaces';
 import { useRegionSafety } from '../../map/useRegionSafety';
 import {
   FESTIVAL_RANGES,
@@ -60,12 +56,10 @@ import { type SafetyPlaceType } from '../../api/safetyPlaceApi';
 import { useSafetyPlaces, type MapBounds } from '../../map/useSafetyPlaces';
 import type { SafetyMapMarker } from './kakaoMapHtml';
 import SafetyFilterSheet, { SAFETY_FILTERS } from './SafetyFilterSheet';
+import ConvenienceFilterSheet from './ConvenienceFilterSheet';
 import type { TabScreenProps } from '../../navigation/tabs';
 import { getNearestCity } from '../../data/cities';
 import { useTabBarVisibility } from '../../navigation/TabBarVisibilityContext';
-
-/** 지도에서 제공하는 관광정보의 고정 서비스 범위 */
-const MAP_REGION_NAME = '충청북도';
 
 type IconComponent = React.ComponentType<{ color: string; size?: number }>;
 
@@ -127,23 +121,22 @@ function MapScreen({ onBack }: TabScreenProps) {
   const [locationNoticeClosed, setLocationNoticeClosed] = useState(false);
 
   const [category, setCategory] = useState<TourCategory>('attraction');
+  const [tourCategoryEnabled, setTourCategoryEnabled] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [safetyTypes, setSafetyTypes] = useState<SafetyPlaceType[]>([]);
   const [draftSafetyTypes, setDraftSafetyTypes] = useState<SafetyPlaceType[]>(
     [],
   );
   const [safetyFilterOpen, setSafetyFilterOpen] = useState(false);
+  const [convenienceFilterOpen, setConvenienceFilterOpen] = useState(false);
   const [selectedSafetyId, setSelectedSafetyId] = useState<string | null>(null);
 
-  /**
-   * 마커를 조회한 기준점. 지도를 끌고 다녀도 여기는 그대로 두었다가
-   * "이 지역에서 재검색" 을 눌렀을 때만 옮깁니다.
-   */
+  /** 지도 이동이 끝난 시점의 조회 중심점입니다. */
   const [queryCenter, setQueryCenter] = useState<Coords>(myLocation);
   /** 지도가 지금 보고 있는 중심 (idle 마다 갱신) */
   const [mapCenter, setMapCenter] = useState<Coords>(myLocation);
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
-  /** 마지막으로 조회를 확정한 화면 영역. 지도 이동 중에는 바꾸지 않습니다. */
+  /** 지도 이동이 끝날 때마다 자동으로 갱신되는 현재 화면 영역입니다. */
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
   /** 현재 조회 중심점에 가장 가까운 충북 시군구 (예: 괴산군, 단양군 등) */
   const currentCity = useMemo(
@@ -154,8 +147,7 @@ function MapScreen({ onBack }: TabScreenProps) {
     queryCenter,
     currentCity,
     safetyTypes,
-    safetyFilterOpen,
-    mapCenter,
+    queryBounds,
     mapBounds,
   );
   const selectedSafetyPlace = useMemo(
@@ -172,9 +164,18 @@ function MapScreen({ onBack }: TabScreenProps) {
       lng: place.lng,
       type: place.type,
       color: metadata[place.type].color,
-      glyph: metadata[place.type].glyph,
+      label: metadata[place.type].markerLabel,
     }));
   }, [safety.places]);
+  const safetyChipLabel = useMemo(() => {
+    if (!safetyTypes.length) return '도움이 필요할 때';
+    if (safetyTypes.length > 1)
+      return `도움이 필요할 때 ${safetyTypes.length}종`;
+    return (
+      SAFETY_FILTERS.find(item => item.key === safetyTypes[0])?.label ??
+      '도움이 필요할 때'
+    );
+  }, [safetyTypes]);
 
   // 측위가 끝나면 조회 기준점을 실제 현위치로 한 번 옮깁니다.
   useEffect(() => {
@@ -186,7 +187,7 @@ function MapScreen({ onBack }: TabScreenProps) {
 
   /** 축제 레이어의 기간 필터 (축제 칩을 골랐을 때만 보입니다) */
   const [festivalRange, setFestivalRange] = useState<FestivalRange>('now');
-  const isFestival = category === 'festival';
+  const isFestival = tourCategoryEnabled && category === 'festival';
 
   // 비상벨 화면 — 하단 탭바까지 덮는 전체 화면으로 열립니다.
   const [sosOpen, setSosOpen] = useState(false);
@@ -222,6 +223,10 @@ function MapScreen({ onBack }: TabScreenProps) {
           setSafetyFilterOpen(false);
           return true;
         }
+        if (convenienceFilterOpen) {
+          setConvenienceFilterOpen(false);
+          return true;
+        }
         if (selectedId || selectedPoiId) {
           setSelectedId(null);
           setSelectedPoiId(null);
@@ -231,7 +236,14 @@ function MapScreen({ onBack }: TabScreenProps) {
       },
     );
     return () => subscription.remove();
-  }, [sosOpen, searchOpen, safetyFilterOpen, selectedId, selectedPoiId]);
+  }, [
+    sosOpen,
+    searchOpen,
+    safetyFilterOpen,
+    convenienceFilterOpen,
+    selectedId,
+    selectedPoiId,
+  ]);
 
   /*
    * 축제는 다른 API 를 씁니다.
@@ -247,7 +259,7 @@ function MapScreen({ onBack }: TabScreenProps) {
     queryCenter,
     currentCity,
     category,
-    !isFestival,
+    tourCategoryEnabled && category !== 'festival',
     undefined,
     queryBounds,
   );
@@ -259,9 +271,21 @@ function MapScreen({ onBack }: TabScreenProps) {
     retry: retryFestivals,
   } = useNearbyFestivals(queryCenter, festivalRange, undefined, queryBounds);
 
-  const places = isFestival ? festivalPlaces : tourPlaces;
-  const placesLoading = isFestival ? festivalLoading : tourLoading;
-  const placesError = isFestival ? festivalError : tourError;
+  const places = useMemo(
+    () =>
+      !tourCategoryEnabled ? [] : isFestival ? festivalPlaces : tourPlaces,
+    [tourCategoryEnabled, isFestival, festivalPlaces, tourPlaces],
+  );
+  const placesLoading = tourCategoryEnabled
+    ? isFestival
+      ? festivalLoading
+      : tourLoading
+    : false;
+  const placesError = tourCategoryEnabled
+    ? isFestival
+      ? festivalError
+      : tourError
+    : null;
   const retryPlaces = isFestival ? retryFestivals : retryTour;
 
   // 검색 결과에서 직접 고른 관광지 (현재 지역 목록에 아직 없어도 지도에 즉시 표시)
@@ -290,9 +314,6 @@ function MapScreen({ onBack }: TabScreenProps) {
     }
     return places.find(place => place.contentId === selectedId) ?? null;
   }, [places, selectedId, selectedSearchPlace]);
-
-  /** 이동뿐 아니라 확대·축소로 마지막 조회 화면과 달라져도 재검색할 수 있습니다. */
-  const canResearch = hasViewportChanged(mapBounds, queryBounds);
 
   /**
    * 상단 UI 아래에서 시작하는 요소들(우측 버튼·재검색)의 y 좌표.
@@ -342,28 +363,28 @@ function MapScreen({ onBack }: TabScreenProps) {
 
   const handleCategory = useCallback(
     (next: TourCategory) => {
+      if (tourCategoryEnabled && next === category) {
+        setTourCategoryEnabled(false);
+        setSelectedId(null);
+        return;
+      }
+      setTourCategoryEnabled(true);
       setCategory(next);
       setQueryCenter(mapCenter);
       setQueryBounds(mapBounds);
       setSelectedId(null); // 현재 보고 있는 지역을 기준으로 새 카테고리를 조회합니다.
     },
-    [mapCenter, mapBounds],
+    [tourCategoryEnabled, category, mapCenter, mapBounds],
   );
-
-  /** 지금 보고 있는 지역으로 마커를 다시 조회합니다. */
-  const handleResearch = useCallback(() => {
-    setSelectedId(null);
-    setQueryCenter(mapCenter);
-    setQueryBounds(mapBounds);
-  }, [mapCenter, mapBounds]);
 
   const handleViewportChanged = useCallback(
     (center: Coords, bounds?: MapBounds) => {
       setMapCenter(center);
       if (bounds) {
         setMapBounds(bounds);
-        // 최초 지도 로드나 현위치 이동 직후에는 현재 화면을 최초 조회 영역으로 씁니다.
-        setQueryBounds(current => current ?? bounds);
+        // idle 시점만 전달되므로 현재 화면의 관광·안전시설을 자동 갱신합니다.
+        setQueryCenter(center);
+        setQueryBounds(bounds);
       }
     },
     [],
@@ -581,16 +602,8 @@ function MapScreen({ onBack }: TabScreenProps) {
           contentContainerStyle={styles.chipRow}
         >
           <FilterChip
-            label={
-              safetyTypes.length
-                ? `도움이 필요할 때 ${safetyTypes.length}`
-                : '도움이 필요할 때'
-            }
-            count={
-              safetyTypes.length && !safety.loading
-                ? safety.places.length
-                : null
-            }
+            label={safetyChipLabel}
+            count={null}
             Icon={ShieldCheckIcon}
             selected={safetyTypes.length > 0}
             onPress={openSafetyFilter}
@@ -600,12 +613,25 @@ function MapScreen({ onBack }: TabScreenProps) {
               key={key}
               label={SOLO_CATEGORY_LABEL[key]}
               // 선택된 칩만 실제 조회 결과가 있으므로 그때만 개수를 보여 줍니다.
-              count={key === category ? places.length : null}
+              count={
+                tourCategoryEnabled && key === category ? places.length : null
+              }
               Icon={CATEGORY_ICON[key]}
-              selected={key === category}
+              selected={tourCategoryEnabled && key === category}
               onPress={() => handleCategory(key)}
             />
           ))}
+          <FilterChip
+            label="편의시설"
+            count={null}
+            Icon={ToiletIcon}
+            selected={false}
+            onPress={() => {
+              setSelectedId(null);
+              setSelectedSafetyId(null);
+              setConvenienceFilterOpen(true);
+            }}
+          />
           {safety.loading && (
             <ActivityIndicator size="small" color={colors.textSecondary} />
           )}
@@ -618,6 +644,13 @@ function MapScreen({ onBack }: TabScreenProps) {
             >
               <Text style={styles.safetyRetryText}>일부 실패 · 재시도</Text>
             </Pressable>
+          )}
+          {!!safety.hasMoreTypes.length && !safety.loading && (
+            <View style={styles.safetyLimitNotice}>
+              <Text style={styles.safetyLimitNoticeText}>
+                안전시설이 많아요 · 지도를 확대해 주세요
+              </Text>
+            </View>
           )}
         </ScrollView>
 
@@ -724,22 +757,6 @@ function MapScreen({ onBack }: TabScreenProps) {
         </View>
       )}
 
-      {/* 지도를 옮겼을 때의 재검색 버튼 — 상세시트·검색카드에 가리지 않게 숨깁니다 */}
-      {canResearch && !locationNotice && !selectedPlace && !selectedPoi && (
-        <Pressable
-          style={[styles.researchButton, { top: topLayerBottom }]}
-          onPress={handleResearch}
-          accessibilityRole="button"
-          accessibilityLabel="이 지역에서 재검색"
-        >
-          {placesLoading ? (
-            <ActivityIndicator size="small" color={colors.textPrimary} />
-          ) : (
-            <Text style={styles.researchText}>이 지역에서 재검색</Text>
-          )}
-        </Pressable>
-      )}
-
       {/* 조회 실패 안내 — 지도는 그대로 두고 다시 시도만 권합니다 */}
       {placesError && !placesLoading && !locationNotice && (
         <Pressable
@@ -755,7 +772,7 @@ function MapScreen({ onBack }: TabScreenProps) {
       {!placesLoading &&
         !placesError &&
         !places.length &&
-        !canResearch &&
+        tourCategoryEnabled &&
         !!queryBounds &&
         !locationNotice &&
         !selectedPoi &&
@@ -816,6 +833,17 @@ function MapScreen({ onBack }: TabScreenProps) {
               {selectedSafetyPlace.address}
             </Text>
           )}
+          {!!selectedSafetyPlace.installDetail &&
+            selectedSafetyPlace.installDetail !== selectedSafetyPlace.name && (
+              <Text style={styles.safetyCardDetail} numberOfLines={2}>
+                설치 위치 · {selectedSafetyPlace.installDetail}
+              </Text>
+            )}
+          {!!selectedSafetyPlace.regionName && (
+            <Text style={styles.safetyCardMeta}>
+              관리 지역 · {selectedSafetyPlace.regionName}
+            </Text>
+          )}
           {!!selectedSafetyPlace.phone && (
             <Pressable
               onPress={() =>
@@ -835,12 +863,15 @@ function MapScreen({ onBack }: TabScreenProps) {
       <SafetyFilterSheet
         visible={safetyFilterOpen}
         selected={draftSafetyTypes}
-        counts={safety.counts}
-        loadingTypes={safety.loadingTypes}
         onToggle={toggleDraftSafetyType}
         onClear={() => setDraftSafetyTypes([])}
         onApply={applySafetyFilter}
         onClose={() => setSafetyFilterOpen(false)}
+      />
+
+      <ConvenienceFilterSheet
+        visible={convenienceFilterOpen}
+        onClose={() => setConvenienceFilterOpen(false)}
       />
 
       <SosScreen visible={sosOpen} onClose={() => setSosOpen(false)} />
@@ -991,6 +1022,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.primary,
   },
+  safetyLimitNotice: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 14,
+    backgroundColor: colors.background,
+  },
+  safetyLimitNoticeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
   safetyCard: {
     position: 'absolute',
     left: 16,
@@ -1026,6 +1068,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     color: colors.textSecondary,
+  },
+  safetyCardDetail: {
+    marginTop: 8,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.textPrimary,
+  },
+  safetyCardMeta: {
+    marginTop: 5,
+    fontSize: 11,
+    color: colors.textTertiary,
   },
   safetyCardPhone: {
     marginTop: 12,
@@ -1183,7 +1236,7 @@ const styles = StyleSheet.create({
     color: colors.inkText,
   },
 
-  // 이 지역에서 재검색 — 필터/현위치 버튼과 같은 높이의 중앙 알약 버튼
+  // 위치·조회 오류 안내 — 필터/현위치 버튼과 같은 높이의 중앙 알약 버튼
   locationNotice: {
     position: 'absolute',
     left: 16,

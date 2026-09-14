@@ -46,7 +46,7 @@ export type SafetyMapMarker = {
   lng: number;
   type: string;
   color: string;
-  glyph: string;
+  label: string;
 };
 
 /** 공통 관광 콘텐츠 배열을 웹뷰가 쓰는 마커 데이터로 줄입니다. */
@@ -118,18 +118,22 @@ export function buildKakaoMapHtml({
   .spin.on .drop { fill:#1b2233; }
   .spin text { font:700 13px -apple-system, BlinkMacSystemFont,
     'Apple SD Gothic Neo', sans-serif; }
-  .safety-pin { width:30px; height:30px; cursor:pointer; border-radius:9px;
+  .safety-pin { width:32px; height:32px; cursor:pointer; border-radius:10px;
     display:flex; align-items:center; justify-content:center; color:#fff;
-    border:2px solid #fff; box-sizing:border-box; font:700 12px -apple-system,
-    BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif;
+    border:2px solid #fff; box-sizing:border-box;
     box-shadow:0 3px 6px rgba(0,0,0,.3); transform-origin:50% 50%;
     transition:transform .16s ease; }
   .safety-pin.on { transform:scale(1.22); }
+  .safety-pin:focus-visible, .safety-cluster:focus-visible {
+    outline:3px solid #111827; outline-offset:2px; }
   .cluster { min-width:38px; height:38px; padding:0 8px; box-sizing:border-box;
     display:flex; align-items:center; justify-content:center; border-radius:20px;
     background:#1b2233; color:#fff; border:3px solid rgba(255,255,255,.95);
     box-shadow:0 3px 8px rgba(0,0,0,.32); cursor:pointer;
     font:700 13px -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif; }
+  .safety-cluster { min-width:48px; gap:4px; white-space:nowrap; }
+  .safety-icon { display:block; width:18px; height:18px; fill:currentColor; }
+  .safety-cluster .safety-icon { width:17px; height:17px; }
 
   /* ── 현위치 파란 점 ── */
   .me { position:relative; width:20px; height:20px; }
@@ -212,12 +216,42 @@ export function buildKakaoMapHtml({
     '</svg>';
   }
 
+  /* phosphor-react-native에서 사용하는 동일한 Phosphor bold 아이콘 경로입니다. */
+  var SAFETY_ICON_PATHS = {
+    cctv: 'M249.45 69.31a12 12 0 0 0-12.51 1L212 88.43V72a20 20 0 0 0-20-20H32a20 20 0 0 0-20 20v112a20 20 0 0 0 20 20h160a20 20 0 0 0 20-20v-16.43l24.94 18.14A12 12 0 0 0 256 176V80a12 12 0 0 0-6.55-10.69M188 180H36V76h152Zm44-27.57-20-14.54v-19.78l20-14.54Z',
+    emergencyBell: 'M225.81 74.65A11.86 11.86 0 0 1 220.3 76a12 12 0 0 1-10.67-6.47 90.1 90.1 0 0 0-32-35.38 12 12 0 1 1 12.8-20.29 115.25 115.25 0 0 1 40.54 44.62 12 12 0 0 1-5.16 16.17M46.37 69.53a90.1 90.1 0 0 1 32-35.38A12 12 0 1 0 65.6 13.86a115.25 115.25 0 0 0-40.54 44.62 12 12 0 0 0 5.13 16.17A11.86 11.86 0 0 0 35.7 76a12 12 0 0 0 10.67-6.47m173.51 98.35A20 20 0 0 1 204 200h-32.19a44 44 0 0 1-87.62 0H52a20 20 0 0 1-15.91-32.12c7.17-9.33 15.73-26.62 15.88-55.94A76 76 0 0 1 204 112c.15 29.26 8.71 46.55 15.88 55.88M147.6 200h-39.2a20 20 0 0 0 39.2 0m48.74-24c-8.16-13-16.19-33.57-16.34-63.94A52 52 0 1 0 76 112c-.15 30.42-8.18 51-16.34 64Z',
+    femaleHouse: 'M208 36H48a20 20 0 0 0-20 20v56c0 54.29 26.32 87.22 48.4 105.29 23.71 19.39 47.44 26 48.44 26.29a12.1 12.1 0 0 0 6.32 0c1-.28 24.73-6.9 48.44-26.29 22.08-18.07 48.4-51 48.4-105.29V56a20 20 0 0 0-20-20m-4 76c0 35.71-13.09 64.69-38.91 86.15A126.3 126.3 0 0 1 128 219.38a126.1 126.1 0 0 1-37.09-21.23C65.09 176.69 52 147.71 52 112V60h152ZM79.51 144.49a12 12 0 1 1 17-17L112 143l47.51-47.52a12 12 0 0 1 17 17l-56 56a12 12 0 0 1-17 0Z',
+    streetlight: 'M180 72.28V72a20 20 0 0 0-20-20h-20V16a12 12 0 0 0-24 0v36H96a20 20 0 0 0-20 20v.28A115.7 115.7 0 0 0 12 176a12 12 0 0 0 12 12h60.19a44 44 0 0 0 87.62 0H232a12 12 0 0 0 12-12 115.7 115.7 0 0 0-64-103.72M128 204a20 20 0 0 1-19.6-16h39.2a20 20 0 0 1-19.6 16m-91.22-40a91.75 91.75 0 0 1 55.84-72.95A12 12 0 0 0 100 80v-4h56v4a12 12 0 0 0 7.38 11.08 91.75 91.75 0 0 1 55.84 73Z',
+    hospital: 'M216 52h-36v-8a28 28 0 0 0-28-28h-48a28 28 0 0 0-28 28v8H40a20 20 0 0 0-20 20v128a20 20 0 0 0 20 20h176a20 20 0 0 0 20-20V72a20 20 0 0 0-20-20m-116-8a4 4 0 0 1 4-4h48a4 4 0 0 1 4 4v8h-56Zm112 152H44V76h168Zm-48-60a12 12 0 0 1-12 12h-12v12a12 12 0 0 1-24 0v-12h-12a12 12 0 0 1 0-24h12v-12a12 12 0 0 1 24 0v12h12a12 12 0 0 1 12 12'
+  };
+
+  function safetyIconSvg(type) {
+    var path = SAFETY_ICON_PATHS[type] || SAFETY_ICON_PATHS.femaleHouse;
+    return '<svg class="safety-icon" viewBox="0 0 256 256" aria-hidden="true">' +
+      '<path d="' + path + '"/></svg>';
+  }
+
+  function onMarkerActivate(el, action) {
+    el.addEventListener('click', function (event) {
+      event.stopPropagation();
+      action();
+    });
+    el.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      event.stopPropagation();
+      action();
+    });
+  }
+
   var meOverlay = null;      // 현위치 파란 점 (측위 결과가 오면 위치를 갱신)
   var overlays = {};         // id -> { overlay, el, category }
   var category = INITIAL_CATEGORY;  // 현재 필터. 마커를 다시 그릴 때 기준이 됩니다.
   var searchOverlays = {};   // 검색 결과 id -> { overlay, el }
   var safetyOverlays = {};   // 안전 장소 id -> { overlay, el }
+  var SAFETY_PLACES = [];
   var selectedId = null;
+  var selectedSafetyId = null;
   var selectedSearchId = null;
   var placesService = null;  // kakao.maps.services.Places
   var map = null;
@@ -320,6 +354,97 @@ export function buildKakaoMapHtml({
     }
   }
 
+  function addSafetyPlaceOverlay(place) {
+    var el = document.createElement('div');
+    el.className = 'safety-pin';
+    el.style.backgroundColor = place.color;
+    el.innerHTML = safetyIconSvg(place.type);
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.setAttribute('aria-label', place.label + ' 위치');
+    onMarkerActivate(el, function () {
+      send({ type: 'safetyMarkerPress', id: place.id });
+    });
+    var overlay = new kakao.maps.CustomOverlay({
+      map: map,
+      position: new kakao.maps.LatLng(place.lat, place.lng),
+      content: el,
+      yAnchor: .5,
+      zIndex: 4,
+      clickable: true,
+    });
+    safetyOverlays[place.id] = { overlay: overlay, el: el };
+  }
+
+  function addSafetyClusterOverlay(group, key) {
+    var lat = 0;
+    var lng = 0;
+    group.forEach(function (place) { lat += place.lat; lng += place.lng; });
+    var center = new kakao.maps.LatLng(lat / group.length, lng / group.length);
+    var el = document.createElement('div');
+    el.className = 'cluster safety-cluster';
+    var firstType = group[0].type;
+    var sameType = group.every(function (place) { return place.type === firstType; });
+    var clusterLabel = sameType ? group[0].label : '안전시설';
+    var clusterType = sameType ? firstType : 'femaleHouse';
+    if (sameType) el.style.backgroundColor = group[0].color;
+    el.innerHTML = safetyIconSvg(clusterType) + '<span>' + String(group.length) + '</span>';
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.setAttribute(
+      'aria-label',
+      clusterLabel + ' ' + group.length + '곳 확대해서 보기'
+    );
+    onMarkerActivate(el, function () {
+      map.setLevel(Math.max(MIN_LEVEL, map.getLevel() - 2), {
+        anchor: center,
+        animate: true
+      });
+      map.panTo(center);
+    });
+    var overlay = new kakao.maps.CustomOverlay({
+      map: map,
+      position: center,
+      content: el,
+      yAnchor: .5,
+      zIndex: 4,
+      clickable: true,
+    });
+    safetyOverlays['cluster-' + key] = { overlay: overlay, el: el };
+  }
+
+  function renderSafetyPlaces() {
+    Object.keys(safetyOverlays).forEach(function (id) {
+      safetyOverlays[id].overlay.setMap(null);
+    });
+    safetyOverlays = {};
+    if (!map || !SAFETY_PLACES.length) return;
+
+    if (SAFETY_PLACES.length > 1) {
+      var projection = map.getProjection();
+      var groups = {};
+      var cellSize = SAFETY_PLACES.length > 100 ? 80 : 56;
+      SAFETY_PLACES.forEach(function (place) {
+        var point = projection.containerPointFromCoords(
+          new kakao.maps.LatLng(place.lat, place.lng)
+        );
+        var key = Math.floor(point.x / cellSize) + ':' + Math.floor(point.y / cellSize);
+        (groups[key] || (groups[key] = [])).push(place);
+      });
+      Object.keys(groups).forEach(function (key) {
+        var group = groups[key];
+        if (group.length === 1) addSafetyPlaceOverlay(group[0]);
+        else addSafetyClusterOverlay(group, key);
+      });
+    } else {
+      SAFETY_PLACES.forEach(addSafetyPlaceOverlay);
+    }
+
+    if (selectedSafetyId && safetyOverlays[selectedSafetyId]) {
+      safetyOverlays[selectedSafetyId].el.classList.add('on');
+    }
+  }
+
   function initMap() {
     map = new kakao.maps.Map(document.getElementById('map'), {
       center: new kakao.maps.LatLng(CENTER.lat, CENTER.lng),
@@ -371,6 +496,7 @@ export function buildKakaoMapHtml({
 
     kakao.maps.event.addListener(map, 'idle', function () {
       renderPlaces();
+      renderSafetyPlaces();
       sendViewport();
     });
 
@@ -404,33 +530,12 @@ export function buildKakaoMapHtml({
   };
 
   window.__setSafetyPlaces = function (list) {
-    Object.keys(safetyOverlays).forEach(function (id) {
-      safetyOverlays[id].overlay.setMap(null);
-    });
-    safetyOverlays = {};
-    if (!map || !Array.isArray(list)) return;
-    list.forEach(function (place) {
-      var el = document.createElement('div');
-      el.className = 'safety-pin';
-      el.style.backgroundColor = place.color;
-      el.textContent = place.glyph;
-      el.addEventListener('click', function (e) {
-        e.stopPropagation();
-        send({ type: 'safetyMarkerPress', id: place.id });
-      });
-      var overlay = new kakao.maps.CustomOverlay({
-        map: map,
-        position: new kakao.maps.LatLng(place.lat, place.lng),
-        content: el,
-        yAnchor: .5,
-        zIndex: 4,
-        clickable: true,
-      });
-      safetyOverlays[place.id] = { overlay: overlay, el: el };
-    });
+    SAFETY_PLACES = Array.isArray(list) ? list : [];
+    renderSafetyPlaces();
   };
 
   window.__selectSafetyPlace = function (id) {
+    selectedSafetyId = id;
     Object.keys(safetyOverlays).forEach(function (key) {
       safetyOverlays[key].el.classList.toggle('on', key === id);
     });

@@ -18,51 +18,105 @@ const ALL_TYPES: SafetyPlaceType[] = [
   'hospital',
   'femaleHouse',
   'cctv',
+  'emergencyBell',
   'streetlight',
-  'food',
 ];
+const MAP_TYPES: SafetyPlaceType[] = ['cctv', 'emergencyBell'];
+
+type SafetyCacheEntry = {
+  items: SafetyPlace[];
+  hasMore: boolean;
+};
+
+function boundsKey(bounds: MapBounds | null) {
+  if (!bounds) return 'no-bounds';
+  return [bounds.south, bounds.west, bounds.north, bounds.east]
+    .map(value => value.toFixed(6))
+    .join(':');
+}
+
+function isValidBounds(bounds: MapBounds | null): bounds is MapBounds {
+  return !!bounds && bounds.north > bounds.south && bounds.east > bounds.west;
+}
 
 export function useSafetyPlaces(
   center: Coords,
   /** 조회할 충북 시군 — 사용자 좌표 대신 시군명·코드로 서버를 좁힙니다. */
   city: City,
   active: SafetyPlaceType[],
-  preloadAll: boolean = false,
-  countCenter: Coords = center,
-  bounds: MapBounds | null = null,
+  /** 조회를 확정한 지도 경계. CCTV는 이 범위만 서버에서 가져옵니다. */
+  queryBounds: MapBounds | null = null,
+  visibleBounds: MapBounds | null = queryBounds,
 ) {
-  /** 지역이 바뀌면 결과도 달라지므로 캐시 키에 지역을 함께 넣습니다. */
-  const [cache, setCache] = useState<Record<string, SafetyPlace[]>>({});
+  /** CCTV는 지도 경계, 나머지 시설은 지역을 캐시 키로 사용합니다. */
+  const [cache, setCache] = useState<Record<string, SafetyCacheEntry>>({});
   const [loadingTypes, setLoadingTypes] = useState<SafetyPlaceType[]>([]);
   const [errors, setErrors] = useState<SafetyPlaceType[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
-  const requestedTypes = preloadAll ? ALL_TYPES : active;
+  const requestedTypes = active;
   const key = [...requestedTypes].sort().join(',');
+  const mapBoundsKey = boundsKey(queryBounds);
   const cacheKey = useCallback(
-    (type: SafetyPlaceType) => `${city.municipalityCode}|${type}`,
-    [city.municipalityCode],
+    (type: SafetyPlaceType) =>
+      MAP_TYPES.includes(type)
+        ? `${type}|${mapBoundsKey}`
+        : `${city.municipalityCode}|${type}`,
+    [city.municipalityCode, mapBoundsKey],
   );
 
   useEffect(() => {
     const requested = [...requestedTypes];
-    if (!requested.length) return;
+    if (!requested.length) {
+      setLoadingTypes([]);
+      setErrors([]);
+      return;
+    }
+    const typesToLoad = requested.filter(type => !cache[cacheKey(type)]);
+    if (!typesToLoad.length) {
+      setLoadingTypes([]);
+      setErrors([]);
+      return;
+    }
     const controller = new AbortController();
-    setLoadingTypes(requested);
+    setLoadingTypes(typesToLoad);
     setErrors([]);
     Promise.allSettled(
-      requested.map(type => safetyPlaceApi.list(type, city, controller.signal)),
+      typesToLoad.map(async type => {
+        if (MAP_TYPES.includes(type) && isValidBounds(queryBounds)) {
+          return safetyPlaceApi.map(
+            type as 'cctv' | 'emergencyBell',
+            queryBounds,
+            controller.signal,
+          );
+        }
+        const items = await safetyPlaceApi.list(type, city, controller.signal);
+        return { items, hasMore: false };
+      }),
     ).then(results => {
       if (controller.signal.aborted) return;
       setCache(previous => {
         const next = { ...previous };
         results.forEach((result, index) => {
-          if (result.status === 'fulfilled')
-            next[cacheKey(requested[index])] = result.value;
+          const type = typesToLoad[index];
+          if (result.status === 'fulfilled') {
+            const nextKey = cacheKey(type);
+            if (MAP_TYPES.includes(type)) {
+              Object.keys(next).forEach(existingKey => {
+                if (
+                  existingKey.startsWith(`${type}|`) &&
+                  existingKey !== nextKey
+                ) {
+                  delete next[existingKey];
+                }
+              });
+            }
+            next[nextKey] = result.value;
+          }
         });
         return next;
       });
       setErrors(
-        requested.filter((_, index) => results[index].status === 'rejected'),
+        typesToLoad.filter((_, index) => results[index].status === 'rejected'),
       );
       setLoadingTypes([]);
     });
@@ -71,45 +125,40 @@ export function useSafetyPlaces(
 
   const isVisible = useCallback(
     (place: SafetyPlace, fallbackCenter: Coords) => {
-      if (!bounds) return roughDistance(fallbackCenter, place) <= RADIUS_M;
+      if (!visibleBounds)
+        return roughDistance(fallbackCenter, place) <= RADIUS_M;
       const insideLatitude =
-        place.lat >= bounds.south && place.lat <= bounds.north;
+        place.lat >= visibleBounds.south && place.lat <= visibleBounds.north;
       // 일반적인 경우 west <= east. 날짜변경선을 걸친 화면도 안전하게 처리합니다.
       const insideLongitude =
-        bounds.west <= bounds.east
-          ? place.lng >= bounds.west && place.lng <= bounds.east
-          : place.lng >= bounds.west || place.lng <= bounds.east;
+        visibleBounds.west <= visibleBounds.east
+          ? place.lng >= visibleBounds.west && place.lng <= visibleBounds.east
+          : place.lng >= visibleBounds.west || place.lng <= visibleBounds.east;
       return insideLatitude && insideLongitude;
     },
-    [bounds],
+    [visibleBounds],
   );
 
   const places = useMemo(
     () =>
       active
-        .flatMap(type => cache[cacheKey(type)] ?? [])
+        .flatMap(type => cache[cacheKey(type)]?.items ?? [])
         .filter(place => isVisible(place, center)),
     [active, cache, cacheKey, center, isVisible],
   );
-  const counts = useMemo(
+  const hasMoreTypes = useMemo(
     () =>
-      Object.fromEntries(
-        ALL_TYPES.map(type => [
-          type,
-          (cache[cacheKey(type)] ?? []).filter(place =>
-            isVisible(place, countCenter),
-          ).length,
-        ]),
-      ) as Record<SafetyPlaceType, number>,
-    [cache, cacheKey, countCenter, isVisible],
+      ALL_TYPES.filter(
+        type => cache[cacheKey(type)]?.hasMore,
+      ) as SafetyPlaceType[],
+    [cache, cacheKey],
   );
   const retry = useCallback(() => setReloadKey(value => value + 1), []);
   return {
     places,
-    counts,
     loading: loadingTypes.length > 0,
-    loadingTypes,
     errors,
+    hasMoreTypes,
     retry,
   };
 }

@@ -39,8 +39,11 @@ export const ENDPOINTS = {
   /** Kakao Native 앱 설정 조회 */
   kakaoNativeConfig: () => `/auth/kakao/native/config`,
   /** Kakao 웹 OAuth 인가 URL 조회 */
-  kakaoAuthUrl: (params?: { redirectUri?: string; state?: string; dev? : string }) =>
-    withQuery(`/auth/kakao/auth-url`, params),
+  kakaoAuthUrl: (params?: {
+    redirectUri?: string;
+    state?: string;
+    dev?: string;
+  }) => withQuery(`/auth/kakao/auth-url`, params),
   /** Kakao 웹 OAuth callback 로그인 */
   kakaoCallback: (params: { code: string; state?: string; dev?: string }) =>
     withQuery(`/auth/kakao/callback`, params),
@@ -88,8 +91,7 @@ export const ENDPOINTS = {
   myReports: (params?: { page?: number; limit?: number; status?: string }) =>
     withQuery(`/reports/me`, params),
   /** 내 신고 상세 조회 (GET) */
-  myReport: (reportId: string) =>
-    `/reports/me/${encodeURIComponent(reportId)}`,
+  myReport: (reportId: string) => `/reports/me/${encodeURIComponent(reportId)}`,
 
   // 여행 기록
   /** 여행 기록 조회(GET) / 등록(POST) */
@@ -137,10 +139,8 @@ export const ENDPOINTS = {
 
   // SOS
   /** 선택한 지역의 안전 시설(여성안심지킴이집) 조회 — 사용자 좌표는 보내지 않고 regionName으로 조회 */
-  safetyFacilities: (params: {
-    regionName: string;
-    limit?: number;
-  }) => withQuery(`/sos/safety-facilities`, params),
+  safetyFacilities: (params: { regionName: string; limit?: number }) =>
+    withQuery(`/sos/safety-facilities`, params),
 
   // ── 지도 안전 장소 레이어 ──
   // 사용자 좌표는 보내지 않고 시군명·코드로만 좁힙니다. 지역 필터 없이 부르면
@@ -167,6 +167,45 @@ export const ENDPOINTS = {
     page?: number;
     limit?: number;
   }) => withQuery(`/cctvs`, params),
+  /** CCTV GeoJSON — 현재 지도 경계만 조회합니다. limit 1~200. */
+  cctvsMap: (params: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+    page?: number;
+    limit?: number;
+    keyword?: string;
+    regionName?: string;
+  }) => withQuery(`/reference-places/cctvs/map`, params),
+  /** 안전비상벨 목록. page는 1부터 시작하며 limit 기본값은 20입니다. */
+  emergencyBells: (params?: {
+    page?: number;
+    limit?: number;
+    keyword?: string;
+    regionName?: string;
+  }) => withQuery(`/reference-places/emergency-bells`, params),
+  /** 안전비상벨 GeoJSON 지도 조회. limit 최대값은 200입니다. */
+  emergencyBellsMap: (params: {
+    north: number;
+    south: number;
+    east: number;
+    west: number;
+    page?: number;
+    limit?: number;
+    keyword?: string;
+    regionName?: string;
+  }) => withQuery(`/reference-places/emergency-bells/map`, params),
+  /** 안전비상벨 주변 거리순 조회. radiusMeters 최대값은 20km입니다. */
+  emergencyBellsNearby: (params: {
+    longitude: number;
+    latitude: number;
+    radiusMeters?: number;
+    page?: number;
+    limit?: number;
+    keyword?: string;
+    regionName?: string;
+  }) => withQuery(`/reference-places/emergency-bells/nearby`, params),
   /** 스마트 가로등 — sido 필수, sigungu 는 함께 주면 시군까지 좁혀집니다. limit 1~100. */
   smartStreetlights: (params: {
     sido: string;

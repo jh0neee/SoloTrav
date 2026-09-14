@@ -1,9 +1,8 @@
 /**
  * 지도 마커용 주변 관광정보 조회 훅.
  *
- * 지도를 움직일 때마다 요청하면 API 를 남발하게 되므로, 조회는 화면이 넘겨주는
- * `center` 가 실제로 바뀔 때만 일어납니다. 지도를 끌고 다니는 동안의 중심 변화는
- * 화면이 따로 들고 있다가 "이 지역에서 재검색" 을 누를 때 center 로 넘겨 줍니다.
+ * 지도 이동이 끝난 idle 시점의 중심과 경계를 받습니다. 지역 전체 목록은 캐시하고
+ * 현재 화면에 들어오는 장소만 기기에서 다시 골라 불필요한 API 호출을 줄입니다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_RADIUS, REGION_PAGE_SIZE, travelApi } from '../api/travelApi';
@@ -54,7 +53,7 @@ export function useNearbyPlaces(
   /** false 면 조회하지 않습니다 (축제처럼 다른 API 를 쓰는 카테고리). */
   enabled: boolean = true,
   radius: number = DEFAULT_RADIUS,
-  /** "이 지역에서 재검색"을 누른 순간의 지도 화면 경계 */
+  /** 지도 이동이 끝난 시점의 현재 화면 경계 */
   bounds: ViewportBounds | null = null,
 ) {
   const [state, setState] = useState<State>(INITIAL);

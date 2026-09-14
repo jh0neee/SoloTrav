@@ -3,12 +3,21 @@ import { ENDPOINTS } from './endpoints';
 import { toApiError } from './errors';
 import type { City } from '../data/cities';
 
+type ReferencePlaceMapBounds = {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+};
+
 export type SafetyPlaceType =
   | 'hospital'
   | 'femaleHouse'
   | 'cctv'
-  | 'streetlight'
-  | 'food';
+  | 'emergencyBell'
+  | 'streetlight';
+
+type ReferencePlaceMapType = Extract<SafetyPlaceType, 'cctv' | 'emergencyBell'>;
 
 export type SafetyPlace = {
   id: string;
@@ -19,12 +28,25 @@ export type SafetyPlace = {
   lng: number;
   phone: string | null;
   distance: number | null;
+  roadAddress: string | null;
+  parcelAddress: string | null;
+  regionName: string | null;
+  managementNumber: string | null;
+  localGovernmentCode: string | null;
+  installDetail: string | null;
+};
+
+export type SafetyPlacePage = {
+  items: SafetyPlace[];
+  total: number;
+  hasMore: boolean;
 };
 
 type Raw = Record<string, unknown>;
 
 /** 한 페이지 최대 건수 — 서버가 101 이상은 400 으로 거절합니다. */
 const PAGE_SIZE = 100;
+const MAP_PAGE_SIZE = 200;
 /**
  * 페이지 순회 상한. 청주 CCTV 가 약 2,900건(29페이지)으로 가장 많습니다.
  * 서버 total 이 잘못 와도 여기서 멈춥니다.
@@ -45,6 +67,19 @@ function number(input: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function text(input: unknown): string | null {
+  if (typeof input !== 'string' && typeof input !== 'number') return null;
+  const result = String(input).trim();
+  return result || null;
+}
+
+function boolean(input: unknown): boolean | null {
+  if (typeof input === 'boolean') return input;
+  if (input === 'true' || input === 1 || input === '1') return true;
+  if (input === 'false' || input === 0 || input === '0') return false;
+  return null;
+}
+
 function rows(payload: unknown): Raw[] {
   if (Array.isArray(payload)) return payload as Raw[];
   if (!payload || typeof payload !== 'object') return [];
@@ -56,6 +91,7 @@ function rows(payload: unknown): Raw[] {
     'content',
     'results',
     'rows',
+    'features',
   ]) {
     const nested = raw[key];
     if (Array.isArray(nested)) return nested as Raw[];
@@ -63,6 +99,18 @@ function rows(payload: unknown): Raw[] {
     if (found.length) return found;
   }
   return [];
+}
+
+function payloadOf(payload: unknown): Raw {
+  if (!payload || typeof payload !== 'object') return {};
+  const raw = payload as Raw;
+  if (raw.payload && typeof raw.payload === 'object') {
+    return raw.payload as Raw;
+  }
+  if (raw.data && typeof raw.data === 'object') {
+    return raw.data as Raw;
+  }
+  return raw;
 }
 
 /**
@@ -87,8 +135,20 @@ function normalize(
   type: SafetyPlaceType,
   index: number,
 ): SafetyPlace | null {
+  const properties =
+    raw.properties && typeof raw.properties === 'object'
+      ? (raw.properties as Raw)
+      : {};
+  const source = { ...raw, ...properties };
+  const geometry =
+    raw.geometry && typeof raw.geometry === 'object'
+      ? (raw.geometry as Raw)
+      : null;
+  const coordinates = Array.isArray(geometry?.coordinates)
+    ? geometry.coordinates
+    : null;
   const lat = number(
-    value(raw, [
+    value(source, [
       'lat',
       'latitude',
       'wgs84Lat',
@@ -99,10 +159,10 @@ function normalize(
       '위도',
       'LATITUDE',
       'REFINE_WGS84_LAT',
-    ]),
+    ]) ?? coordinates?.[1],
   );
   const lng = number(
-    value(raw, [
+    value(source, [
       'lng',
       'lon',
       'longitude',
@@ -114,7 +174,7 @@ function normalize(
       '경도',
       'LONGITUDE',
       'REFINE_WGS84_LOGT',
-    ]),
+    ]) ?? coordinates?.[0],
   );
   if (
     lat === null ||
@@ -128,17 +188,40 @@ function normalize(
     hospital: '병·의원',
     femaleHouse: '여성안심지킴이집',
     cctv: 'CCTV',
+    emergencyBell: '공공 비상벨',
     streetlight: '스마트 가로등',
-    food: '음식업소',
   }[type];
+  const roadAddress = text(
+    value(source, [
+      'roadAddress',
+      'road_address',
+      '도로명주소',
+      '소재지도로명주소',
+    ]),
+  );
+  const parcelAddress = text(
+    value(source, [
+      'parcelAddress',
+      'parcel_address',
+      '지번주소',
+      '소재지주소',
+    ]),
+  );
   return {
     id: `${type}-${String(
-      value(raw, ['id', 'hpid', 'facilityId', 'managementNo', '관리번호']) ??
-        index,
+      value(source, [
+        'id',
+        'hpid',
+        'facilityId',
+        'managementNumber',
+        'management_number',
+        'managementNo',
+        '관리번호',
+      ]) ?? index,
     )}`,
     type,
     name: String(
-      value(raw, [
+      value(source, [
         'name',
         'title',
         'hospitalName',
@@ -152,7 +235,7 @@ function normalize(
       ]) ?? fallback,
     ),
     address: String(
-      value(raw, [
+      value(source, [
         'address',
         'roadAddress',
         'road_address',
@@ -166,7 +249,7 @@ function normalize(
     ),
     phone:
       String(
-        value(raw, [
+        value(source, [
           'phone',
           'tel',
           'telephone',
@@ -175,9 +258,55 @@ function normalize(
           '전화번호',
         ]) ?? '',
       ) || null,
-    distance: number(value(raw, ['distance', 'distanceMeters', 'dist'])),
+    distance: number(value(source, ['distance', 'distanceMeters', 'dist'])),
+    roadAddress,
+    parcelAddress,
+    regionName: text(value(source, ['regionName', 'region_name'])),
+    managementNumber: text(
+      value(source, [
+        'managementNumber',
+        'management_number',
+        'managementNo',
+        '관리번호',
+      ]),
+    ),
+    localGovernmentCode: text(
+      value(source, ['localGovernmentCode', 'local_government_code']),
+    ),
+    installDetail: text(
+      value(source, [
+        'installDetail',
+        'install_detail',
+        'installationLocation',
+        'installation_location',
+        'installationPurpose',
+        'installation_purpose',
+        '설치장소',
+      ]),
+    ),
     lat,
     lng,
+  };
+}
+
+function pageInfo(payload: unknown, itemCount: number) {
+  const root = payloadOf(payload);
+  const pagination =
+    root.pagination && typeof root.pagination === 'object'
+      ? (root.pagination as Raw)
+      : root;
+  const total =
+    number(value(pagination, ['total', 'totalCount', 'totalElements'])) ??
+    itemCount;
+  const page = number(value(pagination, ['page', 'currentPage'])) ?? 1;
+  const limit =
+    number(value(pagination, ['limit', 'size', 'pageSize'])) ?? MAP_PAGE_SIZE;
+  const explicitHasMore = boolean(
+    value(pagination, ['hasMore', 'has_more', 'hasNext']),
+  );
+  return {
+    total,
+    hasMore: explicitHasMore ?? page * limit < total,
   };
 }
 
@@ -220,6 +349,16 @@ async function fetchRaw(
           }),
         signal,
       );
+    case 'emergencyBell':
+      return fetchAllPages(
+        page =>
+          ENDPOINTS.emergencyBells({
+            page,
+            limit: PAGE_SIZE,
+            regionName: `${city.sido} ${city.sigungu}`,
+          }),
+        signal,
+      );
     case 'streetlight':
       return fetchAllPages(
         page =>
@@ -254,18 +393,33 @@ async function fetchRaw(
       );
       return rows(data);
     }
-    case 'food': {
-      // 충북 전용 API 라 지역 파라미터가 없고, 데이터도 통틀어 10건뿐입니다.
-      const { data } = await apiClient.get(
-        ENDPOINTS.chungbukFoods({ currentPage: 1, perPage: PAGE_SIZE }),
-        { signal },
-      );
-      return rows(data);
-    }
   }
 }
 
 export const safetyPlaceApi = {
+  map: async (
+    type: ReferencePlaceMapType,
+    bounds: ReferencePlaceMapBounds,
+    signal?: AbortSignal,
+  ): Promise<SafetyPlacePage> => {
+    try {
+      const path =
+        type === 'cctv'
+          ? ENDPOINTS.cctvsMap({ ...bounds, page: 1, limit: MAP_PAGE_SIZE })
+          : ENDPOINTS.emergencyBellsMap({
+              ...bounds,
+              page: 1,
+              limit: MAP_PAGE_SIZE,
+            });
+      const { data } = await apiClient.get(path, { signal });
+      const items = rows(data)
+        .map((item, index) => normalize(item, type, index))
+        .filter((item): item is SafetyPlace => item !== null);
+      return { items, ...pageInfo(data, items.length) };
+    } catch (error) {
+      throw toApiError(error);
+    }
+  },
   list: async (
     type: SafetyPlaceType,
     /** 조회할 충북 시군 */

@@ -1,15 +1,10 @@
 import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import {
+  BellRingingIcon,
   FirstAidKitIcon,
-  ForkKnifeIcon,
   LampPendantIcon,
+  PillIcon,
   ShieldCheckIcon,
   VideoCameraIcon,
 } from 'phosphor-react-native';
@@ -23,23 +18,15 @@ export const SAFETY_FILTERS: Array<{
   key: SafetyPlaceType;
   label: string;
   description: string;
-  glyph: string;
+  markerLabel: string;
   color: string;
   Icon: IconComponent;
 }> = [
   {
-    key: 'hospital',
-    label: '병·의원',
-    description: '진료가 필요한 상황에 대비해요',
-    glyph: '+',
-    color: '#dc4c64',
-    Icon: FirstAidKitIcon,
-  },
-  {
     key: 'femaleHouse',
-    label: '여성 안심이 집',
+    label: '여성안심지킴이집',
     description: '위급할 때 도움을 요청할 수 있어요',
-    glyph: '안',
+    markerLabel: '여성안심지킴이집',
     color: '#8b5cf6',
     Icon: ShieldCheckIcon,
   },
@@ -47,33 +34,72 @@ export const SAFETY_FILTERS: Array<{
     key: 'cctv',
     label: 'CCTV',
     description: '방범 카메라 설치 위치를 확인해요',
-    glyph: 'C',
+    markerLabel: 'CCTV',
     color: '#2563eb',
     Icon: VideoCameraIcon,
+  },
+  {
+    key: 'emergencyBell',
+    label: '공공 비상벨',
+    description: '위급할 때 사용할 수 있는 현장 비상벨이에요',
+    markerLabel: '비상벨',
+    color: '#f97316',
+    Icon: BellRingingIcon,
   },
   {
     key: 'streetlight',
     label: '스마트 가로등',
     description: '야간에 밝고 안전한 길을 찾기 쉬워요',
-    glyph: '빛',
+    markerLabel: '스마트 가로등',
     color: '#e59b18',
     Icon: LampPendantIcon,
   },
   {
-    key: 'food',
-    label: '음식업소',
-    description: '가까운 음식업소에서 혼밥 장소를 찾아봐요',
-    glyph: '식',
-    color: '#e06a3b',
-    Icon: ForkKnifeIcon,
+    key: 'hospital',
+    label: '병원',
+    description: '진료가 필요한 상황에 대비해요',
+    markerLabel: '병원',
+    color: '#dc4c64',
+    Icon: FirstAidKitIcon,
   },
 ];
+
+const SECTIONS: Array<{
+  title: string;
+  keys: SafetyPlaceType[];
+}> = [
+  {
+    title: '긴급·방범',
+    keys: ['femaleHouse', 'cctv', 'emergencyBell', 'streetlight'],
+  },
+  {
+    title: '의료',
+    keys: ['hospital'],
+  },
+];
+
+const UPCOMING_FILTERS = [
+  {
+    key: 'clinic',
+    section: '의료',
+    label: '의원',
+    description: '가까운 동네 의원 위치를 확인해요',
+    color: '#e11d48',
+    Icon: FirstAidKitIcon,
+  },
+  {
+    key: 'pharmacy',
+    section: '의료',
+    label: '약국',
+    description: '가까운 약국 위치를 확인해요',
+    color: '#16a34a',
+    Icon: PillIcon,
+  },
+] as const;
 
 type Props = {
   visible: boolean;
   selected: SafetyPlaceType[];
-  counts: Record<SafetyPlaceType, number>;
-  loadingTypes: SafetyPlaceType[];
   onToggle: (type: SafetyPlaceType) => void;
   onClear: () => void;
   onApply: () => void;
@@ -83,8 +109,6 @@ type Props = {
 export default function SafetyFilterSheet({
   visible,
   selected,
-  counts,
-  loadingTypes,
   onToggle,
   onClear,
   onApply,
@@ -94,47 +118,73 @@ export default function SafetyFilterSheet({
     <BottomSheet
       visible={visible}
       onClose={onClose}
-      snapPoints={[0.66]}
+      snapPoints={[0.72, 0.92]}
       header={
         <View style={styles.header}>
           <Text style={styles.title}>도움이 필요할 때</Text>
           <Text style={styles.subtitle}>
-            혼자 여행할 때 필요한 안전시설 · 현재 지도 화면에 보이는 장소 수예요
+            혼자 여행할 때 필요한 시설만 골라 지도에서 확인하세요
           </Text>
         </View>
       }
     >
       <View style={styles.list}>
-        {SAFETY_FILTERS.map(({ key, label, description, color, Icon }) => {
-          const on = selected.includes(key);
-          return (
-            <Pressable
-              key={key}
-              onPress={() => onToggle(key)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: on }}
-              style={[styles.option, on && styles.optionOn]}
-            >
-              <View style={[styles.icon, { backgroundColor: `${color}18` }]}>
-                <Icon color={color} size={21} />
-              </View>
-              <View style={styles.optionCopy}>
-                <Text style={styles.optionTitle}>{label}</Text>
-                <Text style={styles.optionDescription}>{description}</Text>
-              </View>
-              <View style={styles.countBox}>
-                {loadingTypes.includes(key) ? (
-                  <ActivityIndicator size="small" color={colors.textTertiary} />
-                ) : (
-                  <Text style={styles.countText}>{counts[key]}곳</Text>
-                )}
-              </View>
-              <View style={[styles.check, on && styles.checkOn]}>
-                {on && <Text style={styles.checkMark}>✓</Text>}
-              </View>
-            </Pressable>
-          );
-        })}
+        {SECTIONS.map(section => (
+          <View key={section.title} style={styles.section}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            {[
+              ...section.keys.map(key => ({
+                kind: 'available' as const,
+                filter: SAFETY_FILTERS.find(item => item.key === key)!,
+              })),
+              ...UPCOMING_FILTERS.filter(
+                item => item.section === section.title,
+              ).map(filter => ({ kind: 'upcoming' as const, filter })),
+            ].map(({ kind, filter }) => {
+              const available = kind === 'available';
+              const key = filter.key;
+              const safetyKey = available
+                ? (filter.key as SafetyPlaceType)
+                : null;
+              const on = safetyKey !== null && selected.includes(safetyKey);
+              const { label, description, color, Icon } = filter;
+              return (
+                <Pressable
+                  key={key}
+                  onPress={safetyKey ? () => onToggle(safetyKey) : undefined}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on, disabled: !available }}
+                  disabled={!available}
+                  style={[
+                    styles.option,
+                    on && styles.optionOn,
+                    !available && styles.optionDisabled,
+                  ]}
+                >
+                  <View
+                    style={[styles.icon, { backgroundColor: `${color}18` }]}
+                  >
+                    <Icon color={color} size={21} />
+                  </View>
+                  <View style={styles.optionCopy}>
+                    <Text style={styles.optionTitle}>{label}</Text>
+                    <Text style={styles.optionDescription}>{description}</Text>
+                  </View>
+                  {!available ? (
+                    <View style={styles.upcomingBadge}>
+                      <Text style={styles.upcomingText}>연결 예정</Text>
+                    </View>
+                  ) : null}
+                  {available && (
+                    <View style={[styles.check, on && styles.checkOn]}>
+                      {on && <Text style={styles.checkMark}>✓</Text>}
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        ))}
       </View>
       <View style={styles.actions}>
         <Pressable
@@ -149,9 +199,7 @@ export default function SafetyFilterSheet({
           accessibilityRole="button"
           style={styles.applyButton}
         >
-          <Text style={styles.applyText}>
-            {selected.length ? `${selected.length}개 시설 보기` : '적용하기'}
-          </Text>
+          <Text style={styles.applyText}>적용</Text>
         </Pressable>
       </View>
     </BottomSheet>
@@ -162,7 +210,14 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 },
   title: { fontSize: 20, fontWeight: '700', color: colors.textPrimary },
   subtitle: { marginTop: 5, fontSize: 13, color: colors.textSecondary },
-  list: { gap: 8 },
+  list: { gap: 16 },
+  section: { gap: 8 },
+  sectionTitle: {
+    marginLeft: 4,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
   option: {
     minHeight: 64,
     flexDirection: 'row',
@@ -177,6 +232,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     backgroundColor: colors.primarySoft,
   },
+  optionDisabled: { opacity: 0.62 },
   icon: {
     width: 42,
     height: 42,
@@ -191,8 +247,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
   },
-  countBox: { minWidth: 42, alignItems: 'flex-end', marginRight: 10 },
-  countText: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+  upcomingBadge: {
+    marginRight: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+  },
+  upcomingText: { fontSize: 10, fontWeight: '700', color: colors.textTertiary },
   check: {
     width: 22,
     height: 22,
