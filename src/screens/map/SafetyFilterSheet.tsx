@@ -50,10 +50,18 @@ export const SAFETY_FILTERS: Array<{
   },
   {
     key: 'streetlight',
-    label: '스마트 가로등',
-    description: '야간에 밝고 안전한 길을 찾기 쉬워요',
+    label: '빛길',
+    description: '보안등과 스마트 가로등이 이어지는 밤길이에요',
     markerLabel: '스마트 가로등',
-    color: '#e59b18',
+    color: '#f0a91f',
+    Icon: LampPendantIcon,
+  },
+  {
+    key: 'securityLight',
+    label: '빛길',
+    description: '보안등과 스마트 가로등이 이어지는 밤길이에요',
+    markerLabel: '보안등',
+    color: '#f6c453',
     Icon: LampPendantIcon,
   },
   {
@@ -96,7 +104,7 @@ const SECTIONS: Array<{
 }> = [
   {
     title: '긴급·방범',
-    keys: ['femaleHouse', 'cctv', 'emergencyBell', 'streetlight'],
+    keys: ['femaleHouse', 'cctv', 'emergencyBell', 'securityLight'],
   },
   {
     title: '의료',

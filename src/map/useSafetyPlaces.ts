@@ -26,6 +26,7 @@ const ALL_TYPES: SafetyPlaceType[] = [
   'affiliatedClinic',
   'toilet',
   'streetlight',
+  'securityLight',
 ];
 const MAP_TYPES: ReferencePlaceMapType[] = [
   'cctv',
@@ -263,12 +264,7 @@ export function useSafetyPlaces(
     () =>
       active
         .flatMap(type => {
-          const exact = reusableCache(
-            cache,
-            type,
-            cacheKey(type),
-            queryBounds,
-          );
+          const exact = reusableCache(cache, type, cacheKey(type), queryBounds);
           if (exact?.items.length || !isMapType(type)) {
             return exact?.items ?? [];
           }

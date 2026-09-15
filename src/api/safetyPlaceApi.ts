@@ -19,7 +19,8 @@ export type SafetyPlaceType =
   | 'pharmacy'
   | 'affiliatedClinic'
   | 'toilet'
-  | 'streetlight';
+  | 'streetlight'
+  | 'securityLight';
 
 export type ReferencePlaceMapType = Extract<
   SafetyPlaceType,
@@ -114,6 +115,8 @@ function rows(payload: unknown): Raw[] {
     'results',
     'rows',
     'features',
+    'securityLights',
+    'securityLightList',
   ]) {
     const nested = raw[key];
     if (Array.isArray(nested)) return nested as Raw[];
@@ -216,6 +219,7 @@ function normalize(
     affiliatedClinic: '부속의료기관',
     toilet: '공중화장실',
     streetlight: '스마트 가로등',
+    securityLight: '보안등',
   }[type];
   const roadAddress = text(
     value(source, [
@@ -239,6 +243,8 @@ function normalize(
         'id',
         'hpid',
         'facilityId',
+        'securityLightId',
+        'security_light_id',
         'managementNumber',
         'management_number',
         'managementNo',
@@ -253,6 +259,8 @@ function normalize(
         'hospitalName',
         'dutyName',
         'facilityName',
+        'securityLightName',
+        'security_light_name',
         'companyName',
         'businessName',
         '상호명',
@@ -268,6 +276,8 @@ function normalize(
         'parcel_address',
         'dutyAddr',
         'location',
+        'locationAddress',
+        'location_address',
         '소재지도로명주소',
         '도로명주소',
         '소재지주소',
@@ -420,6 +430,12 @@ async function fetchRaw(
           }),
         signal,
       );
+    case 'securityLight': {
+      const { data } = await apiClient.get(ENDPOINTS.securityLightsNearby(), {
+        signal,
+      });
+      return rows(data);
+    }
     case 'hospital':
       return fetchAllPages(
         pageNo =>

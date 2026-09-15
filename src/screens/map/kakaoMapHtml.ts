@@ -119,10 +119,10 @@ export function buildKakaoMapHtml({
   .spin text { font:700 13px -apple-system, BlinkMacSystemFont,
     'Apple SD Gothic Neo', sans-serif; }
   .safety-pin { width:32px; height:32px; cursor:pointer; border-radius:10px;
-    display:flex; align-items:center; justify-content:center; color:#fff;
+    position:relative; display:flex; align-items:center; justify-content:center; color:#fff;
     border:2px solid #fff; box-sizing:border-box;
     box-shadow:0 3px 6px rgba(0,0,0,.3); transform-origin:50% 50%;
-    transition:transform .16s ease; }
+    transition:transform .16s ease; overflow:visible; }
   .safety-pin.on { transform:scale(1.22); }
   .safety-pin:focus-visible, .safety-cluster:focus-visible {
     outline:3px solid #111827; outline-offset:2px; }
@@ -132,8 +132,19 @@ export function buildKakaoMapHtml({
     box-shadow:0 3px 8px rgba(0,0,0,.32); cursor:pointer;
     font:700 13px -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', sans-serif; }
   .safety-cluster { min-width:48px; gap:4px; white-space:nowrap; }
-  .safety-icon { display:block; width:18px; height:18px; fill:currentColor; }
+  .safety-icon { position:relative; z-index:1; display:block; width:18px; height:18px; fill:currentColor; }
   .safety-cluster .safety-icon { width:17px; height:17px; }
+
+  /* 보안등과 스마트 가로등은 개별 시설보다 '밝은 구간'으로 먼저 읽히게 합니다. */
+  .light-pin::before { content:''; position:absolute; left:50%; top:50%;
+    width:74px; height:74px; transform:translate(-50%,-50%); border-radius:50%;
+    background:radial-gradient(circle, rgba(255,205,92,.38) 0%, rgba(255,205,92,.16) 38%, rgba(255,205,92,0) 72%);
+    pointer-events:none; }
+  .light-pin.smart::after { content:'✦'; position:absolute; z-index:2; right:-6px; top:-7px;
+    width:16px; height:16px; display:flex; align-items:center; justify-content:center;
+    border-radius:8px; background:#155e75; color:#fff; border:1.5px solid #fff;
+    box-shadow:0 2px 4px rgba(0,0,0,.22); font:700 9px sans-serif; }
+  .light-cluster { box-shadow:0 0 0 9px rgba(246,196,83,.16), 0 3px 8px rgba(0,0,0,.28); }
 
   /* ── 현위치 파란 점 ── */
   .me { position:relative; width:20px; height:20px; }
@@ -226,6 +237,7 @@ export function buildKakaoMapHtml({
     toilet: 'M128 68a12 12 0 0 1-12 12h-16a12 12 0 0 1 0-24h16a12 12 0 0 1 12 12m48.15 127.62 3.65 25.55A20 20 0 0 1 160 244H96a20 20 0 0 1-19.8-22.83l3.65-25.55A100.08 100.08 0 0 1 28 108a12 12 0 0 1 12-12h12V40a20 20 0 0 1 20-20h112a20 20 0 0 1 20 20v56h12a12 12 0 0 1 12 12 100.08 100.08 0 0 1-51.85 87.62M76 96h104V44H76Zm77.21 108.78a100.3 100.3 0 0 1-50.42 0L100.61 220h54.78ZM203.05 120H53a76 76 0 0 0 150.1 0Z',
     femaleHouse: 'M208 36H48a20 20 0 0 0-20 20v56c0 54.29 26.32 87.22 48.4 105.29 23.71 19.39 47.44 26 48.44 26.29a12.1 12.1 0 0 0 6.32 0c1-.28 24.73-6.9 48.44-26.29 22.08-18.07 48.4-51 48.4-105.29V56a20 20 0 0 0-20-20m-4 76c0 35.71-13.09 64.69-38.91 86.15A126.3 126.3 0 0 1 128 219.38a126.1 126.1 0 0 1-37.09-21.23C65.09 176.69 52 147.71 52 112V60h152ZM79.51 144.49a12 12 0 1 1 17-17L112 143l47.51-47.52a12 12 0 0 1 17 17l-56 56a12 12 0 0 1-17 0Z',
     streetlight: 'M180 72.28V72a20 20 0 0 0-20-20h-20V16a12 12 0 0 0-24 0v36H96a20 20 0 0 0-20 20v.28A115.7 115.7 0 0 0 12 176a12 12 0 0 0 12 12h60.19a44 44 0 0 0 87.62 0H232a12 12 0 0 0 12-12 115.7 115.7 0 0 0-64-103.72M128 204a20 20 0 0 1-19.6-16h39.2a20 20 0 0 1-19.6 16m-91.22-40a91.75 91.75 0 0 1 55.84-72.95A12 12 0 0 0 100 80v-4h56v4a12 12 0 0 0 7.38 11.08 91.75 91.75 0 0 1 55.84 73Z',
+    securityLight: 'M180 72.28V72a20 20 0 0 0-20-20h-20V16a12 12 0 0 0-24 0v36H96a20 20 0 0 0-20 20v.28A115.7 115.7 0 0 0 12 176a12 12 0 0 0 12 12h60.19a44 44 0 0 0 87.62 0H232a12 12 0 0 0 12-12 115.7 115.7 0 0 0-64-103.72M128 204a20 20 0 0 1-19.6-16h39.2a20 20 0 0 1-19.6 16m-91.22-40a91.75 91.75 0 0 1 55.84-72.95A12 12 0 0 0 100 80v-4h56v4a12 12 0 0 0 7.38 11.08 91.75 91.75 0 0 1 55.84 73Z',
     hospital: 'M216 52h-36v-8a28 28 0 0 0-28-28h-48a28 28 0 0 0-28 28v8H40a20 20 0 0 0-20 20v128a20 20 0 0 0 20 20h176a20 20 0 0 0 20-20V72a20 20 0 0 0-20-20m-116-8a4 4 0 0 1 4-4h48a4 4 0 0 1 4 4v8h-56Zm112 152H44V76h168Zm-48-60a12 12 0 0 1-12 12h-12v12a12 12 0 0 1-24 0v-12h-12a12 12 0 0 1 0-24h12v-12a12 12 0 0 1 24 0v12h12a12 12 0 0 1 12 12'
   };
 
@@ -233,6 +245,10 @@ export function buildKakaoMapHtml({
     var path = SAFETY_ICON_PATHS[type] || SAFETY_ICON_PATHS.femaleHouse;
     return '<svg class="safety-icon" viewBox="0 0 256 256" aria-hidden="true">' +
       '<path d="' + path + '"/></svg>';
+  }
+
+  function isLightType(type) {
+    return type === 'streetlight' || type === 'securityLight';
   }
 
   function onMarkerActivate(el, action) {
@@ -359,7 +375,9 @@ export function buildKakaoMapHtml({
 
   function addSafetyPlaceOverlay(place) {
     var el = document.createElement('div');
-    el.className = 'safety-pin';
+    el.className = 'safety-pin' +
+      (isLightType(place.type) ? ' light-pin' : '') +
+      (place.type === 'streetlight' ? ' smart' : '');
     el.style.backgroundColor = place.color;
     el.innerHTML = safetyIconSvg(place.type);
     el.setAttribute('role', 'button');
@@ -388,9 +406,15 @@ export function buildKakaoMapHtml({
     el.className = 'cluster safety-cluster';
     var firstType = group[0].type;
     var sameType = group.every(function (place) { return place.type === firstType; });
-    var clusterLabel = sameType ? group[0].label : '안전시설';
-    var clusterType = sameType ? firstType : 'femaleHouse';
-    if (sameType) el.style.backgroundColor = group[0].color;
+    var allLights = group.every(function (place) { return isLightType(place.type); });
+    var clusterLabel = allLights ? '빛길' : (sameType ? group[0].label : '안전시설');
+    var clusterType = allLights ? 'streetlight' : (sameType ? firstType : 'femaleHouse');
+    if (allLights) {
+      el.className += ' light-cluster';
+      el.style.backgroundColor = '#c9850d';
+    } else if (sameType) {
+      el.style.backgroundColor = group[0].color;
+    }
     el.innerHTML = safetyIconSvg(clusterType) + '<span>' + String(group.length) + '</span>';
     el.setAttribute('role', 'button');
     el.setAttribute('tabindex', '0');

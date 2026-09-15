@@ -259,6 +259,12 @@ export const ENDPOINTS = {
     page?: number;
     limit?: number;
   }) => withQuery(`/smart-streetlights`, params),
+  /** JWT 사용자의 지역을 기준으로 보안등 목록을 조회합니다. */
+  securityLights: () => `/security-lights`,
+  /** JWT 사용자 현재 위치 주변의 보안등을 조회합니다. */
+  securityLightsNearby: () => `/security-lights/nearby`,
+  /** 보안등 한 곳의 상세 정보를 조회합니다. */
+  securityLight: (id: string) => `/security-lights/${encodeURIComponent(id)}`,
   /** 충북 음식업소 — 지역 파라미터 없음. 서버 데이터가 통틀어 10건뿐입니다(2026-09). */
   chungbukFoods: (params?: { currentPage?: number; perPage?: number }) =>
     withQuery(`/foods/chungbuk`, params),

@@ -33,7 +33,12 @@ import {
   ShoppingIcon,
   SportsIcon,
 } from '../../components/icons/UiIcons';
-import { ShieldCheckIcon, SirenIcon, ToiletIcon } from 'phosphor-react-native';
+import {
+  LampPendantIcon,
+  ShieldCheckIcon,
+  SirenIcon,
+  ToiletIcon,
+} from 'phosphor-react-native';
 import { colors } from '../../theme/colors';
 import KakaoMap, { type KakaoMapHandle } from './KakaoMap';
 import MapSearchOverlay from './MapSearchOverlay';
@@ -78,6 +83,7 @@ const CATEGORIES: TourCategory[] = [
   'festival',
 ];
 const FACILITY_FILTERS = [...SAFETY_FILTERS, CONVENIENCE_FILTER];
+const LIGHT_PATH_TYPES: SafetyPlaceType[] = ['streetlight', 'securityLight'];
 
 function findRegionSearchResult(query: string): SearchPoi | null {
   const normalized = query
@@ -207,6 +213,15 @@ function MapScreen({ onBack }: TabScreenProps) {
   }, [safety.places]);
   const safetyChipLabel = useMemo(() => {
     if (!safetyTypes.length) return '도움이 필요할 때';
+    const nonLightTypes = safetyTypes.filter(
+      type => !LIGHT_PATH_TYPES.includes(type),
+    );
+    const lightPathEnabled = LIGHT_PATH_TYPES.every(type =>
+      safetyTypes.includes(type),
+    );
+    if (lightPathEnabled && !nonLightTypes.length) return '빛길';
+    if (lightPathEnabled)
+      return `도움이 필요할 때 ${nonLightTypes.length + 1}종`;
     if (safetyTypes.length > 1)
       return `도움이 필요할 때 ${safetyTypes.length}종`;
     return (
@@ -214,6 +229,9 @@ function MapScreen({ onBack }: TabScreenProps) {
       '도움이 필요할 때'
     );
   }, [safetyTypes]);
+  const isLightPathOnly =
+    LIGHT_PATH_TYPES.every(type => safetyTypes.includes(type)) &&
+    safetyTypes.every(type => LIGHT_PATH_TYPES.includes(type));
   const safetyErrorLabel = useMemo(() => {
     const labels = safety.errors.map(
       type =>
@@ -464,10 +482,11 @@ function MapScreen({ onBack }: TabScreenProps) {
   }, []);
 
   const toggleDraftSafetyType = useCallback((type: SafetyPlaceType) => {
+    const types = type === 'securityLight' ? LIGHT_PATH_TYPES : [type];
     setDraftSafetyTypes(current =>
-      current.includes(type)
-        ? current.filter(item => item !== type)
-        : [...current, type],
+      types.every(item => current.includes(item))
+        ? current.filter(item => !types.includes(item))
+        : [...new Set([...current, ...types])],
     );
   }, []);
 
@@ -706,7 +725,7 @@ function MapScreen({ onBack }: TabScreenProps) {
           <FilterChip
             label={safetyChipLabel}
             count={null}
-            Icon={ShieldCheckIcon}
+            Icon={isLightPathOnly ? LampPendantIcon : ShieldCheckIcon}
             selected={safetyTypes.length > 0}
             onPress={openSafetyFilter}
           />
@@ -937,7 +956,7 @@ function MapScreen({ onBack }: TabScreenProps) {
               {
                 FACILITY_FILTERS.find(
                   item => item.key === selectedSafetyPlace.type,
-                )?.label
+                )?.markerLabel
               }
             </Text>
             <Pressable
