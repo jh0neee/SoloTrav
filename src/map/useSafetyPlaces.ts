@@ -8,6 +8,7 @@ import {
 import { roughDistance, type Coords } from './useNearbyPlaces';
 import type { City } from '../data/cities';
 import { mapApiSample, startMapApiLog } from './mapApiLogger';
+import { ApiError } from '../api/errors';
 
 const RADIUS_M = 10_000;
 export type MapBounds = {
@@ -42,7 +43,8 @@ function isMapType(type: SafetyPlaceType): type is ReferencePlaceMapType {
   return MAP_TYPES.includes(type as ReferencePlaceMapType);
 }
 const AUTO_RETRY_DELAYS_MS = [700];
-const REQUEST_CONCURRENCY = 2;
+/** 여러 지도 API가 같은 서버 제한을 공유하므로 한꺼번에 쏘지 않습니다. */
+const REQUEST_SPACING_MS = 400;
 
 type SafetyCacheEntry = {
   items: SafetyPlace[];
@@ -106,6 +108,9 @@ export function useSafetyPlaces(
   const [cache, setCache] = useState<Record<string, SafetyCacheEntry>>({});
   const [loadingTypes, setLoadingTypes] = useState<SafetyPlaceType[]>([]);
   const [errors, setErrors] = useState<SafetyPlaceType[]>([]);
+  const [rateLimitedTypes, setRateLimitedTypes] = useState<SafetyPlaceType[]>(
+    [],
+  );
   const [reloadKey, setReloadKey] = useState(0);
   const requestedTypes = active;
   const key = [...requestedTypes].sort().join(',');
@@ -123,6 +128,7 @@ export function useSafetyPlaces(
     if (!requested.length) {
       setLoadingTypes([]);
       setErrors([]);
+      setRateLimitedTypes([]);
       return;
     }
     const typesToLoad = requested.filter(
@@ -131,11 +137,13 @@ export function useSafetyPlaces(
     if (!typesToLoad.length) {
       setLoadingTypes([]);
       setErrors([]);
+      setRateLimitedTypes([]);
       return;
     }
     const controller = new AbortController();
     setLoadingTypes(typesToLoad);
     setErrors([]);
+    setRateLimitedTypes([]);
     const loadType = async (type: SafetyPlaceType) => {
       for (
         let attempt = 0;
@@ -177,6 +185,7 @@ export function useSafetyPlaces(
           else request.failure(error);
           if (
             controller.signal.aborted ||
+            (error instanceof ApiError && error.status === 429) ||
             attempt === AUTO_RETRY_DELAYS_MS.length
           ) {
             throw error;
@@ -221,8 +230,13 @@ export function useSafetyPlaces(
           const result = await loadType(type);
           if (controller.signal.aborted) return;
           storeResult(type, result);
-        } catch {
+        } catch (error) {
           if (controller.signal.aborted) return;
+          if (error instanceof ApiError && error.status === 429) {
+            setRateLimitedTypes(current =>
+              current.includes(type) ? current : [...current, type],
+            );
+          }
           setErrors(current =>
             current.includes(type) ? current : [...current, type],
           );
@@ -231,14 +245,14 @@ export function useSafetyPlaces(
             setLoadingTypes(current => current.filter(item => item !== type));
           }
         }
+        if (!controller.signal.aborted && nextIndex < typesToLoad.length) {
+          await new Promise<void>(resolve =>
+            setTimeout(resolve, REQUEST_SPACING_MS),
+          );
+        }
       }
     };
-    Promise.all(
-      Array.from(
-        { length: Math.min(REQUEST_CONCURRENCY, typesToLoad.length) },
-        runWorker,
-      ),
-    ).catch(() => {
+    runWorker().catch(() => {
       // 시설별 오류는 각 worker에서 errors 상태에 반영합니다.
     });
     return () => controller.abort();
@@ -286,6 +300,7 @@ export function useSafetyPlaces(
     places,
     loading: loadingTypes.length > 0,
     errors,
+    rateLimitedTypes,
     hasMoreTypes,
     retry,
   };

@@ -46,7 +46,11 @@ import TourPlaceSheet from './TourPlaceSheet';
 import PoiCard from './PoiCard';
 import SosScreen from '../sos/SosScreen';
 import { useCurrentLocation } from '../../location/useCurrentLocation';
-import { useNearbyPlaces, type Coords } from '../../map/useNearbyPlaces';
+import {
+  hasViewportChanged,
+  useNearbyPlaces,
+  type Coords,
+} from '../../map/useNearbyPlaces';
 import { useRegionSafety } from '../../map/useRegionSafety';
 import {
   FESTIVAL_RANGES,
@@ -145,7 +149,6 @@ const CATEGORY_ICON: Record<TourCategory, IconComponent> = {
 function MapScreen({ onBack }: TabScreenProps) {
   const insets = useSafeAreaInsets();
   const mapRef = useRef<KakaoMapHandle>(null);
-  const viewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 현위치 — 지도 파란 점과 비상벨의 안전시설 조회가 같은 좌표를 씁니다.
   const {
@@ -176,7 +179,7 @@ function MapScreen({ onBack }: TabScreenProps) {
   /** 지도가 지금 보고 있는 중심 (idle 마다 갱신) */
   const [mapCenter, setMapCenter] = useState<Coords>(myLocation);
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
-  /** 지도 이동이 끝날 때마다 자동으로 갱신되는 현재 화면 영역입니다. */
+  /** 사용자가 조회를 확정한 화면 영역입니다. 지도 이동만으로는 바뀌지 않습니다. */
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
   /** 현재 조회 중심점에 가장 가까운 충북 시군구 (예: 괴산군, 단양군 등) */
   const currentCity = useMemo(
@@ -233,12 +236,23 @@ function MapScreen({ onBack }: TabScreenProps) {
     LIGHT_PATH_TYPES.every(type => safetyTypes.includes(type)) &&
     safetyTypes.every(type => LIGHT_PATH_TYPES.includes(type));
   const safetyErrorLabel = useMemo(() => {
-    const labels = safety.errors.map(
-      type =>
-        FACILITY_FILTERS.find(item => item.key === type)?.label ?? '주변 시설',
+    const labels = Array.from(
+      new Set(
+        safety.errors.map(
+          type =>
+            FACILITY_FILTERS.find(item => item.key === type)?.label ??
+            '주변 시설',
+        ),
+      ),
     );
+    if (safety.rateLimitedTypes.length) {
+      return `${labels.join('·')} 요청이 많아 잠시 후 다시 확인할 수 있어요`;
+    }
     return `${labels.join('·')} 정보를 불러오지 못했어요`;
-  }, [safety.errors]);
+  }, [safety.errors, safety.rateLimitedTypes.length]);
+  const shouldShowMapResearch =
+    (tourCategoryEnabled || activeFacilityTypes.length > 0) &&
+    hasViewportChanged(mapBounds, queryBounds);
 
   // 측위가 끝나면 조회 기준점을 실제 현위치로 한 번 옮깁니다.
   useEffect(() => {
@@ -445,24 +459,25 @@ function MapScreen({ onBack }: TabScreenProps) {
       setMapCenter(center);
       if (bounds) {
         setMapBounds(bounds);
-        if (viewportTimerRef.current) {
-          clearTimeout(viewportTimerRef.current);
-        }
-        viewportTimerRef.current = setTimeout(() => {
+        // 지도가 처음 준비됐을 때만 자동으로 최초 조회 범위를 잡습니다.
+        // 이후 이동은 사용자가 '이 지역에서 다시 찾기'로 확정합니다.
+        if (!queryBounds) {
           setQueryCenter(center);
           setQueryBounds(bounds);
-        }, 450);
+        }
       }
     },
-    [],
+    [queryBounds],
   );
 
-  useEffect(
-    () => () => {
-      if (viewportTimerRef.current) clearTimeout(viewportTimerRef.current);
-    },
-    [],
-  );
+  const researchCurrentViewport = useCallback(() => {
+    if (!mapBounds) return;
+    setQueryCenter(mapCenter);
+    setQueryBounds(mapBounds);
+    setSelectedId(null);
+    setSelectedSafetyId(null);
+    setSelectedPoiId(null);
+  }, [mapBounds, mapCenter]);
 
   const handleMarkerPress = useCallback((id: string) => {
     setSelectedId(id);
@@ -869,6 +884,24 @@ function MapScreen({ onBack }: TabScreenProps) {
         </View>
       )}
 
+      {shouldShowMapResearch &&
+        !placesLoading &&
+        !safety.loading &&
+        !placesError &&
+        !locationNotice &&
+        !selectedPlace &&
+        !selectedPoi &&
+        !selectedSafetyPlace && (
+          <Pressable
+            style={[styles.researchButton, { top: topLayerBottom }]}
+            onPress={researchCurrentViewport}
+            accessibilityRole="button"
+            accessibilityLabel="현재 지도 영역에서 다시 찾기"
+          >
+            <Text style={styles.researchText}>이 지역에서 다시 찾기</Text>
+          </Pressable>
+        )}
+
       {/* 조회 실패 안내 — 지도는 그대로 두고 다시 시도만 권합니다 */}
       {placesError && !placesLoading && !locationNotice && (
         <Pressable
@@ -920,7 +953,11 @@ function MapScreen({ onBack }: TabScreenProps) {
               hitSlop={8}
               style={styles.safetyErrorAction}
             >
-              <Text style={styles.safetyErrorActionText}>다시 시도</Text>
+              <Text style={styles.safetyErrorActionText}>
+                {safety.rateLimitedTypes.length
+                  ? '잠시 후 다시 시도'
+                  : '다시 시도'}
+              </Text>
             </Pressable>
           </View>
         )}
