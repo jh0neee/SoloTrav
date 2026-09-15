@@ -2,13 +2,14 @@
  * 앱 버전 확인 및 업데이트 안내 서비스
  * 
  * - 자체 백엔드 API 없이 원격 JSON (GitHub Raw, Vercel, S3 등)을 통해 최신 버전을 조회합니다.
- * - Android의 경우 표준 market:// 스킴을 사용하여 기기에 설치된 스토어(Play 스토어, 원스토어 등)로 자동 연결합니다.
+ * - Android의 경우 원스토어 상품 페이지로 연결합니다.
  */
 import { Alert, Linking, Platform } from 'react-native';
 
 // 현재 앱의 설치 버전 (package.json 및 build.gradle의 versionName과 일치)
-export const CURRENT_APP_VERSION = '0.0.11';
+export const CURRENT_APP_VERSION = '0.0.13';
 export const APP_PACKAGE_NAME = 'com.solotravelmatemobile';
+export const ONESTORE_PRODUCT_ID = '0001008932';
 export const APP_STORE_ID = ''; // iOS App Store 출시 시 App ID 입력 (예: '1234567890')
 
 /**
@@ -111,7 +112,7 @@ export async function fetchRemoteVersionConfig(
 
 /**
  * 스토어 상세 페이지 열기
- * Android: market:// 스킴을 통해 Play Store / 원스토어 중 사용자가 선택 또는 기본 연결
+ * Android: 원스토어 앱 상세 페이지를 우선 열고, 앱이 없으면 원스토어 웹으로 연결
  */
 export async function openAppStore(customUrl?: string): Promise<void> {
   if (customUrl) {
@@ -124,18 +125,13 @@ export async function openAppStore(customUrl?: string): Promise<void> {
   }
 
   if (Platform.OS === 'android') {
-    const marketUrl = `market://details?id=${APP_PACKAGE_NAME}`;
-    const webFallbackUrl = `https://play.google.com/store/apps/details?id=${APP_PACKAGE_NAME}`;
+    const oneStoreAppUrl = `onestore://common/product/${ONESTORE_PRODUCT_ID}`;
+    const oneStoreWebUrl = `https://onesto.re/${ONESTORE_PRODUCT_ID}`;
 
     try {
-      const supported = await Linking.canOpenURL(marketUrl);
-      if (supported) {
-        await Linking.openURL(marketUrl);
-      } else {
-        await Linking.openURL(webFallbackUrl);
-      }
+      await Linking.openURL(oneStoreAppUrl);
     } catch {
-      await Linking.openURL(webFallbackUrl);
+      await Linking.openURL(oneStoreWebUrl);
     }
   } else if (Platform.OS === 'ios') {
     if (APP_STORE_ID) {

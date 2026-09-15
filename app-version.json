@@ -1,7 +1,7 @@
 {
-  "latestVersion": "0.0.11",
+  "latestVersion": "0.0.13",
   "minVersion": "0.0.1",
-  "releaseNotes": "갤러리 사진 크기 반응형 조정 및 이미지 간격·여백 개선",
+  "releaseNotes": "앱 업데이트 경로를 원스토어 전용으로 변경",
   "forceUpdate": false,
-  "storeUrl": ""
+  "storeUrl": "https://onesto.re/0001008932"
 }

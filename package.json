@@ -1,6 +1,6 @@
 {
   "name": "SoloTravelMateMobile",
-  "version": "0.0.11",
+  "version": "0.0.13",
   "scripts": {
     "android": "react-native run-android --appIdSuffix debug",
     "web": "npm --prefix web run dev",
