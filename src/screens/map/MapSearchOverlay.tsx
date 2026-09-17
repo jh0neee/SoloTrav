@@ -1,7 +1,7 @@
 /**
  * 지도 검색 오버레이 — 상단 검색바를 누르면 지도 위를 덮으며 열립니다.
  *
- * 결과는 두 갈래를 합쳐 보여 줍니다.
+ * 지역은 내부 목록에서 즉시 찾아 최상단에 표시합니다. 장소는 두 검색을 함께 씁니다.
  *  1) 관광정보(TourAPI) 검색 결과 — 상세 정보가 붙는 관광 콘텐츠
  *  2) 카카오 장소 검색 결과 — 편의점·약국 등 그 외 모든 POI
  *
@@ -9,12 +9,12 @@
  * 결과는 그대로 보여 줍니다.
  *
  * 입력은 350ms 디바운스하고, 응답이 늦게 도착해 이전 결과가 덮어쓰는 일이 없도록
- * 마지막 질의어를 ref 로 붙들어 비교합니다.
+ * 입력 버전을 비교합니다. 제출 시에는 해당 입력의 응답만 기다려 적용합니다.
  *
  * ⚠️ TextInput 은 일부러 **비제어(uncontrolled)** 로 둡니다.
  * value 를 매 타이핑마다 되돌려 주면 한글 조합 중(예: ㅎ→하→한) 네이티브 입력기의
  * 조합 상태가 초기화되어 글자가 깨지거나 자음/모음이 분리됩니다.
- * 그래서 입력값은 typedRef 로만 들고 있고, 화면 상태(query)는 디바운스 뒤에만 갱신합니다.
+ * 입력의 value를 다시 전달하지 않고 목록 상태만 갱신합니다.
  * 코드에서 입력칸을 채워야 할 때(최근 검색어 탭)는 key 를 바꿔 리마운트하고,
  * 비울 때는 명령형 API 인 clear() 를 씁니다.
  */
@@ -34,17 +34,12 @@ import { TAB_CONTENT_BOTTOM_GAP } from '../../navigation/layout';
 import { Chevron, SearchIcon } from '../../components/icons/UiIcons';
 import PlaceResultRow from '../../components/travel/PlaceResultRow';
 import { colors } from '../../theme/colors';
-import { travelApi } from '../../api/travelApi';
+import { useMapSearch } from './useMapSearch';
 import { TOUR_CATEGORY_LABEL, formatTourDistance } from '../../types/tourPlace';
-import {
-  isMappableTourContent,
-  type MappableTourContent,
-} from '../../types/travel';
+import { type MappableTourContent } from '../../types/travel';
 import type { SearchPoi, SearchStatus } from './searchTypes';
 import { formatDistance } from './searchTypes';
-import { mapApiSample, startMapApiLog } from '../../map/mapApiLogger';
 
-const DEBOUNCE_MS = 350;
 const MAX_RECENT = 8;
 
 /**
@@ -61,9 +56,6 @@ function pushRecent(keyword: string) {
     ...recentKeywords.filter(k => k !== trimmed),
   ].slice(0, MAX_RECENT);
 }
-
-/** 관광정보 검색은 목록에 너무 길게 늘어지지 않게 위에서 몇 건만 보여 줍니다. */
-const TOUR_HIT_LIMIT = 8;
 
 type Props = {
   visible: boolean;
@@ -91,217 +83,83 @@ function MapSearchOverlay({
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
 
-  /** 디바운스를 거쳐 확정된 검색어. 목록 렌더링과 검색에만 씁니다. */
-  const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [pois, setPois] = useState<SearchPoi[]>([]);
-  const [status, setStatus] = useState<SearchStatus>('OK');
-
-  /** 사용자가 방금 친 원문 (조합 중인 글자 포함) — 리렌더를 일으키지 않습니다. */
-  const typedRef = useRef('');
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // 응답 도착 시점에 아직 유효한 질의어인지 확인하는 용도
-  const latestQuery = useRef('');
-
-  /** 코드로 입력칸을 채울 때만 올립니다 — 값이 바뀌면 TextInput 이 리마운트됩니다. */
   const [inputSeed, setInputSeed] = useState(0);
   const seedTextRef = useRef('');
-
-  /** 관광정보(TourAPI) 검색 결과 */
-  const [tourHits, setTourHits] = useState<MappableTourContent[]>([]);
-
+  const {
+    query,
+    regionResult,
+    pois,
+    tourHits,
+    loading,
+    tourLoading,
+    status,
+    changeText,
+    submit,
+    invalidate,
+  } = useMapSearch({
+    visible,
+    onSearch,
+    onSubmit,
+    onRegion: (region, text) => onSelectPoi(region, [region], text),
+  });
   const trimmed = query.trim();
 
-  // 열릴 때마다 입력 상태를 비웁니다. (오버레이가 통째로 언마운트되므로 입력칸은 자동으로 빕니다)
   useEffect(() => {
     if (!visible) {
       Keyboard.dismiss();
       inputRef.current?.blur();
       return;
     }
-    typedRef.current = '';
     seedTextRef.current = '';
-    latestQuery.current = '';
-    setQuery('');
-    setPois([]);
-    setTourHits([]);
-    setStatus('OK');
-    setLoading(false);
+    inputRef.current?.clear();
     const timer = setTimeout(() => inputRef.current?.focus(), 80);
     return () => clearTimeout(timer);
   }, [visible]);
 
-  // 디바운스 타이머 정리
-  useEffect(
-    () => () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
+  const fillInput = useCallback(
+    (text: string) => {
+      seedTextRef.current = text;
+      setInputSeed(seed => seed + 1);
+      changeText(text);
     },
-    [],
+    [changeText],
   );
-
-  /**
-   * 타이핑 처리 — 여기서는 state 를 건드리지 않습니다.
-   * 조합 중에 리렌더가 일어나면 한글 입력이 깨지기 때문입니다.
-   */
-  const handleChangeText = useCallback((text: string) => {
-    typedRef.current = text;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setQuery(text), DEBOUNCE_MS);
-  }, []);
-
-  // 확정된 검색어로 카카오 검색
-  useEffect(() => {
-    if (!visible) return;
-    latestQuery.current = trimmed;
-
-    if (trimmed.length < 2) {
-      setPois([]);
-      setTourHits([]);
-      setStatus('OK');
-      setLoading(false);
-      return;
-    }
-
-    let alive = true;
-    setLoading(true);
-    const request = startMapApiLog('kakao/keyword-search', {
-      query: trimmed,
-      regionFilter: '충청북도',
-    });
-    onSearch(trimmed)
-      .then(result => {
-        // 이미 다음 글자를 친 뒤라면 늦게 온 응답은 버립니다.
-        if (!alive || latestQuery.current !== trimmed) {
-          request.cancelled({ reason: 'stale-query' });
-          return;
-        }
-        request.success({
-          status: result.status,
-          count: result.items.length,
-          sample: mapApiSample(result.items),
-        });
-        setPois(result.items);
-        setStatus(result.status);
-        setLoading(false);
-      })
-      .catch(error => {
-        if (!alive || latestQuery.current !== trimmed) {
-          request.cancelled({ reason: 'stale-query' });
-          return;
-        }
-        request.failure(error);
-        setPois([]);
-        setStatus('ERROR');
-        setLoading(false);
-      });
-
-    return () => {
-      alive = false;
-      request.cancelled({ reason: 'effect-cleanup' });
-    };
-  }, [visible, trimmed, onSearch]);
-
-  // 관광정보 검색 — 카카오 검색과 나란히 나가고, 실패하면 조용히 비웁니다.
-  useEffect(() => {
-    if (!visible || trimmed.length < 2) return;
-
-    const controller = new AbortController();
-    const request = startMapApiLog('tour/search-keyword', {
-      keyword: trimmed,
-      regionCode: '43',
-      size: TOUR_HIT_LIMIT,
-      arrange: 'O',
-    });
-    travelApi
-      .searchSpots(
-        {
-          keyword: trimmed,
-          regionCode: '43',
-          size: TOUR_HIT_LIMIT,
-          arrange: 'O',
-        },
-        controller.signal,
-      )
-      .then(page => {
-        if (controller.signal.aborted || latestQuery.current !== trimmed)
-          return;
-        const items = page.items.filter(isMappableTourContent);
-        request.success({
-          count: items.length,
-          totalCount: page.totalCount,
-          sample: mapApiSample(items),
-        });
-        setTourHits(items);
-      })
-      .catch(error => {
-        if (controller.signal.aborted) request.cancelled();
-        else {
-          request.failure(error);
-          setTourHits([]);
-        }
-      });
-
-    return () => {
-      controller.abort();
-      request.cancelled({ reason: 'effect-cleanup' });
-    };
-  }, [visible, trimmed]);
-
-  /** 최근 검색어를 눌렀을 때 — 입력칸을 리마운트해 값을 채웁니다. */
-  const fillInput = useCallback((text: string) => {
-    typedRef.current = text;
-    seedTextRef.current = text;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    setInputSeed(seed => seed + 1);
-    setQuery(text);
-  }, []);
-
   const clearInput = useCallback(() => {
-    typedRef.current = '';
     seedTextRef.current = '';
-    if (debounceRef.current) clearTimeout(debounceRef.current);
     inputRef.current?.clear();
     inputRef.current?.focus();
-    setQuery('');
-  }, []);
-
+    changeText('');
+  }, [changeText]);
   const handleClose = useCallback(() => {
+    invalidate();
     Keyboard.dismiss();
     inputRef.current?.blur();
     onClose();
-  }, [onClose]);
-
+  }, [invalidate, onClose]);
   const handleSubmit = useCallback(() => {
     Keyboard.dismiss();
-    const text = typedRef.current.trim();
-    if (!text) return;
-    pushRecent(text);
-    // 디바운스가 아직 안 끝났으면 먼저 검색부터 확정합니다.
-    if (text !== trimmed) {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-      setQuery(text);
-    }
-    if (pois.length) onSubmit(pois, text);
-  }, [trimmed, pois, onSubmit]);
-
+    pushRecent(trimmed);
+    submit();
+  }, [trimmed, submit]);
   const handlePlace = useCallback(
     (place: MappableTourContent) => {
+      invalidate();
       Keyboard.dismiss();
       inputRef.current?.blur();
       pushRecent(place.title);
       onSelectPlace(place);
     },
-    [onSelectPlace],
+    [invalidate, onSelectPlace],
   );
-
   const handlePoi = useCallback(
     (poi: SearchPoi) => {
+      invalidate();
       Keyboard.dismiss();
       inputRef.current?.blur();
       pushRecent(trimmed || poi.name);
-      onSelectPoi(poi, pois, trimmed);
+      onSelectPoi(poi, poi.id.startsWith('region:') ? [poi] : pois, trimmed);
     },
-    [onSelectPoi, pois, trimmed],
+    [invalidate, onSelectPoi, pois, trimmed],
   );
 
   if (!visible) return null;
@@ -309,6 +167,8 @@ function MapSearchOverlay({
   const showEmpty =
     trimmed.length >= 2 &&
     !loading &&
+    !tourLoading &&
+    !regionResult &&
     tourHits.length === 0 &&
     pois.length === 0;
 
@@ -332,7 +192,7 @@ function MapSearchOverlay({
             key={inputSeed}
             ref={inputRef}
             defaultValue={seedTextRef.current}
-            onChangeText={handleChangeText}
+            onChangeText={changeText}
             onSubmitEditing={handleSubmit}
             placeholder="혼자 갈 장소, 주소, 숙소를 검색해 보세요"
             placeholderTextColor={colors.textSecondary}
@@ -366,6 +226,21 @@ function MapSearchOverlay({
           { paddingBottom: (insets.bottom || 16) + 48 },
         ]}
       >
+        {regionResult && (
+          <>
+            <Text style={styles.sectionTitle}>지역</Text>
+            <View style={styles.resultRow}>
+              <PlaceResultRow
+                title={regionResult.name}
+                address={regionResult.address}
+                categoryLabel="지역 둘러보기"
+                imageUrl={null}
+                distanceLabel=""
+                onPress={() => handlePoi(regionResult)}
+              />
+            </View>
+          </>
+        )}
         {/* 입력 전 — 최근 검색어 + 앱 등록 장소 */}
         {trimmed.length === 0 && (
           <>
@@ -393,7 +268,7 @@ function MapSearchOverlay({
           </>
         )}
 
-        {/* 입력 중 — 관광정보 우선, 그 아래 카카오 결과 */}
+        {/* 지역 아래에 관광정보와 카카오 장소 결과를 표시합니다. */}
         {trimmed.length > 0 && (
           <>
             {tourHits.length > 0 && (
@@ -413,7 +288,7 @@ function MapSearchOverlay({
               <Text style={styles.hint}>두 글자 이상 입력해 주세요.</Text>
             )}
 
-            {loading && (
+            {(loading || tourLoading) && (
               <View style={styles.loading}>
                 <ActivityIndicator color={colors.textSecondary} />
               </View>

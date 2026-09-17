@@ -29,6 +29,8 @@ import {
 import type { TourCategory } from '../../types/tourPlace';
 import type { MappableTourContent } from '../../types/travel';
 import type { SearchPoi, SearchStatus } from './searchTypes';
+import { getMapActionId, logMapDiagnostic } from '../../map/mapApiLogger';
+import type { MapViewport } from '../../map/mapViewportStorage';
 
 /**
  * react-native-webview 14.0.1의 TypeScript 타입 정의 오류를 우회하기 위한 코드
@@ -41,6 +43,14 @@ const WebView = RNWebView as unknown as ComponentType<
 export type SearchResponse = { items: SearchPoi[]; status: SearchStatus };
 
 export type KakaoMapHandle = {
+  fitRegionBounds: (bounds: {
+    south: number;
+    west: number;
+    north: number;
+    east: number;
+  }) => void;
+  /** 개발 빌드에서만 실제 WebView 화면을 비동기로 기록합니다. */
+  traceViewport: (actionId: string) => void;
   /** 현위치로 지도 이동 */
   moveToMyLocation: () => void;
   /** 한 단계 확대 */
@@ -60,6 +70,19 @@ export type KakaoMapHandle = {
 };
 
 type Props = {
+  initialViewport?: MapViewport;
+  initialBounds?: { south: number; west: number; north: number; east: number };
+  resolveMyRegion?: boolean;
+  onMyRegion?: (
+    inside: boolean | null,
+    center: { lat: number; lng: number },
+  ) => void;
+  onViewportRegion?: (
+    viewport: MapViewport,
+    inside: boolean | null,
+    sigungu: string | null,
+  ) => void;
+  onUserInteraction?: () => void;
   /** 관광정보 API 로 받아 온 마커 목록 */
   places: MappableTourContent[];
   category: TourCategory;
@@ -86,6 +109,12 @@ const SEARCH_TIMEOUT_MS = 8000;
 
 const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
   {
+    initialViewport,
+    initialBounds,
+    resolveMyRegion = false,
+    onMyRegion,
+    onViewportRegion,
+    onUserInteraction,
     places,
     category,
     selectedId,
@@ -103,6 +132,8 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
 ) {
   const webRef = useRef<WebViewInstance>(null);
   const [ready, setReady] = useState(false);
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+  const pendingCamera = useRef<string | null>(null);
 
   // 진행 중인 검색 요청: reqId -> resolve
   const pendingSearch = useRef(new Map<number, (r: SearchResponse) => void>());
@@ -112,12 +143,18 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
   // HTML 은 최초 1회만 만듭니다. 최초 카테고리만 ref 로 붙잡아 둡니다.
   const initialCategoryRef = useRef(category);
   const initialLocationRef = useRef(myLocation);
+  const initialViewportRef = useRef(initialViewport);
+  const initialBoundsRef = useRef(initialBounds);
   const html = useMemo(
     () =>
       buildKakaoMapHtml({
-        center: initialLocationRef.current,
+        center:
+          initialViewportRef.current?.center ?? initialLocationRef.current,
+        level: initialViewportRef.current?.level,
+        initialBounds: initialBoundsRef.current,
         myLocation: initialLocationRef.current,
         initialCategory: initialCategoryRef.current,
+        debug: __DEV__,
       }),
     [],
   );
@@ -126,21 +163,43 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
   const run = useCallback((code: string) => {
     webRef.current?.injectJavaScript(`${code}; true;`);
   }, []);
+  const moveCamera = useCallback(
+    (code: string) => {
+      if (!readyRef.current) pendingCamera.current = code;
+      else run(code);
+    },
+    [run],
+  );
 
   // 브릿지 메시지가 누락되거나 지연되어도 무한 스피너에 갇히지 않도록 안전 타이머 설정
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!readyRef.current) {
-        readyRef.current = true;
-        setReady(true);
+        setLoadingTimedOut(true);
       }
     }, 3500);
     return () => clearTimeout(timer);
   }, []);
 
   useImperativeHandle(ref, () => ({
+    fitRegionBounds: bounds =>
+      moveCamera(`window.__fitRegionBounds(${JSON.stringify(bounds)})`),
+    traceViewport: (actionId: string) => {
+      if (__DEV__) {
+        logMapDiagnostic(
+          'viewport.snapshot-request',
+          { ready: readyRef.current },
+          actionId,
+        );
+        run(
+          `window.__debugViewport && window.__debugViewport(${JSON.stringify(
+            actionId,
+          )})`,
+        );
+      }
+    },
     moveToMyLocation: () =>
-      run('window.__moveToMyLocation && window.__moveToMyLocation()'),
+      moveCamera('window.__moveToMyLocation && window.__moveToMyLocation()'),
 
     zoomIn: () => run('window.__zoomIn && window.__zoomIn()'),
     zoomOut: () => run('window.__zoomOut && window.__zoomOut()'),
@@ -178,7 +237,7 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
       run(`window.__selectSearchMarker(${JSON.stringify(id)})`),
 
     moveTo: (lat: number, lng: number, level?: number) =>
-      run(`window.__moveTo(${lat}, ${lng}, ${level ?? 'undefined'})`),
+      moveCamera(`window.__moveTo(${lat}, ${lng}, ${level ?? 'undefined'})`),
   }));
 
   // 지도 로드가 끝난 뒤에만 주입해야 합니다 (그 전엔 전역 함수가 아직 없음).
@@ -190,7 +249,17 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
   // 관광정보 API 결과가 바뀌면 마커를 통째로 교체합니다.
   useEffect(() => {
     if (!ready) return;
-    run(`window.__setPlaces(${JSON.stringify(toMapMarkers(places))})`);
+    const actionId = getMapActionId();
+    logMapDiagnostic(
+      'markers.sent',
+      { layer: 'tour', count: places.length },
+      actionId,
+    );
+    run(
+      `window.__setPlaces(${JSON.stringify(
+        toMapMarkers(places),
+      )}, ${JSON.stringify(actionId)})`,
+    );
   }, [ready, places, run]);
 
   useEffect(() => {
@@ -200,7 +269,17 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
 
   useEffect(() => {
     if (!ready) return;
-    run(`window.__setSafetyPlaces(${JSON.stringify(safetyPlaces)})`);
+    const actionId = getMapActionId();
+    logMapDiagnostic(
+      'markers.sent',
+      { layer: 'safety', count: safetyPlaces.length },
+      actionId,
+    );
+    run(
+      `window.__setSafetyPlaces(${JSON.stringify(
+        safetyPlaces,
+      )}, ${JSON.stringify(actionId)})`,
+    );
   }, [ready, safetyPlaces, run]);
 
   useEffect(() => {
@@ -216,6 +295,11 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
       run('window.__moveToMyLocation && window.__moveToMyLocation()');
     }
   }, [ready, myLocation, centerOnMyLocation, run]);
+
+  useEffect(() => {
+    if (ready && resolveMyRegion)
+      run(`window.__locateRegion(${myLocation.lat}, ${myLocation.lng})`);
+  }, [ready, resolveMyRegion, myLocation.lat, myLocation.lng, run]);
 
   const handleMessage = useCallback(
     (event: WebViewMessageEvent) => {
@@ -233,6 +317,12 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
         west?: number;
         north?: number;
         east?: number;
+        actionId?: string;
+        event?: string;
+        details?: Record<string, unknown>;
+        level?: number;
+        insideChungbuk?: boolean | null;
+        sigungu?: string | null;
       };
       try {
         payload = JSON.parse(event.nativeEvent.data);
@@ -241,9 +331,51 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
       }
 
       switch (payload.type) {
+        case 'userInteraction':
+          onUserInteraction?.();
+          break;
+        case 'myRegion':
+          if (
+            typeof payload.lat === 'number' &&
+            typeof payload.lng === 'number'
+          ) {
+            onMyRegion?.(payload.insideChungbuk ?? null, {
+              lat: payload.lat,
+              lng: payload.lng,
+            });
+          }
+          break;
+        case 'viewportRegion':
+          if (
+            typeof payload.lat === 'number' &&
+            typeof payload.lng === 'number' &&
+            typeof payload.level === 'number'
+          ) {
+            onViewportRegion?.(
+              {
+                center: { lat: payload.lat, lng: payload.lng },
+                level: payload.level,
+              },
+              payload.insideChungbuk ?? null,
+              typeof payload.sigungu === 'string' ? payload.sigungu : null,
+            );
+          }
+          break;
+        case 'diagnostic':
+          if (__DEV__)
+            logMapDiagnostic(
+              payload.event ?? 'webview',
+              payload.details,
+              payload.actionId,
+            );
+          break;
         case 'ready':
           readyRef.current = true;
           setReady(true);
+          if (pendingCamera.current) {
+            run(pendingCamera.current);
+            pendingCamera.current = null;
+          }
           break;
         case 'markerPress':
           if (payload.id) {
@@ -313,6 +445,10 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
       onSearchMarkerPress,
       onMapPress,
       onCenterChanged,
+      onMyRegion,
+      onViewportRegion,
+      onUserInteraction,
+      run,
     ],
   );
 
@@ -349,7 +485,7 @@ const KakaoMap = forwardRef<KakaoMapHandle, Props>(function KakaoMapView(
         setSupportMultipleWindows={false}
         style={styles.web}
       />
-      {!ready && (
+      {!ready && !loadingTimedOut && (
         <View style={styles.loading} pointerEvents="none">
           <ActivityIndicator color={colors.textSecondary} />
         </View>

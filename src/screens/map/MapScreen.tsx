@@ -71,6 +71,16 @@ import ConvenienceFilterSheet, {
 import type { TabScreenProps } from '../../navigation/tabs';
 import { CITIES, getNearestCity } from '../../data/cities';
 import { useTabBarVisibility } from '../../navigation/TabBarVisibilityContext';
+import { beginMapAction, logMapDiagnostic } from '../../map/mapApiLogger';
+import { useTravelCooldown } from '../../map/useTravelCooldown';
+import RegionSelectSheet from './RegionSelectSheet';
+import {
+  CHUNGBUK_VIEWPORT,
+  CHUNGBUK_OVERVIEW_BOUNDS,
+  mapViewportStorage,
+  type MapViewport,
+} from '../../map/mapViewportStorage';
+import type { City } from '../../data/cities';
 
 type IconComponent = React.ComponentType<{ color: string; size?: number }>;
 
@@ -88,32 +98,6 @@ const CATEGORIES: TourCategory[] = [
 ];
 const FACILITY_FILTERS = [...SAFETY_FILTERS, CONVENIENCE_FILTER];
 const LIGHT_PATH_TYPES: SafetyPlaceType[] = ['streetlight', 'securityLight'];
-
-function findRegionSearchResult(query: string): SearchPoi | null {
-  const normalized = query
-    .replace(/\s/g, '')
-    .replace(/^충청북도/, '')
-    .replace(/^충북/, '');
-  const city = CITIES.find(item =>
-    [item.name, item.sigungu].some(name => {
-      const withoutSuffix = name.replace(/[시군]$/, '');
-      return normalized === name || normalized === withoutSuffix;
-    }),
-  );
-  if (!city) return null;
-  return {
-    id: `region:${city.id}`,
-    name: city.sigungu,
-    address: `${city.sido} ${city.sigungu}`,
-    roadAddress: '',
-    category: '지역 둘러보기',
-    phone: '',
-    url: '',
-    distance: null,
-    lat: city.center.lat,
-    lng: city.center.lng,
-  };
-}
 
 /**
  * 칩에 보이는 혼행 관점 라벨. 데이터 분류(TOUR_CATEGORY_LABEL)는 그대로 두고
@@ -148,6 +132,7 @@ const CATEGORY_ICON: Record<TourCategory, IconComponent> = {
 
 function MapScreen({ onBack }: TabScreenProps) {
   const insets = useSafeAreaInsets();
+  const travelCooldown = useTravelCooldown();
   const mapRef = useRef<KakaoMapHandle>(null);
 
   // 현위치 — 지도 파란 점과 비상벨의 안전시설 조회가 같은 좌표를 씁니다.
@@ -160,7 +145,7 @@ function MapScreen({ onBack }: TabScreenProps) {
   const [locationNoticeClosed, setLocationNoticeClosed] = useState(false);
 
   const [category, setCategory] = useState<TourCategory>('attraction');
-  const [tourCategoryEnabled, setTourCategoryEnabled] = useState(true);
+  const [tourCategoryEnabled, setTourCategoryEnabled] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [safetyTypes, setSafetyTypes] = useState<SafetyPlaceType[]>([]);
   const [draftSafetyTypes, setDraftSafetyTypes] = useState<SafetyPlaceType[]>(
@@ -172,12 +157,25 @@ function MapScreen({ onBack }: TabScreenProps) {
   const [convenienceFilterOpen, setConvenienceFilterOpen] = useState(false);
   const [selectedSafetyId, setSelectedSafetyId] = useState<string | null>(null);
   /** 검색으로 여행지를 고른 후 늦게 도착한 현위치가 지도를 다시 돌리지 않게 합니다. */
-  const [hasChosenDestination, setHasChosenDestination] = useState(false);
+  const chosenDestination = useRef(false);
+  const [initialViewport, setInitialViewport] = useState(CHUNGBUK_VIEWPORT);
+  const [historyReady, setHistoryReady] = useState(false);
+  const [hasSavedViewport, setHasSavedViewport] = useState(false);
+  const [regionSelectOpen, setRegionSelectOpen] = useState(false);
+  const [outsideRegion, setOutsideRegion] = useState(false);
+  const pendingMyLocation = useRef(false);
+  const markDestination = useCallback(() => {
+    chosenDestination.current = true;
+    pendingMyLocation.current = false;
+    setOutsideRegion(false);
+  }, []);
 
   /** 지도 이동이 끝난 시점의 조회 중심점입니다. */
-  const [queryCenter, setQueryCenter] = useState<Coords>(myLocation);
+  const [queryCenter, setQueryCenter] = useState<Coords>(
+    CHUNGBUK_VIEWPORT.center,
+  );
   /** 지도가 지금 보고 있는 중심 (idle 마다 갱신) */
-  const [mapCenter, setMapCenter] = useState<Coords>(myLocation);
+  const [mapCenter, setMapCenter] = useState<Coords>(CHUNGBUK_VIEWPORT.center);
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
   /** 사용자가 조회를 확정한 화면 영역입니다. 지도 이동만으로는 바뀌지 않습니다. */
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
@@ -254,13 +252,74 @@ function MapScreen({ onBack }: TabScreenProps) {
     (tourCategoryEnabled || activeFacilityTypes.length > 0) &&
     hasViewportChanged(mapBounds, queryBounds);
 
-  // 측위가 끝나면 조회 기준점을 실제 현위치로 한 번 옮깁니다.
+  // 저장된 여행 지역은 늦게 도착하는 GPS보다 우선합니다.
   useEffect(() => {
-    if (locationStatus !== 'granted' || hasChosenDestination) return;
-    setQueryCenter(myLocation);
-    setMapCenter(myLocation);
+    let active = true;
+    mapViewportStorage.load().then(saved => {
+      if (!active) return;
+      const viewport = saved ?? CHUNGBUK_VIEWPORT;
+      chosenDestination.current = !!saved;
+      setHasSavedViewport(!!saved);
+      setInitialViewport(viewport);
+      setQueryCenter(viewport.center);
+      setMapCenter(viewport.center);
+      setHistoryReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const moveToLocation = useCallback((center: Coords) => {
+    setQueryCenter(center);
+    setMapCenter(center);
     setQueryBounds(null);
-  }, [locationStatus, myLocation, hasChosenDestination]);
+    mapRef.current?.moveTo(center.lat, center.lng, 4);
+  }, []);
+
+  useEffect(() => {
+    if (locationStatus === 'granted' && pendingMyLocation.current) {
+      pendingMyLocation.current = false;
+      moveToLocation(myLocation);
+    }
+  }, [locationStatus, myLocation, moveToLocation]);
+
+  const handleMyRegion = useCallback(
+    (inside: boolean | null, center: Coords) => {
+      if (
+        chosenDestination.current ||
+        center.lat !== myLocation.lat ||
+        center.lng !== myLocation.lng
+      )
+        return;
+      chosenDestination.current = true;
+      if (inside) moveToLocation(center);
+      else if (inside === false) setOutsideRegion(true);
+    },
+    [myLocation, moveToLocation],
+  );
+
+  const handleViewportRegion = useCallback(
+    (viewport: MapViewport, inside: boolean | null) => {
+      if (inside === true) mapViewportStorage.save(viewport);
+    },
+    [],
+  );
+
+  const handleMyLocation = useCallback(() => {
+    markDestination();
+    if (locationStatus === 'granted') moveToLocation(myLocation);
+    else {
+      pendingMyLocation.current = true;
+      refreshLocation();
+    }
+  }, [
+    locationStatus,
+    myLocation,
+    refreshLocation,
+    markDestination,
+    moveToLocation,
+  ]);
 
   /** 축제 레이어의 기간 필터 (축제 칩을 골랐을 때만 보입니다) */
   const [festivalRange, setFestivalRange] = useState<FestivalRange>('now');
@@ -296,6 +355,10 @@ function MapScreen({ onBack }: TabScreenProps) {
           setSearchOpen(false);
           return true;
         }
+        if (regionSelectOpen) {
+          setRegionSelectOpen(false);
+          return true;
+        }
         if (safetyFilterOpen) {
           setSafetyFilterOpen(false);
           return true;
@@ -316,6 +379,7 @@ function MapScreen({ onBack }: TabScreenProps) {
   }, [
     sosOpen,
     searchOpen,
+    regionSelectOpen,
     safetyFilterOpen,
     convenienceFilterOpen,
     selectedId,
@@ -332,6 +396,7 @@ function MapScreen({ onBack }: TabScreenProps) {
     loading: tourLoading,
     error: tourError,
     retry: retryTour,
+    refreshing: tourRefreshing,
   } = useNearbyPlaces(
     queryCenter,
     currentCity,
@@ -346,7 +411,13 @@ function MapScreen({ onBack }: TabScreenProps) {
     loading: festivalLoading,
     error: festivalError,
     retry: retryFestivals,
-  } = useNearbyFestivals(queryCenter, festivalRange, undefined, queryBounds);
+  } = useNearbyFestivals(
+    queryCenter,
+    festivalRange,
+    undefined,
+    queryBounds,
+    isFestival,
+  );
 
   const places = useMemo(
     () =>
@@ -409,7 +480,7 @@ function MapScreen({ onBack }: TabScreenProps) {
     }
     if (locationStatus === 'blocked') {
       return {
-        text: '위치 권한이 꺼져 있어 기본 지역을 보여주고 있어요',
+        text: '위치 권한이 꺼져 있어요. 여행 지역은 직접 고를 수 있어요',
         action: '설정 열기',
         onAction: () => Linking.openSettings(),
       };
@@ -423,11 +494,20 @@ function MapScreen({ onBack }: TabScreenProps) {
     }
     if (locationStatus === 'unavailable') {
       return {
-        text: '현위치를 찾지 못해 기본 지역을 보여주고 있어요',
+        text: '현위치를 찾지 못했어요. 여행 지역은 직접 고를 수 있어요',
         action: '다시 시도',
         onAction: refreshLocation,
       };
     }
+    if (outsideRegion)
+      return {
+        text: '충북 여행을 준비 중이신가요? 지역을 골라보세요',
+        action: '지역 선택',
+        onAction: () => {
+          markDestination();
+          setRegionSelectOpen(true);
+        },
+      };
     return null;
   })();
 
@@ -438,8 +518,98 @@ function MapScreen({ onBack }: TabScreenProps) {
   const selectedPoi =
     selectedPoiIndex >= 0 ? searchResults[selectedPoiIndex] : null;
 
+  /** 필터 탐색으로 전환할 때 이전 검색 마커와 카드를 함께 정리합니다. */
+  const clearSearchSelection = useCallback(() => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setSelectedPoiId(null);
+    setSelectedSearchPlace(null);
+    setSelectedId(null);
+    mapRef.current?.clearSearchMarkers();
+  }, []);
+
+  /** 검색 결과는 사용자가 선택했던 필터와 독립적으로 표시합니다. */
+  const resetFiltersForSearch = useCallback(() => {
+    setTourCategoryEnabled(false);
+    setSafetyTypes([]);
+    setDraftSafetyTypes([]);
+    setToiletEnabled(false);
+    setDraftToiletEnabled(false);
+    setSelectedSafetyId(null);
+    setSafetyFilterOpen(false);
+    setConvenienceFilterOpen(false);
+  }, []);
+
+  const selectRegion = useCallback(
+    (city: City | null) => {
+      markDestination();
+      clearSearchSelection();
+      resetFiltersForSearch();
+      setRegionSelectOpen(false);
+      const viewport = city
+        ? { center: city.center, level: 7 }
+        : CHUNGBUK_VIEWPORT;
+      setQueryCenter(viewport.center);
+      setMapCenter(viewport.center);
+      setQueryBounds(null);
+      mapViewportStorage.save(viewport);
+      if (city) mapRef.current?.moveTo(city.center.lat, city.center.lng, 7);
+      else mapRef.current?.fitRegionBounds(CHUNGBUK_OVERVIEW_BOUNDS);
+    },
+    [markDestination, clearSearchSelection, resetFiltersForSearch],
+  );
+
+  const traceFilterAction = useCallback(
+    (filter: string, enabled: boolean) => {
+      markDestination();
+      const actionId = beginMapAction('filter.click', {
+        filter,
+        enabled,
+        mapCenter,
+        mapBounds,
+        previousQueryCenter: queryCenter,
+        previousQueryBounds: queryBounds,
+        requestedCenter: mapCenter,
+        requestedBounds: mapBounds,
+        city: currentCity.sigungu,
+      });
+      mapRef.current?.traceViewport(actionId);
+    },
+    [
+      mapCenter,
+      mapBounds,
+      queryCenter,
+      queryBounds,
+      currentCity.sigungu,
+      markDestination,
+    ],
+  );
+
+  useEffect(() => {
+    logMapDiagnostic('query.state', {
+      category,
+      enabled: tourCategoryEnabled,
+      queryCenter,
+      queryBounds,
+      city: currentCity.sigungu,
+      districtCodes: currentCity.tourismDistrictCodes ?? [
+        currentCity.districtCode,
+      ],
+      facilityTypes: activeFacilityTypes,
+    });
+  }, [
+    category,
+    tourCategoryEnabled,
+    queryCenter,
+    queryBounds,
+    currentCity,
+    activeFacilityTypes,
+  ]);
+
   const handleCategory = useCallback(
     (next: TourCategory) => {
+      traceFilterAction(next, !(tourCategoryEnabled && next === category));
+      clearSearchSelection();
       if (tourCategoryEnabled && next === category) {
         setTourCategoryEnabled(false);
         setSelectedId(null);
@@ -451,11 +621,19 @@ function MapScreen({ onBack }: TabScreenProps) {
       setQueryBounds(mapBounds);
       setSelectedId(null); // 현재 보고 있는 지역을 기준으로 새 카테고리를 조회합니다.
     },
-    [tourCategoryEnabled, category, mapCenter, mapBounds],
+    [
+      tourCategoryEnabled,
+      category,
+      mapCenter,
+      mapBounds,
+      clearSearchSelection,
+      traceFilterAction,
+    ],
   );
 
   const handleViewportChanged = useCallback(
     (center: Coords, bounds?: MapBounds) => {
+      logMapDiagnostic('viewport.received', { center, bounds });
       setMapCenter(center);
       if (bounds) {
         setMapBounds(bounds);
@@ -472,12 +650,13 @@ function MapScreen({ onBack }: TabScreenProps) {
 
   const researchCurrentViewport = useCallback(() => {
     if (!mapBounds) return;
+    traceFilterAction('research', true);
     setQueryCenter(mapCenter);
     setQueryBounds(mapBounds);
     setSelectedId(null);
     setSelectedSafetyId(null);
     setSelectedPoiId(null);
-  }, [mapBounds, mapCenter]);
+  }, [mapBounds, mapCenter, traceFilterAction]);
 
   const handleMarkerPress = useCallback((id: string) => {
     setSelectedId(id);
@@ -513,20 +692,39 @@ function MapScreen({ onBack }: TabScreenProps) {
   }, [safetyTypes]);
 
   const applySafetyFilter = useCallback(() => {
+    traceFilterAction(
+      `safety:${draftSafetyTypes.join(',')}`,
+      draftSafetyTypes.length > 0,
+    );
+    clearSearchSelection();
     setSafetyTypes(draftSafetyTypes);
     setQueryCenter(mapCenter);
     setQueryBounds(mapBounds);
     setSelectedSafetyId(null);
     setSafetyFilterOpen(false);
-  }, [draftSafetyTypes, mapCenter, mapBounds]);
+  }, [
+    draftSafetyTypes,
+    mapCenter,
+    mapBounds,
+    clearSearchSelection,
+    traceFilterAction,
+  ]);
 
   const applyConvenienceFilter = useCallback(() => {
+    traceFilterAction('toilet', draftToiletEnabled);
+    clearSearchSelection();
     setToiletEnabled(draftToiletEnabled);
     setQueryCenter(mapCenter);
     setQueryBounds(mapBounds);
     setSelectedSafetyId(null);
     setConvenienceFilterOpen(false);
-  }, [draftToiletEnabled, mapCenter, mapBounds]);
+  }, [
+    draftToiletEnabled,
+    mapCenter,
+    mapBounds,
+    clearSearchSelection,
+    traceFilterAction,
+  ]);
 
   const handleSafetyMarkerPress = useCallback((id: string) => {
     setSelectedId(null);
@@ -543,21 +741,24 @@ function MapScreen({ onBack }: TabScreenProps) {
       items: [],
       status: 'ERROR' as const,
     };
-    const region = findRegionSearchResult(query);
+
     const items = result.items.filter(item => {
       const address = item.roadAddress || item.address;
       return /^(충청북도|충북)(\s|$)/.test(address.trim());
     });
     return {
       ...result,
-      items: region ? [region, ...items] : items,
-      status: region || items.length ? ('OK' as const) : result.status,
+      items,
+      status: items.length ? ('OK' as const) : result.status,
     };
   }, []);
 
   /** 검색 결과 마커를 지도에 올리고, 특정 항목이 있으면 강조합니다. */
   const applyResults = useCallback(
     (items: SearchPoi[], query: string, focusId: string | null) => {
+      resetFiltersForSearch();
+      markDestination();
+      setSelectedSearchPlace(null);
       setSearchQuery(query);
       setSearchResults(items);
       setSelectedId(null);
@@ -567,7 +768,7 @@ function MapScreen({ onBack }: TabScreenProps) {
       mapRef.current?.showSearchMarkers(items, focusId === null);
       if (focusId) mapRef.current?.selectSearchMarker(focusId);
     },
-    [],
+    [resetFiltersForSearch, markDestination],
   );
 
   const handleSelectPoi = useCallback(
@@ -576,16 +777,15 @@ function MapScreen({ onBack }: TabScreenProps) {
         const cityId = poi.id.slice('region:'.length);
         const city = CITIES.find(item => item.id === cityId);
         if (city) {
+          resetFiltersForSearch();
           const center = city.center;
-          setHasChosenDestination(true);
+          markDestination();
           setSearchQuery(city.name);
           setSearchResults([]);
           setSelectedPoiId(null);
           setSelectedSearchPlace(null);
           setSelectedId(null);
           setSearchOpen(false);
-          setTourCategoryEnabled(true);
-          setCategory('attraction');
           setQueryCenter(center);
           setQueryBounds(null);
           setMapCenter(center);
@@ -595,10 +795,10 @@ function MapScreen({ onBack }: TabScreenProps) {
           return;
         }
       }
-      setHasChosenDestination(true);
+      markDestination();
       applyResults(all.length ? all : [poi], query || poi.name, poi.id);
     },
-    [applyResults],
+    [applyResults, resetFiltersForSearch, markDestination],
   );
 
   const handleSubmitSearch = useCallback(
@@ -606,26 +806,26 @@ function MapScreen({ onBack }: TabScreenProps) {
     [applyResults],
   );
 
-  /**
-   * 관광정보 검색 결과를 고르면 그 좌표를 새 조회 기준점으로 삼습니다.
-   * (충북 어디든 검색될 수 있어서, 지도만 옮기면 마커가 하나도 없는 화면이 됩니다.)
-   */
-  const handleSelectPlace = useCallback((place: MappableTourContent) => {
-    const center = { lat: place.lat, lng: place.lng };
-    setHasChosenDestination(true);
-    setSelectedSearchPlace(place);
-    setSearchQuery(place.title);
-    setSearchResults([]);
-    setSelectedPoiId(null);
-    setSearchOpen(false);
-    mapRef.current?.clearSearchMarkers();
-    setCategory(place.category); // 다른 필터에 가려 마커가 안 보이는 일을 막습니다
-    setQueryCenter(center);
-    setQueryBounds(null);
-    setMapCenter(center);
-    setSelectedId(place.contentId);
-    mapRef.current?.moveTo(place.lat, place.lng);
-  }, []);
+  /** 관광정보 검색 장소는 필터를 켜지 않고 별도 마커와 상세 카드로 표시합니다. */
+  const handleSelectPlace = useCallback(
+    (place: MappableTourContent) => {
+      resetFiltersForSearch();
+      const center = { lat: place.lat, lng: place.lng };
+      markDestination();
+      setSelectedSearchPlace(place);
+      setSearchQuery(place.title);
+      setSearchResults([]);
+      setSelectedPoiId(null);
+      setSearchOpen(false);
+      mapRef.current?.clearSearchMarkers();
+      setQueryCenter(center);
+      setQueryBounds(null);
+      setMapCenter(center);
+      setSelectedId(place.contentId);
+      mapRef.current?.moveTo(place.lat, place.lng);
+    },
+    [resetFiltersForSearch, markDestination],
+  );
 
   /** 카드에서 이전/다음 결과로 넘기기 */
   const stepPoi = useCallback(
@@ -643,20 +843,21 @@ function MapScreen({ onBack }: TabScreenProps) {
 
   /** 검색 결과 전체 해제 (검색바의 × 버튼) */
   const clearSearch = useCallback(() => {
-    setSearchQuery('');
-    setSearchResults([]);
-    setSelectedPoiId(null);
-    setSelectedSearchPlace(null);
-    setSelectedId(null);
+    clearSearchSelection();
     setSearchOpen(false);
-    mapRef.current?.selectSearchMarker(null);
-    mapRef.current?.clearSearchMarkers();
-  }, []);
+  }, [clearSearchSelection]);
 
   const closePoiCard = useCallback(() => {
     setSelectedPoiId(null);
     mapRef.current?.selectSearchMarker(null);
   }, []);
+
+  if (!historyReady)
+    return (
+      <View style={styles.locationLoading}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
 
   return (
     <View style={styles.container}>
@@ -668,9 +869,13 @@ function MapScreen({ onBack }: TabScreenProps) {
         safetyPlaces={safetyMarkers}
         selectedSafetyId={selectedSafetyId}
         myLocation={myLocation}
-        centerOnMyLocation={
-          locationStatus === 'granted' && !hasChosenDestination
-        }
+        initialViewport={initialViewport}
+        initialBounds={hasSavedViewport ? undefined : CHUNGBUK_OVERVIEW_BOUNDS}
+        centerOnMyLocation={false}
+        resolveMyRegion={locationStatus === 'granted'}
+        onMyRegion={handleMyRegion}
+        onViewportRegion={handleViewportRegion}
+        onUserInteraction={markDestination}
         onMarkerPress={handleMarkerPress}
         onSafetyMarkerPress={handleSafetyMarkerPress}
         onSearchMarkerPress={handleSearchMarkerPress}
@@ -695,7 +900,10 @@ function MapScreen({ onBack }: TabScreenProps) {
 
           <Pressable
             style={styles.searchBar}
-            onPress={() => setSearchOpen(true)}
+            onPress={() => {
+              markDestination();
+              setSearchOpen(true);
+            }}
             accessibilityRole="search"
             accessibilityLabel="장소 검색"
           >
@@ -729,6 +937,20 @@ function MapScreen({ onBack }: TabScreenProps) {
                 </Text>
               </View>
             ) : null}
+          </Pressable>
+          <Pressable
+            style={styles.regionButton}
+            onPress={() => {
+              markDestination();
+              setSelectedId(null);
+              setSelectedPoiId(null);
+              setSelectedSafetyId(null);
+              setRegionSelectOpen(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="충북 지역 선택"
+          >
+            <Text style={styles.regionButtonText}>지역 선택</Text>
           </Pressable>
         </View>
 
@@ -814,7 +1036,7 @@ function MapScreen({ onBack }: TabScreenProps) {
       >
         <Pressable
           style={styles.floatButton}
-          onPress={() => mapRef.current?.moveToMyLocation()}
+          onPress={handleMyLocation}
           accessibilityRole="button"
           accessibilityLabel="현위치로 이동"
         >
@@ -825,7 +1047,10 @@ function MapScreen({ onBack }: TabScreenProps) {
         <View style={styles.zoomGroup}>
           <Pressable
             style={styles.zoomButton}
-            onPress={() => mapRef.current?.zoomIn()}
+            onPress={() => {
+              markDestination();
+              mapRef.current?.zoomIn();
+            }}
             accessibilityRole="button"
             accessibilityLabel="확대"
           >
@@ -834,7 +1059,10 @@ function MapScreen({ onBack }: TabScreenProps) {
           <View style={styles.zoomDivider} />
           <Pressable
             style={styles.zoomButton}
-            onPress={() => mapRef.current?.zoomOut()}
+            onPress={() => {
+              markDestination();
+              mapRef.current?.zoomOut();
+            }}
             accessibilityRole="button"
             accessibilityLabel="축소"
           >
@@ -886,6 +1114,7 @@ function MapScreen({ onBack }: TabScreenProps) {
 
       {shouldShowMapResearch &&
         !placesLoading &&
+        travelCooldown === 0 &&
         !safety.loading &&
         !placesError &&
         !locationNotice &&
@@ -903,20 +1132,31 @@ function MapScreen({ onBack }: TabScreenProps) {
         )}
 
       {/* 조회 실패 안내 — 지도는 그대로 두고 다시 시도만 권합니다 */}
-      {placesError && !placesLoading && !locationNotice && (
-        <Pressable
-          style={[styles.researchButton, { top: topLayerBottom }]}
-          onPress={retryPlaces}
-          accessibilityRole="button"
-          accessibilityLabel="주변 정보 다시 불러오기"
-        >
+      {travelCooldown > 0 && tourCategoryEnabled && !locationNotice && (
+        <View style={[styles.researchButton, { top: topLayerBottom }]}>
           <Text style={styles.researchText}>
-            주변 관광정보를 불러오지 못했어요 · 다시 시도
+            {(isFestival ? festivalLoading : tourRefreshing)
+              ? `잠시 후 다시 불러올게요 · ${travelCooldown}초`
+              : `요청이 많아요 · ${travelCooldown}초 후 다시 시도해 주세요`}
           </Text>
-        </Pressable>
+        </View>
       )}
+      {placesError &&
+        !placesLoading &&
+        !locationNotice &&
+        travelCooldown === 0 && (
+          <Pressable
+            style={[styles.researchButton, { top: topLayerBottom }]}
+            onPress={retryPlaces}
+            accessibilityRole="button"
+            accessibilityLabel="주변 정보 다시 불러오기"
+          >
+            <Text style={styles.researchText}>{placesError} · 다시 시도</Text>
+          </Pressable>
+        )}
 
       {!placesLoading &&
+        travelCooldown === 0 &&
         !placesError &&
         !places.length &&
         tourCategoryEnabled &&
@@ -1038,6 +1278,12 @@ function MapScreen({ onBack }: TabScreenProps) {
 
       <TourPlaceSheet place={selectedPlace} onClose={closeSheet} />
 
+      <RegionSelectSheet
+        visible={regionSelectOpen}
+        onClose={() => setRegionSelectOpen(false)}
+        onSelect={selectRegion}
+      />
+
       <SafetyFilterSheet
         visible={safetyFilterOpen}
         selected={draftSafetyTypes}
@@ -1127,6 +1373,15 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
   },
+  regionButton: {
+    height: 44,
+    paddingHorizontal: 12,
+    borderRadius: 22,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    elevation: 1,
+  },
+  regionButtonText: { fontSize: 13, fontWeight: '700', color: colors.primary },
   circleButton: {
     width: 40,
     height: 40,

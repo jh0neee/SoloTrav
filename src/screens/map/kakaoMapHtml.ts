@@ -77,6 +77,8 @@ type Options = {
    * 마커는 API 응답이 온 뒤 __setPlaces 로 들어오므로 여기서는 필터값만 정합니다.
    */
   initialCategory: TourCategory;
+  debug?: boolean;
+  initialBounds?: { south: number; west: number; north: number; east: number };
   level?: number; // 카카오 확대 레벨 (숫자가 작을수록 확대)
 };
 
@@ -84,6 +86,8 @@ export function buildKakaoMapHtml({
   center,
   myLocation,
   initialCategory,
+  debug = false,
+  initialBounds,
   level = 4,
 }: Options) {
   return `<!DOCTYPE html>
@@ -176,6 +180,7 @@ export function buildKakaoMapHtml({
   var MIN_LEVEL = 1;   // 최대 확대
   var MAX_LEVEL = 14;  // 최대 축소
   var INITIAL_CATEGORY = ${JSON.stringify(initialCategory)};
+  var INITIAL_BOUNDS = ${JSON.stringify(initialBounds ?? null)};
 
   function send(payload) {
     if (window.ReactNativeWebView) {
@@ -273,7 +278,79 @@ export function buildKakaoMapHtml({
   var selectedId = null;
   var selectedSafetyId = null;
   var selectedSearchId = null;
+  var DEBUG = ${debug};
+  var debugActionId = 'initial';
+  var tourActionId = 'initial';
+  var safetyActionId = 'initial';
+  var viewportMoving = false;
+
+  function debugViewport(event, actionId, extra) {
+    if (!DEBUG) return;
+    var details = extra || {};
+    details.sampledAt = new Date().toISOString();
+    details.ready = !!map;
+    details.moving = viewportMoving;
+    if (map) {
+      var center = map.getCenter();
+      var bounds = map.getBounds();
+      var sw = bounds.getSouthWest();
+      var ne = bounds.getNorthEast();
+      details.center = { lat: center.getLat(), lng: center.getLng() };
+      details.bounds = { south: sw.getLat(), west: sw.getLng(), north: ne.getLat(), east: ne.getLng() };
+      details.level = map.getLevel();
+    }
+    send({ type: 'diagnostic', event: event, actionId: actionId, details: details });
+  }
+
+  // 브리지 명령이 실행된 시점의 스냅샷입니다. 클릭 시각과 sampledAt을 비교합니다.
+  window.__debugViewport = function (actionId) {
+    debugActionId = actionId;
+    debugViewport('viewport.snapshot', actionId);
+  };
   var placesService = null;  // kakao.maps.services.Places
+  var regionService = null;
+  var regionCache = {};
+  var viewportRegionTimer = null;
+  var viewportRegionRevision = 0;
+
+  function lookupRegion(lat, lng, callback) {
+    if (!regionService) { callback(null); return; }
+    var key = lat + ',' + lng;
+    if (Object.prototype.hasOwnProperty.call(regionCache, key)) { callback(regionCache[key].inside, regionCache[key].sigungu); return; }
+    var settled = false;
+    var timer = setTimeout(function () {
+      if (!settled) { settled = true; callback(null); }
+    }, 5000);
+    regionService.coord2RegionCode(lng, lat, function (rows, status) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      var inside = null;
+      var sigungu = null;
+      if (status === kakao.maps.services.Status.OK && rows && rows.length) {
+        inside = rows.some(function (row) { return String(row.code || '').slice(0, 2) === '43'; });
+        var region = rows.find(function (row) { return String(row.code || '').slice(0, 2) === '43'; });
+        sigungu = region ? region.region_2depth_name || null : null;
+        if (Object.keys(regionCache).length >= 50) regionCache = {};
+        regionCache[key] = { inside: inside, sigungu: sigungu };
+      }
+      callback(inside, sigungu);
+    });
+  }
+
+  window.__locateRegion = function (lat, lng) {
+    lookupRegion(lat, lng, function (inside) {
+      send({ type: 'myRegion', lat: lat, lng: lng, insideChungbuk: inside });
+    });
+  };
+
+  window.__fitRegionBounds = function (bounds) {
+    if (!map) return;
+    map.setBounds(new kakao.maps.LatLngBounds(
+      new kakao.maps.LatLng(bounds.south, bounds.west),
+      new kakao.maps.LatLng(bounds.north, bounds.east)
+    ), 150, 36, 100, 36);
+  };
   var map = null;
 
   function makePin(place) {
@@ -343,9 +420,9 @@ export function buildKakaoMapHtml({
 
     if (!map) return;
 
-    var visible = PLACES.filter(function (place) {
-      return place.category === category;
-    });
+    // RN에서 필터 결과와 직접 선택한 검색 장소를 확정합니다.
+    // 여기서 카테고리로 다시 거르면 필터와 무관한 검색 마커가 사라집니다.
+    var visible = PLACES;
 
     // 축소된 지도에서는 52px 안에 모인 핀을 하나로 묶어 잘못된 핀을 누르는 일을 줄입니다.
     if (map.getLevel() >= 4 && visible.length > 1) {
@@ -371,6 +448,9 @@ export function buildKakaoMapHtml({
     if (selectedId && overlays[selectedId]) {
       overlays[selectedId].el.classList.add('on');
     }
+    debugViewport('markers.rendered', tourActionId, {
+      layer: 'tour', receivedCount: PLACES.length, overlayCount: Object.keys(overlays).length
+    });
   }
 
   function addSafetyPlaceOverlay(place) {
@@ -452,7 +532,10 @@ export function buildKakaoMapHtml({
       safetyOverlays[id].overlay.setMap(null);
     });
     safetyOverlays = {};
-    if (!map || !SAFETY_PLACES.length) return;
+    if (!map || !SAFETY_PLACES.length) {
+      debugViewport('markers.rendered', safetyActionId, { layer: 'safety', receivedCount: SAFETY_PLACES.length, overlayCount: 0 });
+      return;
+    }
 
     // 축소된 지도에서는 클러스터로 모으고, 레벨 2 이하로 확대하면
     // 개별 마커로 전환해 같은 숫자 클러스터가 끝까지 남지 않게 합니다.
@@ -479,6 +562,9 @@ export function buildKakaoMapHtml({
     if (selectedSafetyId && safetyOverlays[selectedSafetyId]) {
       safetyOverlays[selectedSafetyId].el.classList.add('on');
     }
+    debugViewport('markers.rendered', safetyActionId, {
+      layer: 'safety', receivedCount: SAFETY_PLACES.length, overlayCount: Object.keys(safetyOverlays).length
+    });
   }
 
   function initMap() {
@@ -489,6 +575,14 @@ export function buildKakaoMapHtml({
 
     // 키워드 검색용 서비스 (SDK URL 의 libraries=services 로 로드됩니다)
     placesService = new kakao.maps.services.Places();
+    regionService = new kakao.maps.services.Geocoder();
+    if (INITIAL_BOUNDS) window.__fitRegionBounds(INITIAL_BOUNDS);
+    kakao.maps.event.addListener(map, 'dragstart', function () {
+      send({ type: 'userInteraction' });
+    });
+    document.getElementById('map').addEventListener('touchstart', function () {
+      send({ type: 'userInteraction' });
+    }, { passive: true });
 
     renderPlaces();
 
@@ -528,9 +622,28 @@ export function buildKakaoMapHtml({
         east: ne.getLng(),
         level: map.getLevel()
       });
+      var lat = c.getLat();
+      var lng = c.getLng();
+      var level = map.getLevel();
+      var revision = ++viewportRegionRevision;
+      if (viewportRegionTimer) clearTimeout(viewportRegionTimer);
+      viewportRegionTimer = setTimeout(function () {
+        lookupRegion(lat, lng, function (inside, sigungu) {
+          if (revision !== viewportRegionRevision || !map) return;
+          var current = map.getCenter();
+          if (Math.abs(current.getLat() - lat) > 0.0000001 || Math.abs(current.getLng() - lng) > 0.0000001 || map.getLevel() !== level) return;
+          send({ type: 'viewportRegion', lat: lat, lng: lng, level: level, insideChungbuk: inside, sigungu: sigungu });
+        });
+      }, 400);
     }
 
+    if (DEBUG) {
+      kakao.maps.event.addListener(map, 'center_changed', function () { viewportMoving = true; });
+      kakao.maps.event.addListener(map, 'zoom_changed', function () { viewportMoving = true; });
+    }
     kakao.maps.event.addListener(map, 'idle', function () {
+      viewportMoving = false;
+      debugViewport('viewport.idle', debugActionId);
       renderPlaces();
       renderSafetyPlaces();
       sendViewport();
@@ -543,7 +656,8 @@ export function buildKakaoMapHtml({
   /* ── RN 에서 호출하는 전역 함수들 ── */
 
   /** 관광정보 API 결과로 마커를 통째로 교체합니다. */
-  window.__setPlaces = function (list) {
+  window.__setPlaces = function (list, actionId) {
+    tourActionId = actionId || 'initial';
     PLACES = Array.isArray(list) ? list : [];
     renderPlaces();
   };
@@ -565,7 +679,8 @@ export function buildKakaoMapHtml({
     }
   };
 
-  window.__setSafetyPlaces = function (list) {
+  window.__setSafetyPlaces = function (list, actionId) {
+    safetyActionId = actionId || 'initial';
     SAFETY_PLACES = Array.isArray(list) ? list : [];
     renderSafetyPlaces();
   };
