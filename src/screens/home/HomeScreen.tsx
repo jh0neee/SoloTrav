@@ -195,12 +195,10 @@ function HomeScreen({
                   accessibilityRole="button"
                   accessibilityLabel={`${selectedMapCity.name} 혼자 가기 전 체크 보기`}
                 >
-                  <Text style={styles.mapDetailButtonText}>혼자 가기 전 체크</Text>
-                  <Chevron
-                    direction="right"
-                    color={colors.primary}
-                    size={16}
-                  />
+                  <Text style={styles.mapDetailButtonText}>
+                    혼자 가기 전 체크
+                  </Text>
+                  <Chevron direction="right" color={colors.primary} size={16} />
                 </Pressable>
               </>
             ) : (
@@ -228,6 +226,7 @@ function HomeScreen({
                 accessibilityState={{ selected: active }}
               >
                 <Text
+                  textBreakStrategy="simple"
                   style={[
                     styles.rankTabText,
                     active && styles.rankTabTextActive,
@@ -494,7 +493,8 @@ function PreferencePromptCard({
         <View style={styles.promptTexts}>
           <Text style={styles.promptKicker}>나의 혼행 스타일 알려주기</Text>
           <Text style={styles.promptTitle}>
-            혼자 여행할 때 어떤 스타일인지 알려주면{`\n`}딱 맞는 혼행 코스를 만들어드려요
+            혼자 여행할 때 어떤 스타일인지 알려주면{`\n`}딱 맞는 혼행 코스를
+            만들어드려요
           </Text>
         </View>
       </View>
@@ -813,6 +813,7 @@ const styles = StyleSheet.create({
   rankTab: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: 9,
     borderRadius: 10,
   },
@@ -825,10 +826,11 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   rankTabText: {
+    alignSelf: 'stretch',
+    textAlign: 'center',
     fontSize: 13,
     fontWeight: '600',
     color: colors.textSecondary,
-    lineHeight: 18,
     includeFontPadding: true,
   },
   rankTabTextActive: {

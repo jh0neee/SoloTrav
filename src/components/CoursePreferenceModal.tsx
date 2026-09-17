@@ -114,7 +114,7 @@ export function CoursePreferenceModal({
                 </View>
                 <View style={styles.optionTextBox}>
                   <View style={styles.optionHeaderRow}>
-                    <Text style={styles.optionTitlePrimary}>내 혼행 스타일 그대로 빠른 코스</Text>
+                    <Text style={styles.optionTitlePrimary}>내 스타일 그대로 빠른 코스</Text>
                     <View style={styles.badgeRecommend}>
                       <Text style={styles.badgeRecommendText}>추천</Text>
                     </View>
