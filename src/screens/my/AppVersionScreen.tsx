@@ -101,6 +101,13 @@ export default function AppVersionScreen({ onBack }: Props) {
       >
         {/* ── 상단 앱 히어로 ── */}
         <View style={styles.appHero}>
+          <View style={styles.appIconWrapper}>
+            <Image
+              source={require('../../assets/logo.png')}
+              style={styles.appLogo}
+              resizeMode="contain"
+            />
+          </View>
           <Image
             source={require('../../assets/app_icon.png')}
             style={styles.appLauncherIcon}
@@ -313,11 +320,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 18,
   },
+  appIconWrapper: {
   appLauncherIcon: {
     width: 68,
     height: 68,
+    borderRadius: 20,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 18,
     marginBottom: 14,
+  },
+  appLogo: {
+    width: 44,
+    height: 44,
   },
   appName: {
     fontSize: 20,
