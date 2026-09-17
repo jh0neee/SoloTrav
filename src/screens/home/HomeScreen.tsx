@@ -182,13 +182,11 @@ function HomeScreen({
                     style={[
                       styles.mapSelectionStatus,
                       {
-                        color: safetyStatusColor(
-                          selectedMapCitySafety.status,
-                        ),
+                        color: safetyStatusColor(selectedMapCitySafety.status),
                       },
                     ]}
                   >
-                    혼행 안전 {selectedMapCitySafety.status}
+                    혼행 {selectedMapCitySafety.status}
                   </Text>
                 </View>
                 <Pressable

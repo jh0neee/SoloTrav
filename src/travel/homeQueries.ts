@@ -26,17 +26,17 @@ const REGION_CODE = '43';
 /** 시군구명 → 지역안전지수 */
 export type SafetyMap = Record<string, RegionSafety>;
 
-export type SafetyStatus = '안심' | '보통' | '확인 필요';
+export type SafetyStatus = '안전 양호' | '안전 보통' | '안전 주의';
 
 /** 혼행 안전점수를 빠르게 이해할 수 있는 세 단계 상태로 바꿉니다. */
 export function safetyStatusOf(score: number): SafetyStatus {
   if (score >= 70) {
-    return '안심';
+    return '안전 양호';
   }
   if (score >= 50) {
-    return '보통';
+    return '안전 보통';
   }
-  return '확인 필요';
+  return '안전 주의';
 }
 
 /**

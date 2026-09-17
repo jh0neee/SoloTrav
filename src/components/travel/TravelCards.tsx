@@ -26,10 +26,10 @@ import type {
 import type { SafetyStatus } from '../../travel/homeQueries';
 
 export function safetyStatusColor(status: SafetyStatus): string {
-  if (status === '안심') {
+  if (status === '안전 양호') {
     return colors.safeText;
   }
-  if (status === '보통') {
+  if (status === '안전 보통') {
     return '#a66b00';
   }
   return colors.danger;
@@ -324,15 +324,15 @@ export function RankingRow({
             <View
               style={[
                 styles.rankSafety,
-                safetyStatus === '보통' && styles.rankSafetyNormal,
-                safetyStatus === '확인 필요' && styles.rankSafetyCheck,
+                safetyStatus === '안전 보통' && styles.rankSafetyNormal,
+                safetyStatus === '안전 주의' && styles.rankSafetyCheck,
               ]}
             >
               <Text
                 style={[
                   styles.rankSafetyText,
-                  safetyStatus === '보통' && styles.rankSafetyTextNormal,
-                  safetyStatus === '확인 필요' && styles.rankSafetyTextCheck,
+                  safetyStatus === '안전 보통' && styles.rankSafetyTextNormal,
+                  safetyStatus === '안전 주의' && styles.rankSafetyTextCheck,
                 ]}
               >
                 {safetyStatus}

@@ -99,8 +99,8 @@ function CityDetailScreen({
               <Text
                 style={[
                   styles.gradeText,
-                  citySafety.status === '보통' && styles.gradeTextNormal,
-                  citySafety.status === '확인 필요' && styles.gradeTextCheck,
+                  citySafety.status === '안전 보통' && styles.gradeTextNormal,
+                  citySafety.status === '안전 주의' && styles.gradeTextCheck,
                 ]}
               >
                 {citySafety.status}
@@ -192,9 +192,7 @@ function CityDetailScreen({
               />
               <CheckRow
                 label="진행·예정 축제"
-                value={
-                  festivals.data ? `${festivals.data.length}개` : '—'
-                }
+                value={festivals.data ? `${festivals.data.length}개` : '—'}
               />
             </View>
             <Text style={styles.safetyCaption}>
@@ -205,7 +203,9 @@ function CityDetailScreen({
           {intro.data && intro.data.attractions.length > 0 ? (
             <View style={styles.block}>
               <View style={styles.blockHead}>
-                <Text style={styles.blockTitle}>혼자 가도 심심하지 않은 곳</Text>
+                <Text style={styles.blockTitle}>
+                  혼자 가도 심심하지 않은 곳
+                </Text>
                 <Text style={styles.blockNote}>방문 상위 순</Text>
               </View>
               <View style={styles.hubRow}>
@@ -229,7 +229,10 @@ function CityDetailScreen({
           <Pressable
             style={({ pressed }) => [styles.cta, pressed && styles.ctaPressed]}
             onPress={() => {
-              console.log('[CityDetail] onCreateCourse button clicked for:', city.name);
+              console.log(
+                '[CityDetail] onCreateCourse button clicked for:',
+                city.name,
+              );
               onCreateCourse(city);
             }}
             accessibilityRole="button"
@@ -241,7 +244,9 @@ function CityDetailScreen({
 
         {festivals.data && festivals.data.length > 0 ? (
           <View style={styles.exploreSection}>
-            <Text style={styles.exploreTitle}>혼자 가도 즐기기 좋은 {city.name} 축제</Text>
+            <Text style={styles.exploreTitle}>
+              혼자 가도 즐기기 좋은 {city.name} 축제
+            </Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -259,7 +264,9 @@ function CityDetailScreen({
         ) : null}
 
         <View style={styles.exploreSection}>
-          <Text style={styles.exploreTitle}>{city.name} 혼자 둘러보기 좋은 곳 탐색</Text>
+          <Text style={styles.exploreTitle}>
+            {city.name} 혼자 둘러보기 좋은 곳 탐색
+          </Text>
           <SectionState
             status={intro.status}
             error={intro.error}
@@ -332,7 +339,9 @@ function CheckRow({
       <View style={styles.checkValueWrap}>
         <Text style={styles.checkValue}>{value}</Text>
         {note ? (
-          <Text style={[styles.checkNote, noteColor ? { color: noteColor } : null]}>
+          <Text
+            style={[styles.checkNote, noteColor ? { color: noteColor } : null]}
+          >
             {note}
           </Text>
         ) : null}

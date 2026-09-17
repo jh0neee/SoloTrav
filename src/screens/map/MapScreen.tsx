@@ -177,6 +177,10 @@ function MapScreen({ onBack }: TabScreenProps) {
   /** 지도가 지금 보고 있는 중심 (idle 마다 갱신) */
   const [mapCenter, setMapCenter] = useState<Coords>(CHUNGBUK_VIEWPORT.center);
   const [mapBounds, setMapBounds] = useState<MapBounds | null>(null);
+  const [viewportRegion, setViewportRegion] = useState<{
+    center: Coords;
+    sigungu: string;
+  } | null>(null);
   /** 사용자가 조회를 확정한 화면 영역입니다. 지도 이동만으로는 바뀌지 않습니다. */
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
   /** 현재 조회 중심점에 가장 가까운 충북 시군구 (예: 괴산군, 단양군 등) */
@@ -300,7 +304,12 @@ function MapScreen({ onBack }: TabScreenProps) {
   );
 
   const handleViewportRegion = useCallback(
-    (viewport: MapViewport, inside: boolean | null) => {
+    (viewport: MapViewport, inside: boolean | null, sigungu: string | null) => {
+      setViewportRegion(
+        inside === true && sigungu
+          ? { center: viewport.center, sigungu }
+          : null,
+      );
       if (inside === true) mapViewportStorage.save(viewport);
     },
     [],
@@ -451,10 +460,16 @@ function MapScreen({ onBack }: TabScreenProps) {
   }, [places, selectedSearchPlace]);
 
   /**
-   * 상단 안전 배지 — 가장 가까운 마커의 주소에서 지역을 읽습니다.
-   * 목록이 거리순이라 "지금 보고 있는 곳에서 가장 가까운 지역"이 나옵니다.
+   * 상단 안전 배지 — 지도 중심의 행정구역과 랭킹의 공용 안전 데이터를 사용합니다.
+   * 이동 후 행정구역 확인이 끝나기 전에는 이전 지역의 배지를 숨깁니다.
    */
-  const safetyBadge = useRegionSafety(places);
+  const safetyBadge = useRegionSafety(
+    viewportRegion &&
+      Math.abs(viewportRegion.center.lat - mapCenter.lat) < 0.0000001 &&
+      Math.abs(viewportRegion.center.lng - mapCenter.lng) < 0.0000001
+      ? viewportRegion.sigungu
+      : null,
+  );
 
   const selectedPlace = useMemo(() => {
     if (selectedSearchPlace && selectedSearchPlace.contentId === selectedId) {
@@ -930,10 +945,23 @@ function MapScreen({ onBack }: TabScreenProps) {
                 </View>
               </Pressable>
             ) : safetyBadge ? (
-              // 지역안전지수(범죄·생활안전 평균). 값을 못 받으면 배지를 숨깁니다.
-              <View style={styles.gradeBadge}>
-                <Text style={styles.gradeBadgeText}>
-                  안전 {safetyBadge.letter}
+              // 랭킹과 같은 혼행 안전 상태. 확인된 데이터가 없으면 숨깁니다.
+              <View
+                style={[
+                  styles.gradeBadge,
+                  safetyBadge.status === '안전 보통' && styles.gradeBadgeNormal,
+                  safetyBadge.status === '안전 주의' && styles.gradeBadgeCheck,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.gradeBadgeText,
+                    safetyBadge.status === '안전 보통' &&
+                      styles.gradeTextNormal,
+                    safetyBadge.status === '안전 주의' && styles.gradeTextCheck,
+                  ]}
+                >
+                  {safetyBadge.status}
                 </Text>
               </View>
             ) : null}
@@ -1417,7 +1445,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   gradeBadge: {
-    backgroundColor: colors.bonusBg,
+    backgroundColor: colors.safeBg,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 9,
@@ -1425,8 +1453,12 @@ const styles = StyleSheet.create({
   gradeBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.bonusText,
+    color: colors.safeText,
   },
+  gradeBadgeNormal: { backgroundColor: '#fff6db' },
+  gradeBadgeCheck: { backgroundColor: colors.dangerSoft },
+  gradeTextNormal: { color: '#a66b00' },
+  gradeTextCheck: { color: colors.danger },
   clearButton: {
     width: 20,
     height: 20,
