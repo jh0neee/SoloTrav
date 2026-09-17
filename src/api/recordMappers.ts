@@ -80,9 +80,14 @@ function pickTone(id: string): PhotoTone {
 function toStringArray(...candidates: unknown[]): string[] {
   for (const candidate of candidates) {
     if (Array.isArray(candidate)) {
-      return candidate.filter(
-        (item): item is string => typeof item === 'string' && item.length > 0,
-      );
+      return [
+        ...new Set(
+          candidate
+            .filter((item): item is string => typeof item === 'string')
+            .map(item => item.trim())
+            .filter(Boolean),
+        ),
+      ];
     }
   }
   return [];
@@ -140,27 +145,27 @@ function toRecord(dto: TravelRecordDto): TravelRecord | null {
   const owner = dto.user ?? dto.author;
   return {
     id,
+    isAnonymous: dto.isAnonymous === true,
     safetyGrade: firstString(dto.safetyGrade, dto.grade) ?? '-',
     tags: toStringArray(dto.tag, dto.tags),
     description: firstString(dto.description, dto.content) ?? '',
     date: toDateOnly(firstString(dto.date, dto.createdAt)),
 
     authorId: toId(owner?.id, owner?.userId, dto.userId, dto.authorId),
-    authorName: firstString(
-      owner?.nickname,
-      owner?.nickName,
-      owner?.name,
-      dto.nickname,
-      dto.userNickname,
-    ),
+    authorName:
+      dto.isAnonymous === true
+        ? '익명'
+        : firstString(
+            owner?.nickname,
+            owner?.nickName,
+            owner?.name,
+            dto.nickname,
+            dto.userNickname,
+          ),
 
     likeCount: firstCount(dto.likeCount, dto.likesCount, dto.likes),
     likedByMe: firstFlag(dto.likedByMe, dto.isLiked, dto.liked),
-    commentCount: firstCount(
-      dto.commentCount,
-      dto.commentsCount,
-      dto.comments,
-    ),
+    commentCount: firstCount(dto.commentCount, dto.commentsCount, dto.comments),
 
     imageUrls: toImageUrls(dto),
     tone: pickTone(id),
@@ -208,6 +213,7 @@ export function toTravelRecordRequest(
   input: TravelRecordInput,
 ): TravelRecordRequest {
   return {
+    isAnonymous: input.isAnonymous ?? false,
     safetyGrade: input.safetyGrade,
     tag: input.tags,
     description: input.description.trim(),

@@ -4,7 +4,7 @@
  *   PATCH /travel-records/{recordId}          (수정)
  *   POST  /travel-records/{recordId}/images   (사진)
  *
- * 본문 바디는 스펙대로 `safetyGrade / tag / description / date` 네 개입니다.
+ * 본문 바디는 `isAnonymous / safetyGrade / tag / description / date`입니다.
  * 사진은 기록이 저장된 뒤 recordId 로 따로 올라가므로, 이 화면은 고른 파일을
  * 모아뒀다가 onSubmit 으로 함께 넘기기만 합니다(업로드는 스토어가 합니다).
  */
@@ -16,6 +16,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -26,7 +27,11 @@ import DatePickerSheet from '../../components/DatePickerSheet';
 import { CalendarIcon, Chevron } from '../../components/icons/UiIcons';
 import { colors } from '../../theme/colors';
 import { MAX_RECORD_IMAGES, pickRecordImages } from '../../media/imagePicker';
-import { SAFETY_GRADES, type TravelRecordInput } from '../../types/travelRecord';
+import {
+  SAFETY_GRADES,
+  recordSafetyLabel,
+  type TravelRecordInput,
+} from '../../types/travelRecord';
 import type { UploadImage } from '../../api/recordApi';
 
 type Props = {
@@ -99,6 +104,7 @@ function RecordFormScreen({
   // 상태바가 투명(translucent)이라 상단 여백은 화면이 직접 만들어 줍니다.
   const insets = useSafeAreaInsets();
   const isEditing = !!initial;
+  const [isAnonymous, setIsAnonymous] = useState(initial?.isAnonymous ?? false);
   const [date, setDate] = useState(() => initial?.date || today());
   const [isPickerOpen, setPickerOpen] = useState(false);
   const [safetyGrade, setSafetyGrade] = useState<string>(
@@ -132,7 +138,9 @@ function RecordFormScreen({
       }
     } catch (caught) {
       setImagePickError(
-        caught instanceof Error ? caught.message : '사진을 불러오지 못했습니다.',
+        caught instanceof Error
+          ? caught.message
+          : '사진을 불러오지 못했습니다.',
       );
     }
   };
@@ -172,13 +180,29 @@ function RecordFormScreen({
           style={[styles.input, styles.dateField]}
           onPress={() => setPickerOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel={`다녀온 날짜 ${date || '선택 안 됨'}, 눌러서 달력 열기`}
+          accessibilityLabel={`다녀온 날짜 ${
+            date || '선택 안 됨'
+          }, 눌러서 달력 열기`}
         >
           <Text style={[styles.dateText, !date && styles.datePlaceholder]}>
             {date ? formatDateLabel(date) : '날짜를 선택해주세요'}
           </Text>
           <CalendarIcon color={colors.textSecondary} size={18} />
         </Pressable>
+
+        <View style={styles.anonymousRow}>
+          <View>
+            <Text style={styles.label}>익명으로 작성</Text>
+            <Text style={styles.hint}>닉네임 대신 익명으로 표시해요.</Text>
+          </View>
+          <Switch
+            value={isAnonymous}
+            onValueChange={setIsAnonymous}
+            disabled={isSubmitting}
+            accessibilityLabel="익명으로 작성"
+            trackColor={{ true: colors.primary }}
+          />
+        </View>
 
         <Text style={[styles.label, styles.labelSpaced]}>안전 등급</Text>
         <Text style={styles.hint}>
@@ -188,7 +212,7 @@ function RecordFormScreen({
           {SAFETY_GRADES.map(grade => (
             <Chip
               key={grade}
-              label={grade}
+              label={recordSafetyLabel(grade)}
               selected={safetyGrade === grade}
               onPress={() => setSafetyGrade(grade)}
             />
@@ -222,7 +246,9 @@ function RecordFormScreen({
               key={tag}
               style={styles.suggestChip}
               onPress={() =>
-                setTagText(prev => (prev.trim() ? `${prev.trim()}, ${tag}` : tag))
+                setTagText(prev =>
+                  prev.trim() ? `${prev.trim()}, ${tag}` : tag,
+                )
               }
               accessibilityRole="button"
               accessibilityLabel={`${tag} 태그 추가`}
@@ -314,7 +340,10 @@ function RecordFormScreen({
         {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
         <Pressable
           onPress={() =>
-            onSubmit({ safetyGrade, tags, description, date }, images)
+            onSubmit(
+              { isAnonymous, safetyGrade, tags, description, date },
+              images,
+            )
           }
           disabled={!canSubmit}
           accessibilityRole="button"
@@ -378,6 +407,13 @@ function ExistingThumb({ url }: { url: string }) {
 }
 
 const styles = StyleSheet.create({
+  anonymousRow: {
+    marginTop: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   container: {
     flex: 1,
     backgroundColor: colors.cream,

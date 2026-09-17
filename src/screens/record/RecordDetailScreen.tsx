@@ -46,6 +46,7 @@ import { blockStore } from '../../blocks/blockStore';
 import { reportApi } from '../../api/reportApi';
 import { toApiError } from '../../api/errors';
 import type { RecordComment, TravelRecord } from '../../types/travelRecord';
+import { recordSafetyLabel } from '../../types/travelRecord';
 
 type Props = {
   recordId: string;
@@ -185,7 +186,10 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
     const authorId = target.authorId;
     if (!authorId) {
       setModerationTarget(null);
-      Alert.alert('차단 불가', '작성자 정보를 확인할 수 없어 차단할 수 없습니다.');
+      Alert.alert(
+        '차단 불가',
+        '작성자 정보를 확인할 수 없어 차단할 수 없습니다.',
+      );
       return;
     }
     setModerationTarget(null);
@@ -321,7 +325,8 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
               }
               hitSlop={8}
               accessibilityRole="button"
-              accessibilityLabel="여행 기록 신고 및 작성자 차단">
+              accessibilityLabel="여행 기록 신고 및 작성자 차단"
+            >
               <Text style={styles.moderationAction}>신고</Text>
             </Pressable>
           )
@@ -560,7 +565,7 @@ function RecordBody({ record }: { record: TravelRecord }) {
               isTopGrade ? styles.gradeA : styles.gradeB,
             ]}
           >
-            안전 {record.safetyGrade}
+            {recordSafetyLabel(record.safetyGrade)}
           </Text>
         </View>
       </View>
@@ -653,10 +658,9 @@ function CommentRow({
             onPress={onModerate}
             hitSlop={6}
             accessibilityRole="button"
-            accessibilityLabel="댓글 신고 및 작성자 차단">
-            <Text style={[styles.commentAction, styles.ownerDanger]}>
-              신고
-            </Text>
+            accessibilityLabel="댓글 신고 및 작성자 차단"
+          >
+            <Text style={[styles.commentAction, styles.ownerDanger]}>신고</Text>
           </Pressable>
         </View>
       ) : null}

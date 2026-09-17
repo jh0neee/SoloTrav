@@ -226,11 +226,12 @@ export type VisitCheckInResponseDto = {
 /**
  * 여행 기록 한 건 (GET /travel-records, GET /travel-records/me).
  *
- * 등록 바디는 스펙에서 확인된 `{ safetyGrade, tag, description, date }` 지만,
+ * 등록 바디는 `{ isAnonymous, safetyGrade, tag, description, date }`이며,
  * 조회 응답은 아직 못 봐서 흔히 쓰이는 이름들을 함께 받아둡니다.
  * 특히 태그는 요청이 `tag`(단수)라 응답도 `tag` 일 가능성이 높습니다.
  */
 export type TravelRecordDto = {
+  isAnonymous?: boolean;
   id?: string | number;
   recordId?: string | number;
 
@@ -332,6 +333,7 @@ export type TravelRecordListDto = {
 
 /** POST /travel-records 요청 바디 — 스펙 그대로(태그 키는 `tag`) */
 export type TravelRecordRequest = {
+  isAnonymous: boolean;
   safetyGrade: string;
   tag: string[];
   description: string;

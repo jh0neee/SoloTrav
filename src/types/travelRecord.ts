@@ -1,7 +1,7 @@
 /**
  * 여행 기록 도메인 모델.
  *
- * 등록 바디(safetyGrade/tag/description/date)만 스펙에서 확인됐고, 조회 응답에
+ * 등록 바디(isAnonymous/safetyGrade/tag/description/date)는 스펙에서 확인됐고, 조회 응답에
  * 좋아요·댓글 수가 어떤 이름으로 오는지는 못 봤습니다. mapper 가 여러 이름을
  * 받아보고 없으면 0/false 로 둡니다.
  */
@@ -9,8 +9,21 @@ import type { PhotoTone } from '../theme/colors';
 
 /** 안전 등급 선택지 (작성 화면의 칩) */
 export const SAFETY_GRADES = ['A', 'B', 'C'] as const;
+export function recordSafetyLabel(grade: string): string {
+  switch (grade) {
+    case 'A':
+      return '안전 양호';
+    case 'B':
+      return '안전 보통';
+    case 'C':
+      return '안전 주의';
+    default:
+      return '안전 정보 없음';
+  }
+}
 
 export type TravelRecord = {
+  isAnonymous: boolean;
   id: string;
   /** 'A' | 'B' | 'C' 를 기대하지만 서버 값을 그대로 담습니다. */
   safetyGrade: string;
@@ -35,6 +48,7 @@ export type TravelRecord = {
 
 /** 기록 작성·수정 입력값 */
 export type TravelRecordInput = {
+  isAnonymous: boolean;
   safetyGrade: string;
   tags: string[];
   description: string;

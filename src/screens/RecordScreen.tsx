@@ -40,6 +40,7 @@ import {
   ShieldIcon,
 } from '../components/icons/UiIcons';
 import type { TravelRecord } from '../types/travelRecord';
+import { recordSafetyLabel } from '../types/travelRecord';
 
 const ALL_TAGS = '전체';
 
@@ -117,6 +118,7 @@ function RecordScreen() {
           editing
             ? {
                 safetyGrade: editing.safetyGrade,
+                isAnonymous: editing.isAnonymous,
                 tags: editing.tags,
                 description: editing.description,
                 date: editing.date,
@@ -180,7 +182,9 @@ function RecordScreen() {
             <View style={styles.headerTexts}>
               <Text style={styles.kicker}>혼행자들의 진짜 후기</Text>
               <Text style={styles.title}>
-                {scope === 'mine' ? '내가 혼자 다녀온 곳' : '혼자 다녀온 사람들의 이야기'}
+                {scope === 'mine'
+                  ? '내가 혼자 다녀온 곳'
+                  : '혼자 다녀온 사람들의 이야기'}
               </Text>
             </View>
             <Pressable
@@ -206,10 +210,7 @@ function RecordScreen() {
                   accessibilityState={{ selected: active }}
                 >
                   <Text
-                    style={[
-                      styles.segmentText,
-                      active && styles.segmentTextOn,
-                    ]}
+                    style={[styles.segmentText, active && styles.segmentTextOn]}
                   >
                     {item.label}
                   </Text>
@@ -287,7 +288,9 @@ function ListPlaceholder({
     return (
       <View style={styles.empty}>
         <Text style={styles.emptyText}>
-          {'게스트 모드로 둘러보는 중입니다.\n로그인 후 내가 혼자 다녀온 기록을 남기고 관리해보세요.'}
+          {
+            '게스트 모드로 둘러보는 중입니다.\n로그인 후 내가 혼자 다녀온 기록을 남기고 관리해보세요.'
+          }
         </Text>
         <Pressable
           style={styles.emptyCta}
@@ -351,6 +354,8 @@ function ListPlaceholder({
 }
 
 /** 기록 카드 한 장 — 누르면 상세로 들어갑니다. */
+const TAG_GAP = 8;
+
 function RecordCard({
   record,
   onPress,
@@ -362,6 +367,33 @@ function RecordCard({
   isGuest?: boolean;
   onPromptLogin?: () => void;
 }) {
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [tagRowWidth, setTagRowWidth] = useState(0);
+  const [tagWidths, setTagWidths] = useState<Record<string, number>>({});
+  const [toggleWidth, setToggleWidth] = useState(0);
+  const measured =
+    tagRowWidth > 0 &&
+    toggleWidth > 0 &&
+    record.tags.every(tag => tagWidths[tag] !== undefined);
+  const totalWidth =
+    record.tags.reduce((sum, tag) => sum + (tagWidths[tag] ?? 0), 0) +
+    Math.max(0, record.tags.length - 1) * TAG_GAP;
+  const overflowing = measured && totalWidth > tagRowWidth;
+  let visibleCount = record.tags.length;
+  if (overflowing) {
+    let usedWidth = toggleWidth;
+    visibleCount = 0;
+    for (const tag of record.tags) {
+      usedWidth += TAG_GAP + tagWidths[tag];
+      if (usedWidth > tagRowWidth) break;
+      visibleCount++;
+    }
+    // 긴 태그 하나도 버튼 옆의 남은 너비에서 말줄임으로 보여줍니다.
+    visibleCount = Math.max(1, visibleCount);
+  }
+  const visibleTags = tagsExpanded
+    ? record.tags
+    : record.tags.slice(0, visibleCount);
   const tone = photoTones[record.tone];
   const author = record.authorName ?? '혼행러';
   const isTopGrade = record.safetyGrade === 'A';
@@ -418,7 +450,7 @@ function RecordCard({
               isTopGrade ? styles.gradeA : styles.gradeB,
             ]}
           >
-            안전 {record.safetyGrade}
+            {recordSafetyLabel(record.safetyGrade)}
           </Text>
         </View>
       </View>
@@ -459,12 +491,78 @@ function RecordCard({
         </Text>
       ) : null}
       {record.tags.length > 0 ? (
-        <View style={styles.tagRow}>
-          {record.tags.map(tag => (
-            <View key={tag} style={styles.tagChip}>
-              <Text style={styles.tagChipText}># {tag}</Text>
+        <View
+          onLayout={event => setTagRowWidth(event.nativeEvent.layout.width)}
+        >
+          <ScrollView
+            horizontal
+            style={styles.tagMeasurements}
+            pointerEvents="none"
+            accessible={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            {record.tags.map(tag => (
+              <View
+                key={tag}
+                style={styles.tagMeasureChip}
+                onLayout={event => {
+                  const width = Math.ceil(event.nativeEvent.layout.width);
+                  setTagWidths(current =>
+                    current[tag] === width
+                      ? current
+                      : { ...current, [tag]: width },
+                  );
+                }}
+              >
+                <Text
+                  style={styles.tagChipText}
+                  numberOfLines={1}
+                >{`# ${tag}`}</Text>
+              </View>
+            ))}
+            <View
+              style={styles.tagToggle}
+              onLayout={event =>
+                setToggleWidth(Math.ceil(event.nativeEvent.layout.width))
+              }
+            >
+              <Text style={styles.tagToggleText}>더보기</Text>
             </View>
-          ))}
+          </ScrollView>
+          <View
+            style={[
+              styles.tagRow,
+              !tagsExpanded && styles.tagRowCollapsed,
+              !measured && styles.tagsMeasuring,
+            ]}
+          >
+            {visibleTags.map(tag => (
+              <View key={tag} style={styles.tagChip}>
+                <Text
+                  style={styles.tagChipText}
+                  textBreakStrategy="simple"
+                  numberOfLines={tagsExpanded ? undefined : 1}
+                >{`# ${tag}`}</Text>
+              </View>
+            ))}
+            {overflowing && (
+              <Pressable
+                style={styles.tagToggle}
+                onPress={event => {
+                  event.stopPropagation();
+                  setTagsExpanded(current => !current);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: tagsExpanded }}
+                accessibilityLabel={tagsExpanded ? '태그 접기' : '태그 더보기'}
+              >
+                <Text style={styles.tagToggleText}>
+                  {tagsExpanded ? '접기' : '더보기'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       ) : null}
     </Pressable>
@@ -703,10 +801,22 @@ const styles = StyleSheet.create({
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 0,
+    gap: 8,
     marginTop: 10,
   },
+  tagRowCollapsed: { flexWrap: 'nowrap', alignItems: 'center' },
+  tagsMeasuring: { opacity: 0, height: 0, overflow: 'hidden' },
+  tagMeasurements: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    opacity: 0,
+  },
+  tagMeasureChip: { paddingHorizontal: 9, paddingVertical: 5 },
   tagChip: {
+    maxWidth: '100%',
+    flexShrink: 1,
     paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 9,
@@ -716,8 +826,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: colors.primary,
-    lineHeight: 17,
     includeFontPadding: true,
+  },
+  tagToggle: {
+    flexShrink: 0,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+    minHeight: 36,
+    justifyContent: 'center',
+  },
+  tagToggleText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
   },
 
   // 빈 상태
