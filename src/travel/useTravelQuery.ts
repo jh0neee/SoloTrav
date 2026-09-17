@@ -27,10 +27,14 @@ export type QueryResult<T> = QueryState<T> & {
 
 /** 앱이 살아있는 동안 유지되는 아주 단순한 캐시. 관광정보는 자주 바뀌지 않습니다. */
 const cache = new Map<string, unknown>();
+const pending = new Map<string, Promise<unknown>>();
+let cacheGeneration = 0;
 
 /** 로그아웃처럼 화면을 처음부터 다시 그려야 할 때 씁니다. */
 export function clearTravelCache(): void {
   cache.clear();
+  pending.clear();
+  cacheGeneration++;
 }
 
 const IDLE: QueryState<never> = { status: 'idle', data: null, error: null };
@@ -53,32 +57,44 @@ export function useTravelQuery<T>(
   /** 이 값이 바뀌면 진행 중이던 응답은 버려집니다 */
   const requestIdRef = useRef(0);
 
-  const run = useCallback(
-    async (targetKey: string) => {
-      const requestId = ++requestIdRef.current;
-      setState(prev => ({ ...prev, status: 'loading', error: null }));
-      try {
-        const data = await loaderRef.current();
-        if (requestId !== requestIdRef.current) {
-          return;
-        }
-        cache.set(targetKey, data);
-        setState({ status: 'ready', data, error: null });
-      } catch (caught) {
-        if (requestId !== requestIdRef.current) {
-          return;
-        }
-        setState({
-          status: 'error',
-          data: null,
-          error: toApiError(caught).message,
+  const run = useCallback(async (targetKey: string) => {
+    const requestId = ++requestIdRef.current;
+    setState(prev => ({ ...prev, status: 'loading', error: null }));
+    try {
+      let promise = pending.get(targetKey) as Promise<T> | undefined;
+      if (!promise) {
+        const generation = cacheGeneration;
+        promise = loaderRef.current().then(data => {
+          if (generation === cacheGeneration) cache.set(targetKey, data);
+          return data;
         });
+        pending.set(targetKey, promise);
+        const created = promise;
+        promise
+          .finally(() => {
+            if (pending.get(targetKey) === created) pending.delete(targetKey);
+          })
+          .catch(() => {});
       }
-    },
-    [],
-  );
+      const data = await promise;
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+      setState({ status: 'ready', data, error: null });
+    } catch (caught) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+      setState(previous => ({
+        status: 'error',
+        data: previous.data,
+        error: toApiError(caught).message,
+      }));
+    }
+  }, []);
 
   useEffect(() => {
+    requestIdRef.current += 1;
     if (key === null) {
       // 진행 중인 요청이 있으면 결과를 버리고 초기 상태로 돌아갑니다.
       requestIdRef.current += 1;
@@ -87,9 +103,15 @@ export function useTravelQuery<T>(
     }
     if (cache.has(key)) {
       setState({ status: 'ready', data: cache.get(key) as T, error: null });
-      return;
+      return () => {
+        requestIdRef.current += 1;
+      };
     }
+    setState(IDLE);
     run(key);
+    return () => {
+      requestIdRef.current += 1;
+    };
   }, [key, run]);
 
   const reload = useCallback(() => {

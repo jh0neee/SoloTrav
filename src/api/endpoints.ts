@@ -168,7 +168,12 @@ export const ENDPOINTS = {
     numOfRows?: number;
   }) => withQuery(`/hospitals`, params),
   /** JWT 사용자용 여성안심지킴이집 검색. */
-  femaleSafetyHouses: (params?: { pageNo?: number; numOfRows?: number }) =>
+  femaleSafetyHouses: (params?: {
+    sido?: string;
+    sigungu?: string;
+    pageNo?: number;
+    numOfRows?: number;
+  }) =>
     withQuery(`/female-safety-houses`, params),
   /** CCTV — localGovernmentCode(City.cctvLocalGovernmentCode)로 시군 필터. limit 1~100. */
   cctvs: (params: {

@@ -8,7 +8,7 @@
  * 혼자 여행하는 사람에게 직접 와닿는 건 범죄·생활안전 두 가지라, 화면 배지는
  * 이 둘의 평균으로 만듭니다(교통사고·감염병 등은 여행 안전과 연관이 옅습니다).
  */
-import { apiClient } from './client';
+import { travelPublicGet } from './travelPublicClient';
 import { ENDPOINTS } from './endpoints';
 import { toApiError } from './errors';
 
@@ -87,7 +87,15 @@ export function parseRegion(
   if (tokens.length === 0 || !tokens[0]) {
     return null;
   }
-  const sido = tokens[0];
+  // 공공데이터 주소는 '청주시 ...'처럼 도 이름이 생략되기도 합니다.
+  if (
+    /^(청주|충주|제천)시$|^(보은|옥천|영동|증평|진천|괴산|음성|단양)군$/.test(
+      tokens[0],
+    )
+  ) {
+    return { sido: '충청북도', sigungu: tokens[0] };
+  }
+  const sido = tokens[0] === '충북' ? '충청북도' : tokens[0];
   // 두 번째 토큰이 시/군/구 로 끝날 때만 시군구로 인정합니다(읍·면·동은 제외).
   const second = tokens[1] ?? '';
   const sigungu = /(시|군|구)$/.test(second) ? second : null;
@@ -104,7 +112,7 @@ export const safetyApi = {
     signal?: AbortSignal,
   ): Promise<RegionalSafety[]> => {
     try {
-      const { data } = await apiClient.get(
+      const { data } = await travelPublicGet(
         ENDPOINTS.regionalSafetyBySido({ sido }),
         { signal },
       );

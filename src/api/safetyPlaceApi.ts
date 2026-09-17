@@ -256,6 +256,7 @@ function normalize(
       value(source, [
         'name',
         'title',
+        'storeName',
         'hospitalName',
         'dutyName',
         'facilityName',
@@ -289,6 +290,7 @@ function normalize(
           'phone',
           'tel',
           'telephone',
+          'phoneNumber',
           'management_phone_number',
           'dutyTel1',
           '전화번호',
@@ -297,7 +299,10 @@ function normalize(
     distance: number(value(source, ['distance', 'distanceMeters', 'dist'])),
     roadAddress,
     parcelAddress,
-    regionName: text(value(source, ['regionName', 'region_name'])),
+    regionName:
+      text(value(source, ['regionName', 'region_name'])) ??
+      ([text(source.sido), text(source.sigungu)].filter(Boolean).join(' ') ||
+        null),
     managementNumber: text(
       value(source, [
         'managementNumber',
@@ -347,16 +352,77 @@ function pageInfo(payload: unknown, itemCount: number) {
 }
 
 /**
+ * 좌표가 없는 응답과 프런트 파서가 놓친 응답을 구분하기 위한 개발용 로그입니다.
+ * 빛길·여성안심지킴이집만 대상으로 하며, 대량 응답은 앞 3개 행만 출력합니다.
+ */
+function logRawSafetyResponse(
+  name: string,
+  path: string,
+  data: unknown,
+  type: SafetyPlaceType,
+) {
+  if (!__DEV__) return;
+  const rawRows = rows(data);
+  const mappable = rawRows
+    .map((row, index) => normalize(row, type, index))
+    .filter((item): item is SafetyPlace => item !== null);
+  const envelope =
+    data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
+  const payload = payloadOf(data);
+  const header = `[MapAPI RAW] ${name} · 원본 ${rawRows.length}건 → 지도 ${mappable.length}건`;
+
+  if (typeof console.groupCollapsed === 'function') {
+    console.groupCollapsed(header);
+    console.log('요청', { method: 'GET', path });
+    console.log('응답 요약', {
+      ok: envelope.ok,
+      code: envelope.code,
+      status: envelope.status,
+      message: envelope.message,
+      error: envelope.error,
+      total: value(payload, ['total', 'totalCount']),
+      page: value(payload, ['page', 'currentPage']),
+      limit: value(payload, ['limit', 'size', 'pageSize']),
+      hasMore: value(payload, ['hasMore', 'has_more', 'hasNext']),
+      notice: payload.notice,
+      topLevelKeys: Object.keys(envelope),
+      payloadKeys: Object.keys(payload),
+    });
+    console.log(
+      rawRows.length <= 5 ? '원본 응답' : '원본 행 샘플(최대 3개)',
+      rawRows.length <= 5 ? data : rawRows.slice(0, 3),
+    );
+    console.log('좌표 파싱 결과', {
+      rawCount: rawRows.length,
+      mappableCount: mappable.length,
+      droppedCount: rawRows.length - mappable.length,
+      mappableSample: mappable.slice(0, 3),
+    });
+    console.groupEnd();
+    return;
+  }
+  console.log(header, {
+    request: { method: 'GET', path },
+    rawCount: rawRows.length,
+    mappableCount: mappable.length,
+    sample: rawRows.slice(0, 3),
+  });
+}
+
+/**
  * 페이지를 끝까지 순회해 행을 모읍니다.
  * 서버가 준 총 건수만큼만 돌고, 빈 페이지가 오면 그 전에 멈춥니다.
  */
 async function fetchAllPages(
   pathOf: (page: number) => string,
   signal?: AbortSignal,
+  debug?: { name: string; type: SafetyPlaceType },
 ): Promise<Raw[]> {
   const collected: Raw[] = [];
   for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const { data } = await apiClient.get(pathOf(page), { signal });
+    const path = pathOf(page);
+    const { data } = await apiClient.get(path, { signal });
+    if (debug) logRawSafetyResponse(debug.name, path, data, debug.type);
     const pageRows = rows(data);
     collected.push(...pageRows);
     const total = totalOf(data);
@@ -429,11 +495,14 @@ async function fetchRaw(
             limit: PAGE_SIZE,
           }),
         signal,
+        { name: '빛길/스마트 가로등', type: 'streetlight' },
       );
     case 'securityLight': {
-      const { data } = await apiClient.get(ENDPOINTS.securityLightsNearby(), {
+      const path = ENDPOINTS.securityLightsNearby();
+      const { data } = await apiClient.get(path, {
         signal,
       });
+      logRawSafetyResponse('빛길/보안등', path, data, 'securityLight');
       return rows(data);
     }
     case 'hospital':
@@ -448,9 +517,22 @@ async function fetchRaw(
         signal,
       );
     case 'femaleHouse': {
-      const { data } = await apiClient.get(ENDPOINTS.femaleSafetyHouses(), {
-        signal,
+      // 현재 서버는 sido/sigungu를 보내도 전국 totalCount를 반환합니다.
+      // 전국 2,817건을 100건씩 순회하면 rate limit(429)을 유발하므로,
+      // 서버 지역/지도 필터가 추가되기 전에는 1페이지만 확인합니다.
+      const path = ENDPOINTS.femaleSafetyHouses({
+        sido: city.sido,
+        sigungu: city.sigungu,
+        pageNo: 1,
+        numOfRows: PAGE_SIZE,
       });
+      const { data } = await apiClient.get(path, { signal });
+      logRawSafetyResponse(
+        '여성안심지킴이집',
+        path,
+        data,
+        'femaleHouse',
+      );
       return rows(data);
     }
   }

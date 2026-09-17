@@ -7,7 +7,7 @@ import {
 } from '../api/safetyPlaceApi';
 import { roughDistance, type Coords } from './useNearbyPlaces';
 import type { City } from '../data/cities';
-import { mapApiSample, startMapApiLog } from './mapApiLogger';
+import { getMapActionId, logMapDiagnostic, mapApiSample, startMapApiLog } from './mapApiLogger';
 import { ApiError } from '../api/errors';
 
 const RADIUS_M = 10_000;
@@ -125,6 +125,7 @@ export function useSafetyPlaces(
 
   useEffect(() => {
     const requested = [...requestedTypes];
+    const actionId = getMapActionId();
     if (!requested.length) {
       setLoadingTypes([]);
       setErrors([]);
@@ -134,6 +135,13 @@ export function useSafetyPlaces(
     const typesToLoad = requested.filter(
       type => !reusableCache(cache, type, cacheKey(type), queryBounds),
     );
+    logMapDiagnostic('safety.cache-check', {
+      city: city.sigungu, queryBounds,
+      types: requested.map(type => {
+        const entry = reusableCache(cache, type, cacheKey(type), queryBounds);
+        return { type, cacheKey: cacheKey(type), hit: !!entry, count: entry?.items.length, cachedBounds: entry?.bounds };
+      }),
+    }, actionId);
     if (!typesToLoad.length) {
       setLoadingTypes([]);
       setErrors([]);
@@ -158,7 +166,7 @@ export function useSafetyPlaces(
               ? queryBounds
               : undefined,
           attempt: attempt + 1,
-        });
+        }, actionId);
         try {
           if (isMapType(type) && isValidBounds(queryBounds)) {
             const result = await safetyPlaceApi.map(
@@ -198,6 +206,7 @@ export function useSafetyPlaces(
       throw new Error('안전시설을 불러오지 못했습니다.');
     };
     const storeResult = (type: SafetyPlaceType, result: SafetyCacheEntry) => {
+      logMapDiagnostic('safety.cache-store', { type, cacheKey: cacheKey(type), queryBounds, count: result.items.length, hasMore: result.hasMore }, actionId);
       setCache(previous => {
         const next = { ...previous };
         const nextKey = cacheKey(type);
@@ -296,6 +305,18 @@ export function useSafetyPlaces(
     [cache, cacheKey, queryBounds],
   );
   const retry = useCallback(() => setReloadKey(value => value + 1), []);
+  useEffect(() => {
+    logMapDiagnostic('safety.filtered', {
+      active, queryBounds, visibleBounds, afterBoundsCount: places.length,
+      loadingTypes, errors,
+      sources: active.map(type => {
+        const exact = reusableCache(cache, type, cacheKey(type), queryBounds);
+        const fallback = isMapType(type) && !exact?.items.length ? cache[`last|${type}`] : undefined;
+        const entry = fallback ?? exact;
+        return { type, cacheKey: cacheKey(type), source: fallback ? 'last-result-fallback' : exact ? 'cache' : 'none', beforeBoundsCount: entry?.items.length ?? 0, cachedBounds: entry?.bounds };
+      }),
+    });
+  }, [active, queryBounds, visibleBounds, places.length, loadingTypes, errors, cache, cacheKey]);
   return {
     places,
     loading: loadingTypes.length > 0,

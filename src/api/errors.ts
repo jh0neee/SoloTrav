@@ -9,6 +9,7 @@ export class ApiError extends Error {
   readonly status?: number;
   /** 서버가 내려준 에러 코드 (있을 때) */
   readonly code?: string;
+  readonly retryAfterMs?: number;
   /** 서버 응답 원본 — 디버깅용 */
   readonly payload?: unknown;
   /** 서버에 닿지 못한 경우(오프라인·DNS·타임아웃) */
@@ -19,6 +20,7 @@ export class ApiError extends Error {
     options: {
       status?: number;
       code?: string;
+      retryAfterMs?: number;
       payload?: unknown;
       isNetworkError?: boolean;
     } = {},
@@ -27,6 +29,7 @@ export class ApiError extends Error {
     this.name = 'ApiError';
     this.status = options.status;
     this.code = options.code;
+    this.retryAfterMs = options.retryAfterMs;
     this.payload = options.payload;
     this.isNetworkError = options.isNetworkError ?? false;
     // 트랜스파일 환경에서 instanceof 가 깨지지 않도록 프로토타입을 복구합니다.
@@ -86,9 +89,11 @@ export function toApiError(error: unknown): ApiError {
       );
     }
     return new ApiError(
-      extractMessage(response.data) ?? `요청에 실패했습니다. (${response.status})`,
+      extractMessage(response.data) ??
+        `요청에 실패했습니다. (${response.status})`,
       {
         status: response.status,
+        retryAfterMs: parseRetryAfter(response.headers?.['retry-after']),
         code: extractCode(response.data) ?? error.code,
         payload: response.data,
       },
@@ -100,4 +105,15 @@ export function toApiError(error: unknown): ApiError {
   }
 
   return new ApiError('알 수 없는 오류가 발생했습니다.');
+}
+
+export function parseRetryAfter(value: unknown): number | undefined {
+  if (typeof value !== 'string' && typeof value !== 'number') return undefined;
+  if (String(value).trim() === '') return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const deadline = Date.parse(String(value));
+  return Number.isFinite(deadline)
+    ? Math.max(0, deadline - Date.now())
+    : undefined;
 }

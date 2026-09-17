@@ -5,18 +5,21 @@
  * 현재 화면에 들어오는 장소만 기기에서 다시 골라 불필요한 API 호출을 줄입니다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { DEFAULT_RADIUS, REGION_PAGE_SIZE, travelApi } from '../api/travelApi';
+import { DEFAULT_RADIUS } from '../api/travelApi';
+import { loadRegionTourism } from './regionTourLoader';
 import {
   referenceTourPlaceApi,
   type ReferenceTourCategory,
 } from '../api/referenceTourPlaceApi';
 import type { City } from '../data/cities';
 import type { TourCategory } from '../types/tourPlace';
+import { type MappableTourContent } from '../types/travel';
 import {
-  isMappableTourContent,
-  type MappableTourContent,
-} from '../types/travel';
-import { mapApiSample, startMapApiLog } from './mapApiLogger';
+  getMapActionId,
+  logMapDiagnostic,
+  mapApiSample,
+  startMapApiLog,
+} from './mapApiLogger';
 
 export type Coords = { lat: number; lng: number };
 export type ViewportBounds = {
@@ -33,15 +36,6 @@ type State = {
   /** 서버가 알려 준 반경 안 전체 건수 (가져온 건수보다 클 수 있습니다) */
   totalCount: number;
 };
-
-type RegionCacheEntry = {
-  items: MappableTourContent[];
-  expiresAt: number;
-};
-
-/** 같은 충북 목록을 지도에 들어올 때마다 다시 받지 않도록 10분간 보관합니다. (키: 법정동 시군구 코드) */
-const REGION_CACHE_TTL_MS = 10 * 60 * 1000;
-const regionCache = new Map<string, RegionCacheEntry>();
 
 const INITIAL: State = {
   places: [],
@@ -122,6 +116,7 @@ export function useNearbyPlaces(
   const [referenceState, setReferenceState] = useState<State>(INITIAL);
   /** 재시도 버튼이 같은 좌표로도 다시 요청하게 만드는 카운터 */
   const [reloadKey, setReloadKey] = useState(0);
+  const regionSource = useRef<Record<string, unknown>>({ source: 'none' });
 
   // 좌표는 서버 요청이 아니라 내려받은 지역 후보의 기기 내 필터링에만 씁니다.
   const { lat, lng } = center;
@@ -139,131 +134,72 @@ export function useNearbyPlaces(
 
   useEffect(() => {
     if (!enabled) {
+      regionSource.current = { source: 'disabled' };
       setState(INITIAL);
       return;
     }
 
     const controller = new AbortController();
-    // 조회 지역이 바뀐 동안 이전 지역 마커가 남아 있으면 현재 지역 결과로
-    // 오해할 수 있으므로 새 응답이 올 때까지 비웁니다.
-    setState({ places: [], loading: true, error: null, totalCount: 0 });
-
-    async function loadRegion() {
-      const cacheKey = `${city.municipalityCode}:${districtCodesKey}`;
-      const cached = regionCache.get(cacheKey);
-      if (reloadKey === 0 && cached && cached.expiresAt > Date.now()) {
-        return { items: cached.items, totalCount: cached.items.length };
-      }
-
-      const loadDistrictTourism = async (districtCode: string) => {
-        const items: MappableTourContent[] = [];
-        let pageNo = 1;
-        let totalCount = 0;
-        let totalPages = 1;
-
-        do {
-          const params = {
-              regionCode: city.regionCode,
-              districtCode,
-              page: pageNo,
-              size: REGION_PAGE_SIZE,
-              // 대표이미지가 없어도 마커는 찍어야 하고, 페이지를 넘기는 동안
-              // 순서가 흔들리지 않도록 제목순(A)으로 받습니다.
-              arrange: 'A',
-            } as const;
-          const request = startMapApiLog('tour/area-based-list', {
-            city: city.sigungu,
-            ...params,
-          });
-          let page;
-          try {
-            page = await travelApi.listSpotsByRegion(
-              params,
-              controller.signal,
-            );
-            request.success({
-              count: page.items.length,
-              totalCount: page.totalCount,
-              sample: mapApiSample(page.items),
-            });
-          } catch (error) {
-            if (controller.signal.aborted) request.cancelled();
-            else request.failure(error);
-            throw error;
-          }
-          items.push(...page.items.filter(isMappableTourContent));
-          totalCount = page.totalCount;
-          totalPages = Math.max(1, Math.ceil(totalCount / REGION_PAGE_SIZE));
-          pageNo += 1;
-        } while (pageNo <= totalPages);
-
-        return items;
-      };
-
-      // 예전에 쓰던 지역명 기반 조회(region-based-list)는 숙박이 빠져 숙박 전용
-      // API 로 보완했었습니다. 법정동 코드 조회에는 숙박(contentTypeId=32)이
-      // 그대로 들어 있어(충북 11개 시군 건수 전부 일치) 보완 호출을 뺐습니다.
-      // 청주처럼 콘텐츠가 여러 구 코드에 나뉜 도시는 각 구를 함께 조회합니다.
-      // 구 사이에 같은 콘텐츠가 중복 등록돼도 마커는 한 번만 표시합니다.
-      // 청주는 4개 구를 나란히 조회합니다. 한 구가 일시적으로 실패해도
-      // 나머지 구의 관광지는 표시하고, 모든 구가 실패했을 때만 재시도 안내를 보여줍니다.
-      const districtResults = await Promise.all(
-        districtCodesKey.split(',').map(async districtCode => {
-          try {
-            return { items: await loadDistrictTourism(districtCode) };
-          } catch (error) {
-            return { items: null, error };
-          }
-        }),
-      );
-      const districtItems = districtResults
-        .filter(
-          (result): result is { items: MappableTourContent[] } =>
-            result.items !== null,
-        )
-        .map(result => result.items);
-      if (!districtItems.length) {
-        const firstError = districtResults.find(result => result.error)?.error;
-        throw firstError instanceof Error
-          ? firstError
-          : new Error('지역 관광정보를 불러오지 못했어요.');
-      }
-      const items = Array.from(
-        new Map(
-          districtItems.flat().map(item => [item.contentId, item]),
-        ).values(),
-      );
-      regionCache.set(cacheKey, {
-        items,
-        expiresAt: Date.now() + REGION_CACHE_TTL_MS,
-      });
-      return { items, totalCount: items.length };
-    }
-
-    loadRegion()
-      .then(page => {
+    const actionId = getMapActionId();
+    regionSource.current = {
+      source: 'district-cache-and-network',
+      city: city.sigungu,
+      actionId,
+    };
+    loadRegionTourism(
+      { regionCode: city.regionCode, sigungu: city.sigungu },
+      districtCodesKey.split(','),
+      controller.signal,
+      items => {
         if (controller.signal.aborted || !mounted.current) return;
         setState({
-          places: page.items,
-          loading: false,
+          places: items,
+          loading: true,
           error: null,
-          totalCount: page.totalCount,
+          totalCount: items.length,
+        });
+      },
+      actionId,
+    )
+      .then(result => {
+        if (controller.signal.aborted || !mounted.current) return;
+        regionSource.current = {
+          ...regionSource.current,
+          failedDistrictCodes: result.failedDistrictCodes,
+        };
+        setState({
+          places: result.items,
+          loading: false,
+          error: result.failedDistrictCodes.length
+            ? result.items.length
+              ? '일부 지역 정보를 불러오지 못했어요.'
+              : '주변 정보를 불러오지 못했어요.'
+            : null,
+          totalCount: result.items.length,
         });
       })
-      .catch((err: Error) => {
+      .catch((error: Error) => {
         if (controller.signal.aborted || !mounted.current) return;
-        setState({
-          places: [],
+        setState(previous => ({
+          ...previous,
           loading: false,
-          error: err.message || '주변 정보를 불러오지 못했어요.',
-          totalCount: 0,
-        });
+          error: error.message,
+        }));
       });
 
-    return () => controller.abort();
+    return () => {
+      logMapDiagnostic(
+        'region.effect-cleanup',
+        { city: city.sigungu, districtCodesKey },
+        actionId,
+      );
+      controller.abort();
+    };
   }, [
     enabled,
+    category,
     city.regionCode,
+    city.sigungu,
     districtCodesKey,
     city.municipalityCode,
     reloadKey,
@@ -326,7 +262,11 @@ export function useNearbyPlaces(
     const tourPlaces = state.places.filter(
       place => place.category === category,
     );
-    const referencePlaces = referenceCategory ? referenceState.places : [];
+    const referencePlaces = referenceCategory
+      ? referenceState.places.filter(
+          place => place.category === referenceCategory,
+        )
+      : [];
     return mergePlaces(tourPlaces, referencePlaces)
       .map(place => ({
         ...place,
@@ -351,9 +291,55 @@ export function useNearbyPlaces(
 
   const loading =
     (state.loading || referenceState.loading) && places.length === 0;
-  const error =
-    places.length || loading ? null : state.error ?? referenceState.error;
-  return { ...state, places, loading, error, totalCount: places.length, retry };
+  const error = loading ? null : state.error ?? referenceState.error;
+  useEffect(() => {
+    if (!__DEV__) return;
+    const categoryItems = state.places.filter(
+      place => place.category === category,
+    );
+    const referenceItems = referenceCategory ? referenceState.places : [];
+    logMapDiagnostic('places.filtered', {
+      enabled,
+      category,
+      center: { lat, lng },
+      bounds,
+      radiusWhenNoBounds: bounds ? null : radius,
+      regionSource: regionSource.current,
+      regionCount: state.places.length,
+      categoryCount: categoryItems.length,
+      referenceCount: referenceItems.length,
+      beforeBoundsCount: mergePlaces(categoryItems, referenceItems).length,
+      afterBoundsCount: places.length,
+      loading,
+      error,
+      regionLoading: state.loading,
+      referenceLoading: referenceState.loading,
+    });
+  }, [
+    enabled,
+    category,
+    lat,
+    lng,
+    bounds,
+    radius,
+    state.places,
+    state.loading,
+    referenceCategory,
+    referenceState.places,
+    referenceState.loading,
+    places.length,
+    loading,
+    error,
+  ]);
+  return {
+    ...state,
+    places,
+    loading,
+    refreshing: state.loading || referenceState.loading,
+    error,
+    totalCount: places.length,
+    retry,
+  };
 }
 
 /** 날짜변경선을 걸친 화면까지 고려한 지도 경계 포함 여부입니다. */

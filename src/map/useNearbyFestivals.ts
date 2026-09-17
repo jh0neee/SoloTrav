@@ -2,7 +2,7 @@
  * 축제 레이어용 훅.
  *
  * 축제 API 에 충북 법정동 시도 코드(43)를 보내 충북 목록만 받습니다.
- * 지도 중심이 바뀔 때마다 다시 부를 이유가 없으므로 응답을 모듈 수준에 캐시하고,
+ * 공개 조회 계층에서 응답을 캐시하고,
  * 화면에서는 지도 경계·기간 필터만 다시 적용합니다.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -10,7 +10,6 @@ import { FESTIVAL_RADIUS, travelApi } from '../api/travelApi';
 import {
   isMappableTourContent,
   type MappableTourContent,
-  type TourFestival,
 } from '../types/travel';
 import {
   isInsideBounds,
@@ -18,7 +17,7 @@ import {
   type Coords,
   type ViewportBounds,
 } from './useNearbyPlaces';
-import { mapApiSample, startMapApiLog } from './mapApiLogger';
+import { logMapDiagnostic, mapApiSample, startMapApiLog } from './mapApiLogger';
 
 /** 상단 날짜 칩 */
 export type FestivalRange = 'now' | 'weekend' | 'all';
@@ -64,60 +63,36 @@ function overlaps(
 }
 
 /**
- * 충북 축제 목록 캐시.
- * 키는 조회 기준일이라, 날짜가 바뀌면 자연스럽게 다시 받습니다.
+ * 충북 축제 목록. 공통 조회 계층의 캐시·대기열을 사용합니다.
  */
-let cache: { key: string; items: MappableTourContent[] } | null = null;
-let inFlight: {
-  key: string;
-  promise: Promise<MappableTourContent[]>;
-} | null = null;
-
-function loadFestivals(baseYmd: string): Promise<MappableTourContent[]> {
-  if (cache?.key === baseYmd) {
-    if (__DEV__)
-      console.log('[MapAPI] 캐시 tour/search-festival', {
-        baseYmd,
-        count: cache.items.length,
-      });
-    return Promise.resolve(cache.items);
-  }
-  if (inFlight?.key === baseYmd) {
-    if (__DEV__)
-      console.log('[MapAPI] 진행 중 요청 재사용 tour/search-festival', {
-        baseYmd,
-      });
-    return inFlight.promise;
-  }
+async function loadFestivals(
+  baseYmd: string,
+  signal: AbortSignal,
+): Promise<MappableTourContent[]> {
   const request = startMapApiLog('tour/search-festival', {
     from: baseYmd,
     regionCode: '43',
     size: 300,
   });
-  const promise = travelApi
-    .listFestivals({ from: baseYmd, regionCode: '43', size: 300 })
-    .then(results => {
-      // 서버 응답이 같은 contentid 를 중복해서 주더라도 마커-상세 연결은 1:1로 유지합니다.
-      const mappable = results.filter(
-        (item): item is TourFestival & MappableTourContent =>
-          isMappableTourContent(item),
-      );
-      const items: MappableTourContent[] = [
-        ...new Map(mappable.map(item => [item.contentId, item])).values(),
-      ];
-      cache = { key: baseYmd, items };
-      request.success({ count: items.length, sample: mapApiSample(items) });
-      return items;
-    })
-    .catch(error => {
-      request.failure(error);
-      throw error;
-    })
-    .finally(() => {
-      inFlight = null;
-    });
-  inFlight = { key: baseYmd, promise };
-  return promise;
+  try {
+    const results = await travelApi.listFestivals(
+      { from: baseYmd, regionCode: '43', size: 300 },
+      signal,
+    );
+    const items = [
+      ...new Map(
+        results
+          .filter(isMappableTourContent)
+          .map(item => [item.contentId, item]),
+      ).values(),
+    ] as MappableTourContent[];
+    request.success({ count: items.length, sample: mapApiSample(items) });
+    return items;
+  } catch (error) {
+    if (signal.aborted) request.cancelled();
+    else request.failure(error);
+    throw error;
+  }
 }
 
 export function useNearbyFestivals(
@@ -125,6 +100,7 @@ export function useNearbyFestivals(
   range: FestivalRange,
   radius: number = FESTIVAL_RADIUS,
   bounds: ViewportBounds | null = null,
+  enabled = true,
 ) {
   const [all, setAll] = useState<MappableTourContent[]>([]);
   const [loading, setLoading] = useState(false);
@@ -137,11 +113,16 @@ export function useNearbyFestivals(
   const baseYmd = toYmd(today);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
     let alive = true;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
 
-    loadFestivals(baseYmd)
+    loadFestivals(baseYmd, controller.signal)
       .then(items => {
         if (!alive) return;
         setAll(items);
@@ -149,15 +130,15 @@ export function useNearbyFestivals(
       })
       .catch((err: Error) => {
         if (!alive) return;
-        setAll([]);
         setError(err.message || '축제 정보를 불러오지 못했어요.');
         setLoading(false);
       });
 
     return () => {
       alive = false;
+      controller.abort();
     };
-  }, [baseYmd, reloadKey]);
+  }, [baseYmd, reloadKey, enabled]);
 
   const retry = useCallback(() => {
     // 실패했다면 캐시에 아무것도 안 담겼으니 카운터만 올리면 다시 요청됩니다.
@@ -191,6 +172,29 @@ export function useNearbyFestivals(
       )
       .sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
   }, [all, range, lat, lng, radius, bounds, baseYmd, today]);
+
+  useEffect(() => {
+    logMapDiagnostic('festival.filtered', {
+      range,
+      center: { lat, lng },
+      bounds,
+      radiusWhenNoBounds: bounds ? null : radius,
+      beforeDateAndBoundsCount: all.length,
+      afterDateAndBoundsCount: places.length,
+      loading,
+      error,
+    });
+  }, [
+    range,
+    lat,
+    lng,
+    bounds,
+    radius,
+    all.length,
+    places.length,
+    loading,
+    error,
+  ]);
 
   return { places, loading, error, retry };
 }
