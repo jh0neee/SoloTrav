@@ -1,10 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CopySimpleIcon } from 'phosphor-react-native';
 import RecordImage from './RecordImage';
 import { usePhotoViewer } from './PhotoViewer';
-import { isCleanMediaUrl, mediaScanStore } from '../media/mediaScanStore';
-import { mediaIdFromUrl } from '../api/mediaApi';
+import { useCleanMediaUrls } from '../media/mediaScanStore';
 
 export function RecordPhotoCount({
   count,
@@ -47,25 +46,8 @@ export default function RecordPhotoGallery({
   const { open, close } = usePhotoViewer();
   useEffect(() => close, [close]);
 
-  // 사진 ID들의 검사 상태를 구독합니다 (게시물 조회 시 1회 조회 후 반응).
-  const subscribeAll = useCallback(
-    (listener: () => void) => {
-      const unsubscribes = urls
-        .map(mediaIdFromUrl)
-        .filter((id): id is string => id !== null)
-        .map(id => mediaScanStore.subscribe(id, listener));
-      return () => {
-        unsubscribes.forEach(unsub => unsub());
-      };
-    },
-    [urls],
-  );
-
-  const getCleanUrls = useCallback(() => {
-    return urls.filter(isCleanMediaUrl);
-  }, [urls]);
-
-  const cleanUrls = useSyncExternalStore(subscribeAll, getCleanUrls);
+  // 검사를 통과한(CLEAN) 사진만 필터링합니다.
+  const cleanUrls = useCleanMediaUrls(urls);
 
   if (cleanUrls.length === 0) {
     return null;

@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { mediaApi, mediaIdFromUrl, type MediaStatus } from '../api/mediaApi';
 import { toApiError } from '../api/errors';
 
@@ -29,6 +30,9 @@ type Entry = {
 const entries = new Map<string, Entry>();
 const pendingFetchIds = new Set<string>();
 let fetchTimer: ReturnType<typeof setTimeout> | undefined;
+
+let globalVersion = 0;
+const globalListeners = new Set<() => void>();
 
 export function isScanReady(status: string): boolean {
   return status.toUpperCase() === 'CLEAN';
@@ -68,6 +72,8 @@ function entryFor(id: string): Entry {
 function publish(entry: Entry, state: ScanState) {
   entry.state = state;
   entry.listeners.forEach(listener => listener());
+  globalVersion += 1;
+  globalListeners.forEach(listener => listener());
 }
 
 function scheduleFetch() {
@@ -91,7 +97,7 @@ async function executePendingFetch() {
           ? [{ ...(await mediaApi.status(chunk[0])), id: chunk[0] }]
           : await mediaApi.statuses(chunk);
 
-      for (const [index, id] of chunk.entries()) {
+      for (const id of chunk) {
         const entry = entryFor(id);
         entry.fetched = true;
         const result =
@@ -133,6 +139,17 @@ export type ScanWaitResult = {
 export const mediaScanStore = {
   get(id: string): ScanState {
     return entryFor(id).state;
+  },
+
+  getVersion(): number {
+    return globalVersion;
+  },
+
+  subscribeGlobal(listener: () => void) {
+    globalListeners.add(listener);
+    return () => {
+      globalListeners.delete(listener);
+    };
   },
 
   /**
@@ -270,3 +287,34 @@ export const mediaScanStore = {
     scheduleFetch();
   },
 };
+
+/**
+ * 주어진 사진 URL 목록 중 검사를 통과한(CLEAN) 사진만 필터링하여 반환하는 훅.
+ * 버전 번호를 구독하므로 Maximum update depth exceeded 에러를 원천 방지합니다.
+ */
+export function useCleanMediaUrls(urls: string[] = []): string[] {
+  const version = useSyncExternalStore(
+    mediaScanStore.subscribeGlobal,
+    mediaScanStore.getVersion,
+  );
+
+  const key = Array.isArray(urls) ? urls.join(',') : '';
+
+  useEffect(() => {
+    if (!Array.isArray(urls) || urls.length === 0) return;
+    const unsubscribes = urls
+      .map(mediaIdFromUrl)
+      .filter((id): id is string => id !== null)
+      .map(id => mediaScanStore.subscribe(id, () => {}));
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  return useMemo(() => {
+    if (!Array.isArray(urls) || urls.length === 0) return [];
+    return urls.filter(isCleanMediaUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, version]);
+}

@@ -27,7 +27,11 @@ import ModerationSheet, {
 } from '../../components/ModerationSheet';
 import { colors, photoTones } from '../../theme/colors';
 import RecordPhotoGallery from '../../components/RecordPhotoGallery';
-import { isCleanMediaUrl, mediaScanStore } from '../../media/mediaScanStore';
+import {
+  isCleanMediaUrl,
+  mediaScanStore,
+  useCleanMediaUrls,
+} from '../../media/mediaScanStore';
 import { mediaIdFromUrl } from '../../api/mediaApi';
 import {
   Chevron,
@@ -578,23 +582,7 @@ function RecordBody({ record }: { record: TravelRecord }) {
   const isTopGrade = record.safetyGrade === 'A';
 
   // 검사를 통과한 사진만 상세 갤러리에 표시합니다.
-  const subscribeAll = useCallback(
-    (listener: () => void) => {
-      const unsubscribes = record.imageUrls
-        .map(mediaIdFromUrl)
-        .filter((id): id is string => id !== null)
-        .map(id => mediaScanStore.subscribe(id, listener));
-      return () => {
-        unsubscribes.forEach(unsub => unsub());
-      };
-    },
-    [record.imageUrls],
-  );
-  const getCleanUrls = useCallback(
-    () => record.imageUrls.filter(isCleanMediaUrl),
-    [record.imageUrls],
-  );
-  const cleanUrls = useSyncExternalStore(subscribeAll, getCleanUrls);
+  const cleanUrls = useCleanMediaUrls(record.imageUrls);
   const cover = cleanUrls[0] ?? null;
 
   return (
