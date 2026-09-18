@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -23,6 +22,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TAB_CONTENT_BOTTOM_GAP } from '../navigation/layout';
 import Chip from '../components/Chip';
+import RecordImage from '../components/RecordImage';
+import { RecordPhotoCount } from '../components/RecordPhotoGallery';
 import RecordFormScreen from './record/RecordFormScreen';
 import RecordDetailScreen from './record/RecordDetailScreen';
 import { useRecordRoute } from '../navigation/useRecordRoute';
@@ -422,10 +423,10 @@ function RecordCard({
       {/* 이미지가 있으면 첫 장을, 없으면 색 플레이스홀더를 그립니다. */}
       <View style={[styles.photo, { backgroundColor: tone.bg }]}>
         {cover ? (
-          <Image
-            source={{ uri: cover }}
+          <RecordImage
+            uri={cover}
+            ownerId={record.authorId ?? undefined}
             style={styles.photoImage}
-            accessibilityIgnoresInvertColors
           />
         ) : (
           <>
@@ -439,6 +440,7 @@ function RecordCard({
           </>
         )}
 
+        <RecordPhotoCount count={record.imageUrls.length} />
         <View style={styles.safetyPill}>
           <ShieldIcon
             color={isTopGrade ? colors.safeText : colors.bonusText}

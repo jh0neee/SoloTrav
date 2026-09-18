@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -27,6 +26,7 @@ import ModerationSheet, {
   type ReportReason,
 } from '../../components/ModerationSheet';
 import { colors, photoTones } from '../../theme/colors';
+import RecordPhotoGallery from '../../components/RecordPhotoGallery';
 import {
   Chevron,
   CommentIcon,
@@ -588,13 +588,13 @@ function RecordBody({ record }: { record: TravelRecord }) {
         </View>
       </View>
 
-      {/* 이미지가 있으면 첫 장을, 없으면 색 플레이스홀더를 그립니다. */}
+      {/* 여러 사진은 좌우로 넘기고, 사진이 없으면 플레이스홀더를 표시합니다. */}
       <View style={[styles.photo, { backgroundColor: tone.bg }]}>
         {cover ? (
-          <Image
-            source={{ uri: cover }}
-            style={styles.photoImage}
-            accessibilityIgnoresInvertColors
+          <RecordPhotoGallery
+            key={JSON.stringify([record.id, ...record.imageUrls])}
+            urls={record.imageUrls}
+            ownerId={record.authorId ?? undefined}
           />
         ) : (
           <>

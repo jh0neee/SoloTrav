@@ -15,6 +15,7 @@ import { colors } from './src/theme/colors';
 import { checkAndPromptAppUpdate } from './src/services/appUpdateService';
 import { hasSeenPermissionGuide } from './src/config/permissionGuide';
 import PermissionGuideModal from './src/components/PermissionGuideModal';
+import { PhotoViewerProvider } from './src/components/PhotoViewer';
 
 function App() {
   const [showPermissionGuide, setShowPermissionGuide] = useState(false);
@@ -45,7 +46,9 @@ function App() {
             backgroundColor="transparent"
             translucent
           />
-          <RootNavigator />
+          <PhotoViewerProvider>
+            <RootNavigator />
+          </PhotoViewerProvider>
           <PermissionGuideModal
             visible={showPermissionGuide}
             onClose={() => setShowPermissionGuide(false)}

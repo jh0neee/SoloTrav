@@ -33,6 +33,8 @@ import {
   type TravelRecordInput,
 } from '../../types/travelRecord';
 import type { UploadImage } from '../../api/recordApi';
+import RecordImage from '../../components/RecordImage';
+import { useMyProfile } from '../../user/userStore';
 
 type Props = {
   /** 수정 진입이면 기존 값. 없으면 새 기록 작성입니다. */
@@ -378,27 +380,11 @@ function RecordFormScreen({
  * 하는지 알 수 없습니다.
  */
 function ExistingThumb({ url }: { url: string }) {
-  const [failed, setFailed] = useState(false);
+  const profile = useMyProfile();
 
   return (
     <View style={styles.thumb}>
-      {failed ? (
-        <View style={styles.thumbFailed}>
-          <Text style={styles.thumbFailedText}>불러오지{'\n'}못했어요</Text>
-        </View>
-      ) : (
-        <Image
-          source={{ uri: url }}
-          style={styles.thumbImage}
-          onError={({ nativeEvent }) => {
-            if (__DEV__) {
-              console.log('[record] 사진 열기 실패:', url, nativeEvent?.error);
-            }
-            setFailed(true);
-          }}
-          accessibilityIgnoresInvertColors
-        />
-      )}
+      <RecordImage uri={url} ownerId={profile.user?.id} style={styles.thumbImage} />
       <View style={styles.thumbBadge}>
         <Text style={styles.thumbBadgeText}>올라간 사진</Text>
       </View>
