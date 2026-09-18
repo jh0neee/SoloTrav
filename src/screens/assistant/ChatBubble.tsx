@@ -53,7 +53,8 @@ function ChatBubble({
         style={[
           styles.bubble,
           isUser ? styles.bubbleUser : styles.bubbleBot,
-          isFailed && !isFallback && styles.bubbleFailed,
+          isFailed && !isFallback && !message.isLimitExceeded && styles.bubbleFailed,
+          message.isLimitExceeded && styles.bubbleLimit,
           isFallback && styles.bubbleFallback,
         ]}>
         {isPending ? (
@@ -92,8 +93,8 @@ function ChatBubble({
         </View>
       ) : null}
 
-      {/* 통신 실패 시 보조 다시 시도 버튼 */}
-      {isFailed && onRetry && !isFallback ? (
+      {/* 통신 실패 시 보조 다시 시도 버튼 (한도 초과 시에는 재시도 불가하므로 숨김) */}
+      {isFailed && onRetry && !isFallback && !message.isLimitExceeded ? (
         <Pressable
           onPress={onRetry}
           accessibilityRole="button"
@@ -151,6 +152,11 @@ const styles = StyleSheet.create({
   },
   bubbleFailed: {
     backgroundColor: colors.dangerSoft,
+  },
+  bubbleLimit: {
+    backgroundColor: 'rgba(255, 248, 235, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.35)',
   },
   bubbleFallback: {
     backgroundColor: colors.chatBotBubble,

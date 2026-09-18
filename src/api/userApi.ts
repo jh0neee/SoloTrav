@@ -10,10 +10,12 @@ import {
   toTravelPreferenceRequest,
 } from './preferenceMappers';
 import { toBadge, toTravelBadges } from './badgeMappers';
+import { toUserAiUsage } from './assistantMappers';
 import { unwrap } from './mappers';
 import type { Envelope, VisitCheckInResponseDto } from './dto';
 import type { PreferenceAnswers } from '../data/preferences';
 import type { AuthUser, WithdrawalResult } from '../types/auth';
+import type { UserAiUsage } from '../types/assistant';
 import type {
   Badge,
   VisitCheckInInput,
@@ -100,5 +102,11 @@ export const userApi = {
   getBlockedUsers: async (params?: { page?: number; limit?: number }) => {
     const { blockApi } = await import('./blockApi');
     return blockApi.list(params);
+  },
+
+  /** GET /users/me/ai-usage — 내 AI 셋별이 일일 이용 한도 및 사용량 조회 */
+  getAiUsage: async (): Promise<UserAiUsage> => {
+    const { data } = await apiClient.get(ENDPOINTS.userAiUsage());
+    return toUserAiUsage(data);
   },
 };

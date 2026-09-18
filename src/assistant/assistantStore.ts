@@ -16,9 +16,15 @@
  */
 import { useEffect, useSyncExternalStore } from 'react';
 import { assistantApi } from '../api/assistantApi';
-import { toApiError } from '../api/errors';
+import { userApi } from '../api/userApi';
+import { ApiError, toApiError } from '../api/errors';
 import type { SseConnection } from '../api/sse';
-import type { ChatMessage, ChatResult, TravelCourse } from '../types/assistant';
+import type {
+  ChatMessage,
+  ChatResult,
+  TravelCourse,
+  UserAiUsage,
+} from '../types/assistant';
 import { userStore } from '../user/userStore';
 import { tokenStorage } from '../storage/tokenStorage';
 import {
@@ -26,6 +32,10 @@ import {
   THINKING_PHASES,
   getFallbackPrompts,
 } from './suggestions';
+import {
+  MSG_SERVICE_UNAVAILABLE,
+  resolveAssistantErrorMessage,
+} from './errorMessages';
 
 /** 진행 중인 요청 — 결과가 어느 말풍선에 들어가야 하는지 함께 기억합니다 */
 export type PendingRequest = {
@@ -42,6 +52,8 @@ export type AssistantState = {
   pending: PendingRequest | null;
   /** 대화 자체를 막는 오류. 말풍선 안에 표시되는 오류와는 별개입니다 */
   error: string | null;
+  /** 사용자 AI 이용 한도 및 잔여 횟수 정보 */
+  aiUsage: UserAiUsage | null;
 };
 
 /** 결과를 기다리는 동안 말풍선에 띄우는 기본 문구 */
@@ -128,6 +140,7 @@ const INITIAL: AssistantState = {
   isSending: false,
   pending: null,
   error: null,
+  aiUsage: null,
 };
 
 let state: AssistantState = INITIAL;
@@ -177,6 +190,21 @@ function closeStream(): void {
   stream = null;
 }
 
+/** 사용자 AI 이용 한도 정보를 가져와 스토어에 동기화합니다. */
+async function fetchAiUsage(): Promise<void> {
+  if (userStore.get()?.id === 'guest' || !tokenStorage.get()?.accessToken) {
+    return;
+  }
+  try {
+    const aiUsage = await userApi.getAiUsage();
+    setState({ aiUsage });
+  } catch (error) {
+    if (__DEV__) {
+      console.warn('[saetbyeol] fetchAiUsage failed:', error);
+    }
+  }
+}
+
 /** 결과가 도착했을 때 말풍선을 완성합니다. */
 function applyResult(messageId: string, result: ChatResult): void {
   const course: TravelCourse | null = result.course;
@@ -190,11 +218,21 @@ function applyResult(messageId: string, result: ChatResult): void {
   patchMessage(messageId, { text, course, requestId: result.requestId, state: 'done' });
   setState({ pending: null });
   closeStream();
+  // 한도 차감 반영을 위해 최신 한도 정보를 다시 조회합니다.
+  fetchAiUsage();
 }
 
 /** 실패했거나 답변이 불가할 때 말풍선을 친절한 안내 문구와 추천 칩으로 전환합니다. */
-function applyFailure(messageId: string, customMessage?: string): void {
-  const prompts = getFallbackPrompts(lastRequest?.regionName);
+function applyFailure(
+  messageId: string,
+  customMessage?: string,
+  options?: { isLimitExceeded?: boolean },
+): void {
+  const isLimitExceeded = options?.isLimitExceeded ?? false;
+  // 한도 초과 시에는 곧바로 재시도할 수 없으므로 추천 칩을 숨깁니다.
+  const prompts = isLimitExceeded
+    ? undefined
+    : getFallbackPrompts(lastRequest?.regionName);
   const text = customMessage ?? FALLBACK_GUIDE_TEXT;
   patchMessage(messageId, {
     text,
@@ -202,10 +240,14 @@ function applyFailure(messageId: string, customMessage?: string): void {
     requestId: null,
     state: 'failed',
     suggestedPrompts: prompts,
-    isFallback: true,
+    isFallback: !isLimitExceeded,
+    isLimitExceeded,
   });
   setState({ pending: null });
   closeStream();
+  if (isLimitExceeded) {
+    fetchAiUsage();
+  }
 }
 
 /** requestId 를 구독해 결과를 기다립니다. */
@@ -219,12 +261,17 @@ function openStream(requestId: string, messageId: string): void {
       }
     },
     onComplete: result => applyResult(messageId, result),
-    onError: _error => applyFailure(messageId, FALLBACK_GUIDE_TEXT),
+    onError: error => {
+      const resolved = resolveAssistantErrorMessage(error);
+      applyFailure(messageId, resolved.text, {
+        isLimitExceeded: resolved.isLimitExceeded,
+      });
+    },
   });
 
   watchdog = setTimeout(() => {
     watchdog = null;
-    applyFailure(messageId, FALLBACK_GUIDE_TEXT);
+    applyFailure(messageId, MSG_SERVICE_UNAVAILABLE);
   }, RESULT_TIMEOUT_MS);
 }
 
@@ -246,6 +293,7 @@ export const assistantStore = {
    */
   async attach(): Promise<void> {
     attached = true;
+    fetchAiUsage();
     const pending = state.pending;
     if (!pending || stream) {
       return;
@@ -258,7 +306,14 @@ export const assistantStore = {
         return;
       }
       if (result.status === 'FAILED') {
-        applyFailure(pending.messageId, FALLBACK_GUIDE_TEXT);
+        const resolved = resolveAssistantErrorMessage(
+          new ApiError(result.errorMessage ?? '', {
+            code: result.errorCode ?? undefined,
+          }),
+        );
+        applyFailure(pending.messageId, resolved.text, {
+          isLimitExceeded: resolved.isLimitExceeded,
+        });
         return;
       }
     } catch {
@@ -276,6 +331,11 @@ export const assistantStore = {
   detach(): void {
     attached = false;
     closeStream();
+  },
+
+  /** 사용자 AI 잔여 한도 수동 갱신 */
+  async refreshUsage(): Promise<void> {
+    await fetchAiUsage();
   },
 
   /**
@@ -327,6 +387,7 @@ export const assistantStore = {
             '둘러보기(게스트 모드)를 위한 맞춤 추천 코스를 준비했어요 ✦\n로그인하시면 내 취향에 딱 맞춘 AI 코스를 실시간으로 생성할 수 있습니다.',
           course: GUEST_SAMPLE_COURSE,
           errorMessage: null,
+          errorCode: null,
         });
         setState({ isSending: false });
       }, 1200);
@@ -343,7 +404,7 @@ export const assistantStore = {
       // 브로커에 작업이 안 실렸다는 뜻이라 결과가 오지 않습니다.
       if (ticket.status === 'WAITING_BROKER') {
         setState({ isSending: false });
-        applyFailure(replyMessage.id, FALLBACK_GUIDE_TEXT);
+        applyFailure(replyMessage.id, MSG_SERVICE_UNAVAILABLE);
         return;
       }
 
@@ -363,12 +424,14 @@ export const assistantStore = {
         openStream(ticket.requestId, replyMessage.id);
       }
     } catch (caught) {
-      const error = toApiError(caught);
+      const resolved = resolveAssistantErrorMessage(caught);
       if (__DEV__) {
-        console.warn('[saetbyeol] request failed:', error.message);
+        console.warn('[saetbyeol] request failed:', caught);
       }
       setState({ isSending: false });
-      applyFailure(replyMessage.id, FALLBACK_GUIDE_TEXT);
+      applyFailure(replyMessage.id, resolved.text, {
+        isLimitExceeded: resolved.isLimitExceeded,
+      });
     }
   },
 
@@ -405,6 +468,7 @@ export const assistantStore = {
   reset(): void {
     attached = false;
     assistantStore.clear();
+    setState({ aiUsage: null });
   },
 };
 

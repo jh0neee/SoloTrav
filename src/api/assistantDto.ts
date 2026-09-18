@@ -62,6 +62,9 @@ export type SaetbyeolChatResultDto = {
   error?: string | null;
   message?: string | null;
   reason?: string | null;
+  /** 서버 실패 코드 (예: AI_PROVIDER_UNAVAILABLE, AI_RESPONSE_FAILED 등) */
+  errorCode?: string | null;
+  code?: string | null;
   metadata?: { course?: TravelCourseDto | null } | null;
 };
 
@@ -70,4 +73,23 @@ export type SaetbyeolChatStatusDto = {
   requestId?: string;
   status?: string;
   message?: string | null;
+};
+
+/** GET /api/v1/users/me/ai-usage 응답 DTO */
+export type UserAiUsageDto = {
+  userId?: string;
+  tier?: string;
+  requestLimit?: number | null;
+  usedRequestCount?: number;
+  pendingRequestCount?: number;
+  remainingRequestCount?: number | null;
+  canUseAi?: boolean;
+  resetPolicy?: string;
+  resetTimezone?: string;
+  resetsAt?: string;
+  resetAfterSeconds?: number;
+  usedPromptTokens?: string;
+  usedCompletionTokens?: string;
+  usedTotalTokens?: string;
+  usedEstimatedCostKrw?: string;
 };

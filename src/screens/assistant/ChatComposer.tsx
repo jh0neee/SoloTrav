@@ -23,10 +23,12 @@ import { colors } from '../../theme/colors';
 type Props = {
   /** 답을 기다리는 중 — 입력창과 칩을 모두 잠급니다 */
   disabled: boolean;
+  /** 입력창 안내 텍스트 (예: 한도 초과 시 안내) */
+  placeholder?: string;
   onSend: (text: string) => void;
 };
 
-function ChatComposer({ disabled, onSend }: Props) {
+function ChatComposer({ disabled, placeholder, onSend }: Props) {
   const [draft, setDraft] = useState('');
   const canSend = draft.trim().length > 0 && !disabled;
 
@@ -64,7 +66,7 @@ function ChatComposer({ disabled, onSend }: Props) {
           style={styles.input}
           value={draft}
           onChangeText={setDraft}
-          placeholder="혼자 여행하며 궁금한 걸 물어보세요"
+          placeholder={placeholder ?? '혼자 여행하며 궁금한 걸 물어보세요'}
           placeholderTextColor={colors.chatInputPlaceholder}
           editable={!disabled}
           multiline

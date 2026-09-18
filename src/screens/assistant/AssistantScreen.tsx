@@ -67,7 +67,7 @@ const WELCOME_MESSAGES: ChatMessage[] = [
 function AssistantScreen() {
   const insets = useSafeAreaInsets();
   const { isGuest, logout } = useAuth();
-  const { messages, isSending, pending } = useAssistant();
+  const { messages, isSending, pending, aiUsage } = useAssistant();
   const preferences = usePreferences();
   const scrollRef = useRef<ScrollView>(null);
   const [reportRequestId, setReportRequestId] = useState<string | null>(null);
@@ -75,6 +75,29 @@ function AssistantScreen() {
 
   // 답을 기다리는 동안에는 새 질문을 받지 않습니다.
   const isBusy = isSending || pending !== null;
+
+  // 일일 AI 대화 한도 소진 여부
+  const isLimitExceeded = Boolean(
+    !isGuest &&
+      aiUsage &&
+      (!aiUsage.canUseAi ||
+        (aiUsage.remainingRequestCount !== null &&
+          aiUsage.remainingRequestCount <= 0)),
+  );
+
+  // 헤더 상태 표시부 옆에 작게 띄울 보조적인 잔여 횟수 문구
+  const usageLabel = React.useMemo(() => {
+    if (isGuest || !aiUsage) {
+      return null;
+    }
+    if (aiUsage.remainingRequestCount === null) {
+      return '무제한';
+    }
+    if (aiUsage.remainingRequestCount <= 0 || !aiUsage.canUseAi) {
+      return '한도 소진';
+    }
+    return `오늘 ${aiUsage.remainingRequestCount}회 남음`;
+  }, [isGuest, aiUsage]);
 
   /**
    * 앱이 백그라운드로 가면 스트림을 닫고, 돌아오면 다시 붙습니다.
@@ -110,11 +133,18 @@ function AssistantScreen() {
         promptGuestLogin();
         return;
       }
+      if (isLimitExceeded) {
+        Alert.alert(
+          '일일 한도 초과',
+          '오늘 이용할 수 있는 AI 대화 한도를 모두 사용했습니다. 내일 00:00에 초기화됩니다.',
+        );
+        return;
+      }
       // 문장에 도시 이름이 있으면 그 지역을, 없으면 저장된 취향의 지역을 함께 보냅니다.
       const regionName = detectRegionName(text, preferences.answers);
       assistantStore.send(text, regionName);
     },
-    [isGuest, promptGuestLogin, preferences.answers],
+    [isGuest, isLimitExceeded, promptGuestLogin, preferences.answers],
   );
 
   const handleClear = useCallback(() => {
@@ -200,6 +230,21 @@ function AssistantScreen() {
             <Text style={styles.headerSubtitle}>
               혼자 여행할 때 24시 동행 · {isBusy ? '응답 중' : '대기 중'}
             </Text>
+            {usageLabel ? (
+              <View
+                style={[
+                  styles.usageBadge,
+                  isLimitExceeded && styles.usageBadgeEmpty,
+                ]}>
+                <Text
+                  style={[
+                    styles.usageBadgeText,
+                    isLimitExceeded && styles.usageBadgeTextEmpty,
+                  ]}>
+                  {usageLabel}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -233,9 +278,12 @@ function AssistantScreen() {
               <Pressable
                 key={item.label}
                 onPress={() => handleSend(item.prompt)}
-                disabled={isBusy}
+                disabled={isBusy || isLimitExceeded}
                 accessibilityRole="button"
-                style={[styles.starterChip, isBusy && styles.starterChipOff]}>
+                style={[
+                  styles.starterChip,
+                  (isBusy || isLimitExceeded) && styles.starterChipOff,
+                ]}>
                 <Text style={styles.starterChipText}>{item.label}</Text>
               </Pressable>
             ))}
@@ -281,7 +329,7 @@ function AssistantScreen() {
             key={message.id}
             message={message}
             onSelectPrompt={handleSend}
-            disabledPrompt={isBusy}
+            disabledPrompt={isBusy || isLimitExceeded}
             onRetry={() => assistantStore.retry()}
             onReport={
               message.role === 'assistant' && message.requestId
@@ -300,7 +348,15 @@ function AssistantScreen() {
         onReportContent={reportAiResponse}
       />
 
-      <ChatComposer disabled={isBusy} onSend={handleSend} />
+      <ChatComposer
+        disabled={isBusy || isLimitExceeded}
+        placeholder={
+          isLimitExceeded
+            ? '오늘 대화 한도를 모두 사용했어요 (00:00 초기화)'
+            : undefined
+        }
+        onSend={handleSend}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -340,6 +396,7 @@ const styles = StyleSheet.create({
   headerStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
     marginTop: 3,
   },
@@ -355,6 +412,24 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 12,
     color: colors.chatHeaderSub,
+  },
+  usageBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    marginLeft: 2,
+  },
+  usageBadgeEmpty: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  usageBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
+  },
+  usageBadgeTextEmpty: {
+    color: '#FCA5A5',
   },
   headerButton: {
     width: 36,

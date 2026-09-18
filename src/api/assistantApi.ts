@@ -162,15 +162,17 @@ export const assistantApi = {
                 return;
               }
               case EVENT_ERROR: {
-                const result = toChatResult(
-                  parseEventData(message.data),
-                  requestId,
-                );
+                const parsed = parseEventData(message.data);
+                const result = toChatResult(parsed, requestId);
                 settle(() =>
                   handlers.onError(
                     new ApiError(
                       result.errorMessage ??
                         '코스를 만들지 못했어요. 다시 시도해주세요.',
+                      {
+                        code: result.errorCode ?? undefined,
+                        payload: parsed,
+                      },
                     ),
                   ),
                 );
@@ -180,10 +182,8 @@ export const assistantApi = {
                 // 이름 없는 message 이벤트로 결과를 보내는 서버 구현도 있어
                 // 상태가 종료 상태면 결과로 받아들입니다.
                 {
-                  const result = toChatResult(
-                    parseEventData(message.data),
-                    requestId,
-                  );
+                  const parsed = parseEventData(message.data);
+                  const result = toChatResult(parsed, requestId);
                   if (result.status === 'COMPLETED') {
                     settle(() => handlers.onComplete(result));
                   } else if (result.status === 'FAILED') {
@@ -192,6 +192,10 @@ export const assistantApi = {
                         new ApiError(
                           result.errorMessage ??
                             '코스를 만들지 못했어요. 다시 시도해주세요.',
+                          {
+                            code: result.errorCode ?? undefined,
+                            payload: parsed,
+                          },
                         ),
                       ),
                     );

@@ -74,6 +74,8 @@ export type ChatResult = {
   course: TravelCourse | null;
   /** status 가 FAILED 일 때 서버가 준 실패 사유 */
   errorMessage: string | null;
+  /** 실패 시 서버가 준 에러 코드 (예: AI_PROVIDER_UNAVAILABLE, AI_RESPONSE_FAILED 등) */
+  errorCode: string | null;
 };
 
 export type ChatRole = 'user' | 'assistant';
@@ -83,8 +85,6 @@ export type ChatRole = 'user' | 'assistant';
  * pending 동안에는 타이핑 인디케이터를 보여주고, failed 면 다시 시도 버튼을 답니다.
  */
 export type ChatMessageState = 'pending' | 'done' | 'failed';
-
-
 
 export type SuggestedPrompt = {
   /** 칩에 보이는 짧은 문구 */
@@ -106,6 +106,29 @@ export type ChatMessage = {
   suggestedPrompts?: SuggestedPrompt[];
   /** 답변 불가/폴백 안내 메시지 여부 */
   isFallback?: boolean;
+  /** 한도 초과(403 등)로 인한 실패인지 여부 (다시 시도 버튼 숨김용) */
+  isLimitExceeded?: boolean;
   /** 표시용 시각 (epoch ms) */
   createdAt: number;
+};
+
+/** 사용자 AI 이용 한도 및 사용량 정보 (GET /users/me/ai-usage) */
+export type UserAiUsage = {
+  userId: string;
+  tier: string;
+  /** 일일 요청 한도 (무제한 등급은 null) */
+  requestLimit: number | null;
+  usedRequestCount: number;
+  pendingRequestCount: number;
+  /** 잔여 요청 횟수 (무제한 등급은 null) */
+  remainingRequestCount: number | null;
+  canUseAi: boolean;
+  resetPolicy: string;
+  resetTimezone: string;
+  resetsAt: string;
+  resetAfterSeconds: number;
+  usedPromptTokens: string;
+  usedCompletionTokens: string;
+  usedTotalTokens: string;
+  usedEstimatedCostKrw: string;
 };

@@ -87,6 +87,8 @@ export const ENDPOINTS = {
   travelPreferences: () => `/users/me/travel-preferences`,
   /** 내 여행 배지 조회 */
   travelBadges: () => `/users/me/travel-badges`,
+  /** 내 AI 이용 한도 및 사용량 조회 */
+  userAiUsage: () => `/users/me/ai-usage`,
   /** 현장 방문 인증 — 좌표는 보내지 않고 기기에서 계산한 거리만 보냅니다. */
   placeCheckIns: () => `/users/me/place-check-ins`,
   /** 내 차단 목록 조회 (GET) */

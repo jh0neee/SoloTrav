@@ -14,6 +14,7 @@ import type {
   SaetbyeolChatStatusDto,
   SaetbyeolChatTicketDto,
   TravelCourseDto,
+  UserAiUsageDto,
 } from './assistantDto';
 import type {
   AssistantRequestStatus,
@@ -22,6 +23,7 @@ import type {
   CourseDay,
   CourseStop,
   TravelCourse,
+  UserAiUsage,
 } from '../types/assistant';
 
 const KNOWN_STATUSES: AssistantRequestStatus[] = [
@@ -146,6 +148,7 @@ export function toChatResult(
     answer: toText(dto.answer),
     course: toTravelCourse(dto.metadata?.course),
     errorMessage: toText(dto.error) ?? toText(dto.reason) ?? toText(dto.message),
+    errorCode: toText(dto.errorCode) ?? toText(dto.code),
   };
 }
 
@@ -158,5 +161,27 @@ export function toChatStatus(payload: unknown): {
   return {
     status: toRequestStatus(dto.status),
     message: toText(dto.message),
+  };
+}
+
+/** GET /api/v1/users/me/ai-usage 응답 변환 */
+export function toUserAiUsage(payload: unknown): UserAiUsage {
+  const dto = unwrap(payload as Envelope<UserAiUsageDto>);
+  return {
+    userId: String(dto.userId ?? ''),
+    tier: String(dto.tier ?? 'GUEST'),
+    requestLimit: dto.requestLimit !== undefined ? toNumber(dto.requestLimit) : null,
+    usedRequestCount: toNumber(dto.usedRequestCount) ?? 0,
+    pendingRequestCount: toNumber(dto.pendingRequestCount) ?? 0,
+    remainingRequestCount: dto.remainingRequestCount !== undefined ? toNumber(dto.remainingRequestCount) : null,
+    canUseAi: dto.canUseAi !== false,
+    resetPolicy: String(dto.resetPolicy ?? 'DAILY'),
+    resetTimezone: String(dto.resetTimezone ?? 'Asia/Seoul'),
+    resetsAt: String(dto.resetsAt ?? ''),
+    resetAfterSeconds: toNumber(dto.resetAfterSeconds) ?? 0,
+    usedPromptTokens: String(dto.usedPromptTokens ?? '0'),
+    usedCompletionTokens: String(dto.usedCompletionTokens ?? '0'),
+    usedTotalTokens: String(dto.usedTotalTokens ?? '0'),
+    usedEstimatedCostKrw: String(dto.usedEstimatedCostKrw ?? '0'),
   };
 }
