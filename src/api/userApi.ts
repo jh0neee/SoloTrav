@@ -104,7 +104,7 @@ export const userApi = {
     return blockApi.list(params);
   },
 
-  /** GET /users/me/ai-usage — 내 AI 셋별이 일일 이용 한도 및 사용량 조회 */
+  /** GET /users/me/ai-usage — 내 AI 샛별이 일일 이용 한도 및 사용량 조회 */
   getAiUsage: async (): Promise<UserAiUsage> => {
     const { data } = await apiClient.get(ENDPOINTS.userAiUsage());
     return toUserAiUsage(data);

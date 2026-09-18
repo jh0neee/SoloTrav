@@ -70,6 +70,8 @@ import SafetyDetailScreen, {
 import { useMyView } from '../navigation/useMyView';
 import { TAB_CONTENT_BOTTOM_GAP } from '../navigation/layout';
 import { CURRENT_APP_VERSION } from '../services/appUpdateService';
+import { Mascot } from '../components/icons/TabIcons';
+import { assistantStore, useAssistant } from '../assistant/assistantStore';
 
 type IconComponent = React.ComponentType<{ color: string; size?: number }>;
 
@@ -99,10 +101,11 @@ function MyScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
-  // 마이 탭에 들어올 때마다 내 정보를 서버 기준으로 다시 불러옵니다.
+  // 마이 탭에 들어올 때마다 내 정보와 AI 한도를 서버 기준으로 다시 불러옵니다.
   // (로그인 직후 한 번만 받으면 다른 기기에서 바꾼 닉네임 등이 반영되지 않습니다)
   useEffect(() => {
     userStore.refresh();
+    assistantStore.refreshUsage();
   }, []);
 
   /** 당겨서 새로고침 — 마이페이지에 쓰는 서버 데이터를 한 번에 다시 받습니다. */
@@ -115,6 +118,7 @@ function MyScreen() {
       favoriteStore.reload(),
       recordStore.reload('mine'),
       blockStore.reload(),
+      assistantStore.refreshUsage(),
     ]);
     setRefreshing(false);
   };
@@ -342,6 +346,13 @@ function MyScreen() {
           onStart={() => setView('preference')}
           onRetry={() => preferenceStore.reload()}
         />
+      </Section>
+
+      {/* ── AI 샛별이 일일 이용 현황 ── */}
+      <Section
+        title="AI 샛별이 일일 이용 현황"
+      >
+        <AiUsageCard isGuest={isGuest} />
       </Section>
 
       {/* ── 관심 코스 ── */}
@@ -991,6 +1002,159 @@ function PreferenceRow({
   );
 }
 
+/**
+ * AI 샛별이 일일 이용 현황 카드.
+ * - 티어(등급), 일일 한도, 오늘 사용 횟수, 잔여 횟수 및 진행 바를 표시합니다.
+ */
+function AiUsageCard({ isGuest }: { isGuest: boolean }) {
+  const { aiUsage } = useAssistant();
+
+  if (isGuest) {
+    return (
+      <View style={[styles.card, styles.aiUsageCard]}>
+        <View style={styles.aiUsageHeader}>
+          <View style={styles.aiUsageAvatar}>
+            <Mascot size={28} />
+          </View>
+          <View style={styles.aiUsageTitleBox}>
+            <Text style={styles.aiUsageTitle}>방문자 (둘러보기)</Text>
+            <Text style={styles.aiUsageSub}>
+              로그인 시 내 취향 맞춤 AI 코스를 매일 생성할 수 있어요
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  if (!aiUsage) {
+    return (
+      <View style={[styles.card, styles.aiUsagePlaceholder]}>
+        <ActivityIndicator color={colors.goldDeep} />
+        <Text style={styles.prefLoadingText}>
+          AI 이용 현황을 확인하는 중이에요
+        </Text>
+      </View>
+    );
+  }
+
+  const normalizedTier = aiUsage.tier?.toUpperCase();
+  const isUnlimited =
+    normalizedTier === 'DEVELOPER' ||
+    normalizedTier === 'MASTER' ||
+    aiUsage.requestLimit === null ||
+    aiUsage.remainingRequestCount === null;
+
+  const isExceeded =
+    !isUnlimited &&
+    (!aiUsage.canUseAi || (aiUsage.remainingRequestCount ?? 0) <= 0);
+
+  const tierLabel = (() => {
+    switch (normalizedTier) {
+      case 'GUEST':
+        return '새싹 여행자';
+      case 'MEMBER':
+        return '나홀로 탐험가';
+      case 'PERMISSION':
+        return '은하수 길잡이';
+      case 'DEVELOPER':
+        return '개발자';
+      case 'MASTER':
+        return '관리자';
+      default:
+        return aiUsage.tier ?? '회원';
+    }
+  })();
+
+  const usageRatio =
+    !isUnlimited && aiUsage.requestLimit && aiUsage.requestLimit > 0
+      ? Math.min(
+          1,
+          Math.max(0, aiUsage.usedRequestCount / aiUsage.requestLimit),
+        )
+      : 0;
+
+  return (
+    <View style={[styles.card, styles.aiUsageCard]}>
+      <View style={styles.aiUsageHeader}>
+        <View style={styles.aiUsageAvatar}>
+          <Mascot size={28} />
+        </View>
+        <View style={styles.aiUsageTitleBox}>
+          <Text style={styles.aiUsageTitle}>{tierLabel}</Text>
+          <Text style={styles.aiUsageSub}>혼행 메이트 샛별이 일일 한도</Text>
+        </View>
+        <View
+          style={[
+            styles.aiUsageBadge,
+            isExceeded
+              ? styles.aiUsageBadgeExceeded
+              : isUnlimited
+              ? styles.aiUsageBadgeUnlimited
+              : null,
+          ]}>
+          <Text
+            style={[
+              styles.aiUsageBadgeText,
+              isExceeded ? styles.aiUsageBadgeTextExceeded : null,
+            ]}>
+            {isUnlimited
+              ? '무제한'
+              : isExceeded
+              ? '한도 소진'
+              : `오늘 ${aiUsage.remainingRequestCount}회 남음`}
+          </Text>
+        </View>
+      </View>
+
+      {/* 통계 요약 3열 그리드 */}
+      <View style={styles.aiUsageStatsRow}>
+        <View style={styles.aiUsageStatItem}>
+          <Text style={styles.aiUsageStatLabel}>일일 한도</Text>
+          <Text style={styles.aiUsageStatValue}>
+            {isUnlimited ? '무제한' : `${aiUsage.requestLimit}회`}
+          </Text>
+        </View>
+        <View style={styles.aiUsageStatDivider} />
+        <View style={styles.aiUsageStatItem}>
+          <Text style={styles.aiUsageStatLabel}>오늘 사용</Text>
+          <Text style={styles.aiUsageStatValue}>
+            {aiUsage.usedRequestCount}회
+          </Text>
+        </View>
+        <View style={styles.aiUsageStatDivider} />
+        <View style={styles.aiUsageStatItem}>
+          <Text style={styles.aiUsageStatLabel}>남은 횟수</Text>
+          <Text
+            style={[
+              styles.aiUsageStatValue,
+              isExceeded && styles.aiUsageStatValueExceeded,
+            ]}>
+            {isUnlimited ? '무제한' : `${aiUsage.remainingRequestCount}회`}
+          </Text>
+        </View>
+      </View>
+
+      {/* 진행 바 (한도가 있는 경우) */}
+      {!isUnlimited && (
+        <View style={styles.aiUsageProgressTrack}>
+          <View
+            style={[
+              styles.aiUsageProgressBar,
+              { width: `${Math.round(usageRatio * 100)}%` },
+              isExceeded && styles.aiUsageProgressBarExceeded,
+            ]}
+          />
+        </View>
+      )}
+
+      <Text style={styles.aiUsageFooterNote}>
+        매일 자정(00:00) 자동 초기화 · 완료 시점 기준으로 집계됩니다
+      </Text>
+    </View>
+  );
+}
+
 /** 마이탭에서는 배지 이미지를 펼치지 않고 획득 개수만 요약합니다. */
 function BadgeSummaryBar({
   earnedCount,
@@ -1312,6 +1476,114 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#ffffff',
+  },
+
+  // AI 샛별이 일일 이용 현황
+  aiUsageCard: {
+    padding: 16,
+  },
+  aiUsagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    gap: 8,
+  },
+  aiUsageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  aiUsageAvatar: {
+    marginRight: 10,
+  },
+  aiUsageTitleBox: {
+    flex: 1,
+  },
+  aiUsageTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  aiUsageSub: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    marginTop: 1,
+  },
+  aiUsageBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
+  },
+  aiUsageBadgeUnlimited: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primaryBorder,
+  },
+  aiUsageBadgeExceeded: {
+    backgroundColor: colors.dangerSoft,
+    borderColor: 'rgba(240, 68, 56, 0.2)',
+  },
+  aiUsageBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primaryStrong,
+  },
+  aiUsageBadgeTextExceeded: {
+    color: colors.danger,
+  },
+  aiUsageStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  aiUsageStatItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  aiUsageStatDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: colors.border,
+  },
+  aiUsageStatLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginBottom: 3,
+  },
+  aiUsageStatValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  aiUsageStatValueExceeded: {
+    color: colors.danger,
+  },
+  aiUsageProgressTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  aiUsageProgressBar: {
+    height: '100%',
+    borderRadius: 2,
+    backgroundColor: colors.goldDeep,
+  },
+  aiUsageProgressBarExceeded: {
+    backgroundColor: colors.danger,
+  },
+  aiUsageFooterNote: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    marginTop: 10,
+    textAlign: 'center',
   },
   prefRow: {
     flexDirection: 'row',

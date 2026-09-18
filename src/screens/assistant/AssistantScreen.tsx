@@ -76,10 +76,18 @@ function AssistantScreen() {
   // 답을 기다리는 동안에는 새 질문을 받지 않습니다.
   const isBusy = isSending || pending !== null;
 
+  const isUnlimited = Boolean(
+    aiUsage &&
+      (aiUsage.remainingRequestCount === null ||
+        aiUsage.tier?.toUpperCase() === 'DEVELOPER' ||
+        aiUsage.tier?.toUpperCase() === 'MASTER'),
+  );
+
   // 일일 AI 대화 한도 소진 여부
   const isLimitExceeded = Boolean(
     !isGuest &&
       aiUsage &&
+      !isUnlimited &&
       (!aiUsage.canUseAi ||
         (aiUsage.remainingRequestCount !== null &&
           aiUsage.remainingRequestCount <= 0)),
@@ -90,14 +98,18 @@ function AssistantScreen() {
     if (isGuest || !aiUsage) {
       return null;
     }
-    if (aiUsage.remainingRequestCount === null) {
+    if (isUnlimited) {
       return '무제한';
     }
-    if (aiUsage.remainingRequestCount <= 0 || !aiUsage.canUseAi) {
+    if (
+      (aiUsage.remainingRequestCount !== null &&
+        aiUsage.remainingRequestCount <= 0) ||
+      !aiUsage.canUseAi
+    ) {
       return '한도 소진';
     }
     return `오늘 ${aiUsage.remainingRequestCount}회 남음`;
-  }, [isGuest, aiUsage]);
+  }, [isGuest, aiUsage, isUnlimited]);
 
   /**
    * 앱이 백그라운드로 가면 스트림을 닫고, 돌아오면 다시 붙습니다.
