@@ -7,7 +7,7 @@
  * 서버가 주는 기록은 안전등급·태그·내용·날짜뿐이라 목업에 있던 좋아요/댓글은
  * 화면에서 뺐습니다. 사진도 API 에 없어서 예전처럼 색 플레이스홀더를 씁니다.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -34,6 +34,8 @@ import {
   type RecordListState,
   type RecordScope,
 } from '../records/recordStore';
+import { isCleanMediaUrl, mediaScanStore } from '../media/mediaScanStore';
+import { mediaIdFromUrl } from '../api/mediaApi';
 import { colors, photoTones } from '../theme/colors';
 import {
   CommentIcon,
@@ -153,7 +155,28 @@ function RecordScreen() {
             }
 
             if (result.imageError) {
-              Alert.alert('사진 업로드 실패', result.imageError);
+              if (result.retryableMediaId) {
+                Alert.alert('사진 검사 실패', result.imageError, [
+                  { text: '확인', style: 'cancel' },
+                  {
+                    text: '검사 재시도',
+                    onPress: async () => {
+                      try {
+                        await mediaScanStore.retry(result.retryableMediaId!);
+                        Alert.alert(
+                          '알림',
+                          '사진 검사를 다시 요청했습니다. 잠시 후 확인해주세요.',
+                        );
+                        await recordStore.reload('mine');
+                      } catch {
+                        Alert.alert('오류', '재시도 요청에 실패했습니다.');
+                      }
+                    },
+                  },
+                ]);
+              } else {
+                Alert.alert('사진 검사 안내', result.imageError);
+              }
             }
           } catch {
             // 실패 메시지는 작성 화면 하단에 뜹니다. 입력이 날아가지 않게 열어둡니다.
@@ -398,7 +421,25 @@ function RecordCard({
   const tone = photoTones[record.tone];
   const author = record.authorName ?? '혼행러';
   const isTopGrade = record.safetyGrade === 'A';
-  const cover = record.imageUrls[0];
+  // 검사를 통과한 사진만 커버 및 사진 수에 반영합니다.
+  const subscribeAll = useCallback(
+    (listener: () => void) => {
+      const unsubscribes = record.imageUrls
+        .map(mediaIdFromUrl)
+        .filter((id): id is string => id !== null)
+        .map(id => mediaScanStore.subscribe(id, listener));
+      return () => {
+        unsubscribes.forEach(unsub => unsub());
+      };
+    },
+    [record.imageUrls],
+  );
+  const getCleanUrls = useCallback(
+    () => record.imageUrls.filter(isCleanMediaUrl),
+    [record.imageUrls],
+  );
+  const cleanUrls = useSyncExternalStore(subscribeAll, getCleanUrls);
+  const cover = cleanUrls[0] ?? null;
 
   return (
     <Pressable
@@ -440,7 +481,7 @@ function RecordCard({
           </>
         )}
 
-        <RecordPhotoCount count={record.imageUrls.length} />
+        <RecordPhotoCount count={cleanUrls.length} />
         <View style={styles.safetyPill}>
           <ShieldIcon
             color={isTopGrade ? colors.safeText : colors.bonusText}

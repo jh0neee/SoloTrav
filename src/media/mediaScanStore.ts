@@ -1,7 +1,4 @@
-import { AppState } from 'react-native';
-import { mediaApi, type MediaStatus } from '../api/mediaApi';
-import { userStore } from '../user/userStore';
-import { tokenStorage } from '../storage/tokenStorage';
+import { mediaApi, mediaIdFromUrl, type MediaStatus } from '../api/mediaApi';
 import { toApiError } from '../api/errors';
 
 export type ScanState = {
@@ -10,197 +7,266 @@ export type ScanState = {
   retrying: boolean;
   message?: string;
 };
+
 const INITIAL: ScanState = {
   status: 'LOADING',
   retryable: false,
   retrying: false,
 };
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => {
+    setTimeout(() => resolve(), ms);
+  });
+}
+
 type Entry = {
   state: ScanState;
-  listeners: Map<() => void, string | undefined>;
-  attempts: number;
-  checks: number;
-  stopped: boolean;
+  listeners: Set<() => void>;
+  fetched: boolean;
 };
+
 const entries = new Map<string, Entry>();
-let timer: ReturnType<typeof setTimeout> | undefined;
-let controller: AbortController | undefined;
-let appSubscription: ReturnType<typeof AppState.addEventListener> | undefined;
+const pendingFetchIds = new Set<string>();
+let fetchTimer: ReturnType<typeof setTimeout> | undefined;
 
 export function isScanReady(status: string): boolean {
-  return status === 'CLEAN';
+  return status.toUpperCase() === 'CLEAN';
 }
+
 export function isScanPending(status: string): boolean {
   return ['LOADING', 'PENDING', 'QUEUED', 'SCANNING', 'PROCESSING'].includes(
-    status,
+    status.toUpperCase(),
   );
 }
+
+export function isScanFailed(status: string): boolean {
+  return ['ERROR', 'INFECTED', 'BLOCKED', 'REJECTED'].includes(
+    status.toUpperCase(),
+  );
+}
+
+export function isCleanMediaUrl(url: string): boolean {
+  const id = mediaIdFromUrl(url);
+  if (!id) return true;
+  return isScanReady(mediaScanStore.get(id).status);
+}
+
 function entryFor(id: string): Entry {
   let entry = entries.get(id);
   if (!entry) {
     entry = {
       state: INITIAL,
-      listeners: new Map(),
-      attempts: 0,
-      checks: 0,
-      stopped: false,
+      listeners: new Set(),
+      fetched: false,
     };
     entries.set(id, entry);
   }
   return entry;
 }
+
 function publish(entry: Entry, state: ScanState) {
   entry.state = state;
-  entry.listeners.forEach((_, listener) => listener());
+  entry.listeners.forEach(listener => listener());
 }
-function canRetry(entry: Entry): boolean {
-  const userId = userStore.get()?.id;
-  return (
-    !!userId &&
-    userId !== 'guest' &&
-    !!tokenStorage.get()?.accessToken &&
-    [...entry.listeners.values()].some(ownerId => ownerId === userId)
-  );
+
+function scheduleFetch() {
+  if (fetchTimer) return;
+  fetchTimer = setTimeout(() => {
+    fetchTimer = undefined;
+    void executePendingFetch();
+  }, 50);
 }
-function activeEntries() {
-  return [...entries].filter(
-    ([, entry]) => entry.listeners.size > 0 && !entry.stopped,
-  );
-}
-function schedule(delay = 3000) {
-  if (
-    timer ||
-    controller ||
-    AppState.currentState === 'background' ||
-    AppState.currentState === 'inactive'
-  )
-    return;
-  if (!activeEntries().length) return;
-  timer = setTimeout(() => {
-    timer = undefined;
-    poll();
-  }, delay);
-}
-async function retry(id: string, entry: Entry) {
-  if (!canRetry(entry) || entry.attempts >= 2 || entry.state.retrying) return;
-  entry.attempts += 1;
-  publish(entry, { ...entry.state, retrying: true });
-  try {
-    await mediaApi.retry(id);
-    entry.stopped = false;
-    publish(entry, { status: 'PENDING', retryable: false, retrying: false });
-  } catch (error) {
-    entry.stopped = true;
-    publish(entry, {
-      ...entry.state,
-      retrying: false,
-      message: toApiError(error).message,
-    });
-  }
-}
-async function applyStatus(id: string, result: MediaStatus) {
-  const entry = entryFor(id);
-  if (!entry.listeners.size) return;
-  const status =
-    typeof result.status === 'string' ? result.status.toUpperCase() : 'UNKNOWN';
-  publish(entry, {
-    status,
-    retryable: result.retryable === true,
-    retrying: false,
-  });
-  if (
-    status === 'ERROR' &&
-    result.retryable === true &&
-    canRetry(entry) &&
-    entry.attempts < 2
-  ) {
-    await retry(id, entry);
-  } else if (!isScanPending(status)) {
-    entry.stopped = true;
-  }
-}
-async function poll() {
-  controller = new AbortController();
-  const signal = controller.signal;
-  const active = activeEntries();
-  try {
-    for (let i = 0; i < active.length && !signal.aborted; i += 20) {
-      const chunk = active.slice(i, i + 20);
-      const ids = chunk.map(([id]) => id);
-      try {
-        const results =
-          ids.length === 1
-            ? [{ ...(await mediaApi.status(ids[0], signal)), id: ids[0] }]
-            : await mediaApi.statuses(ids, signal);
-        if (signal.aborted) break;
-        for (const [id, entry] of chunk) {
-          if (!entry.listeners.size) continue;
-          entry.checks += 1;
-          const result = results.find(item => item.id === id);
-          if (!result) throw new Error('사진 검사 상태가 응답에 없습니다.');
-          await applyStatus(id, result);
-          if (entry.checks >= 40 && !entry.stopped) {
-            entry.stopped = true;
-            publish(entry, {
-              ...entry.state,
-              message: '검사가 지연되고 있어요. 잠시 후 다시 확인해주세요.',
-            });
-          }
-        }
-      } catch (error) {
-        if (signal.aborted) break;
-        for (const [, entry] of chunk) {
-          entry.stopped = true;
+
+async function executePendingFetch() {
+  if (pendingFetchIds.size === 0) return;
+  const ids = Array.from(pendingFetchIds);
+  pendingFetchIds.clear();
+
+  for (let i = 0; i < ids.length; i += 20) {
+    const chunk = ids.slice(i, i + 20);
+    try {
+      const results =
+        chunk.length === 1
+          ? [{ ...(await mediaApi.status(chunk[0])), id: chunk[0] }]
+          : await mediaApi.statuses(chunk);
+
+      for (const [index, id] of chunk.entries()) {
+        const entry = entryFor(id);
+        entry.fetched = true;
+        const result =
+          results.find(item => item.id === id) ??
+          (chunk.length === 1 ? results[0] : undefined);
+        if (result) {
+          const status =
+            typeof result.status === 'string'
+              ? result.status.toUpperCase()
+              : 'UNKNOWN';
           publish(entry, {
-            ...entry.state,
-            message: toApiError(error).message,
+            status,
+            retryable: result.retryable === true,
+            retrying: false,
           });
         }
       }
+    } catch (error) {
+      for (const id of chunk) {
+        const entry = entryFor(id);
+        entry.fetched = true;
+        publish(entry, {
+          ...entry.state,
+          message: toApiError(error).message,
+        });
+      }
     }
-  } finally {
-    controller = undefined;
-    schedule();
   }
 }
+
+export type ScanWaitResult = {
+  success: boolean;
+  cleanIds: string[];
+  failedIds: string[];
+  retryableId?: string;
+  message?: string;
+};
+
 export const mediaScanStore = {
   get(id: string): ScanState {
     return entryFor(id).state;
   },
-  subscribe(id: string, listener: () => void, ownerId?: string) {
+
+  /**
+   * 게시물 조회 시점의 구독.
+   * 기존 검사 결과를 1회 확인하고 통지하며, 절대 자동 재검사(retry)나 무한 폴링을 돌리지 않습니다.
+   */
+  subscribe(id: string, listener: () => void) {
     const entry = entryFor(id);
-    entry.listeners.set(listener, ownerId);
-    if (!isScanReady(entry.state.status)) {
-      entry.stopped = false;
-      entry.checks = 0;
+    entry.listeners.add(listener);
+
+    if (!entry.fetched) {
+      pendingFetchIds.add(id);
+      scheduleFetch();
     }
-    if (!appSubscription) {
-      appSubscription = AppState.addEventListener('change', state => {
-        if (state === 'active') schedule(100);
-        else {
-          clearTimeout(timer);
-          timer = undefined;
-          controller?.abort();
-        }
-      });
-    }
-    schedule(100);
+
     return () => {
       entry.listeners.delete(listener);
-      if (![...entries.values()].some(item => item.listeners.size)) {
-        clearTimeout(timer);
-        timer = undefined;
-        controller?.abort();
-        appSubscription?.remove();
-        appSubscription = undefined;
-      }
     };
   },
+
+  /**
+   * 업로드 직후: 서버의 검사 완료까지 상태를 확인합니다.
+   * 검사가 완료(CLEAN)되거나 실패(ERROR/차단/타임아웃)할 때까지 폴링합니다.
+   */
+  async waitForScan(
+    ids: string[],
+    options?: { timeoutMs?: number; intervalMs?: number },
+  ): Promise<ScanWaitResult> {
+    const timeoutMs = options?.timeoutMs ?? 15000;
+    const intervalMs = options?.intervalMs ?? 1500;
+    const startTime = Date.now();
+
+    if (ids.length === 0) {
+      return { success: true, cleanIds: [], failedIds: [] };
+    }
+
+    while (Date.now() - startTime < timeoutMs) {
+      try {
+        const results =
+          ids.length === 1
+            ? [{ ...(await mediaApi.status(ids[0])), id: ids[0] }]
+            : await mediaApi.statuses(ids);
+
+        for (const result of results) {
+          const mediaId = result.id ?? (ids.length === 1 ? ids[0] : undefined);
+          if (!mediaId) continue;
+          const entry = entryFor(mediaId);
+          entry.fetched = true;
+          const status =
+            typeof result.status === 'string'
+              ? result.status.toUpperCase()
+              : 'UNKNOWN';
+          publish(entry, {
+            status,
+            retryable: result.retryable === true,
+            retrying: false,
+          });
+        }
+
+        const allClean = ids.every(id =>
+          isScanReady(mediaScanStore.get(id).status),
+        );
+        if (allClean) {
+          return { success: true, cleanIds: ids, failedIds: [] };
+        }
+
+        const failed = ids.filter(id =>
+          isScanFailed(mediaScanStore.get(id).status),
+        );
+        if (failed.length > 0) {
+          const retryable = ids.find(
+            id => mediaScanStore.get(id).retryable === true,
+          );
+          const hasMalware = ids.some(id =>
+            ['INFECTED', 'BLOCKED', 'REJECTED'].includes(
+              mediaScanStore.get(id).status,
+            ),
+          );
+          return {
+            success: false,
+            cleanIds: ids.filter(id =>
+              isScanReady(mediaScanStore.get(id).status),
+            ),
+            failedIds: failed,
+            retryableId: retryable,
+            message: hasMalware
+              ? '안전하지 않은 사진(악성코드 의심)이 감지되어 등록에서 제외되었습니다.'
+              : retryable
+              ? '사진 검사 중 일시적인 오류가 발생했습니다.'
+              : '사진 안전성 검사에 실패했습니다.',
+          };
+        }
+      } catch {
+        // 일시적 오류 시 다음 주기 재시도
+      }
+
+      await sleep(intervalMs);
+    }
+
+    return {
+      success: false,
+      cleanIds: ids.filter(id => isScanReady(mediaScanStore.get(id).status)),
+      failedIds: ids.filter(id => !isScanReady(mediaScanStore.get(id).status)),
+      message:
+        '사진 안전성 검사가 지연되고 있습니다. 검사가 완료되는 대로 게시물에 반영됩니다.',
+    };
+  },
+
+  /**
+   * 사용자 요청에 의한 수동 재검사.
+   * 자동 재검사가 아니며, 사용자가 실패 안내를 보고 재시도를 누를 때만 호출됩니다.
+   */
+  async retry(id: string): Promise<void> {
+    const entry = entryFor(id);
+    publish(entry, { ...entry.state, retrying: true });
+    try {
+      await mediaApi.retry(id);
+      entry.fetched = false;
+      publish(entry, { status: 'PENDING', retryable: false, retrying: false });
+    } catch (error) {
+      publish(entry, {
+        ...entry.state,
+        retrying: false,
+        message: toApiError(error).message,
+      });
+      throw error;
+    }
+  },
+
   recheck(id: string) {
     const entry = entryFor(id);
-    entry.stopped = false;
-    entry.checks = 0;
+    entry.fetched = false;
     publish(entry, INITIAL);
-    schedule(100);
+    pendingFetchIds.add(id);
+    scheduleFetch();
   },
 };

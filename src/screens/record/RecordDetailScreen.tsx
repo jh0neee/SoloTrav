@@ -6,7 +6,7 @@
  *   - 내 글이면 수정·삭제
  *   - 댓글 목록/등록/수정/삭제
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -27,6 +27,8 @@ import ModerationSheet, {
 } from '../../components/ModerationSheet';
 import { colors, photoTones } from '../../theme/colors';
 import RecordPhotoGallery from '../../components/RecordPhotoGallery';
+import { isCleanMediaUrl, mediaScanStore } from '../../media/mediaScanStore';
+import { mediaIdFromUrl } from '../../api/mediaApi';
 import {
   Chevron,
   CommentIcon,
@@ -574,7 +576,26 @@ function RecordBody({ record }: { record: TravelRecord }) {
   const tone = photoTones[record.tone];
   const author = record.authorName ?? '혼행러';
   const isTopGrade = record.safetyGrade === 'A';
-  const cover = record.imageUrls[0];
+
+  // 검사를 통과한 사진만 상세 갤러리에 표시합니다.
+  const subscribeAll = useCallback(
+    (listener: () => void) => {
+      const unsubscribes = record.imageUrls
+        .map(mediaIdFromUrl)
+        .filter((id): id is string => id !== null)
+        .map(id => mediaScanStore.subscribe(id, listener));
+      return () => {
+        unsubscribes.forEach(unsub => unsub());
+      };
+    },
+    [record.imageUrls],
+  );
+  const getCleanUrls = useCallback(
+    () => record.imageUrls.filter(isCleanMediaUrl),
+    [record.imageUrls],
+  );
+  const cleanUrls = useSyncExternalStore(subscribeAll, getCleanUrls);
+  const cover = cleanUrls[0] ?? null;
 
   return (
     <View style={styles.card}>
@@ -592,8 +613,8 @@ function RecordBody({ record }: { record: TravelRecord }) {
       <View style={[styles.photo, { backgroundColor: tone.bg }]}>
         {cover ? (
           <RecordPhotoGallery
-            key={JSON.stringify([record.id, ...record.imageUrls])}
-            urls={record.imageUrls}
+            key={JSON.stringify([record.id, ...cleanUrls])}
+            urls={cleanUrls}
             ownerId={record.authorId ?? undefined}
           />
         ) : (

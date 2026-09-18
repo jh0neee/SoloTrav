@@ -1,8 +1,6 @@
 import React, { useCallback, useState, useSyncExternalStore } from 'react';
 import {
-  ActivityIndicator,
   Image,
-  Pressable,
   StyleSheet,
   Text,
   View,
@@ -11,11 +9,7 @@ import {
   type ImageResizeMode,
 } from 'react-native';
 import { mediaIdFromUrl } from '../api/mediaApi';
-import {
-  isScanPending,
-  isScanReady,
-  mediaScanStore,
-} from '../media/mediaScanStore';
+import { isScanReady, mediaScanStore } from '../media/mediaScanStore';
 import { colors } from '../theme/colors';
 
 type Props = {
@@ -23,6 +17,8 @@ type Props = {
   ownerId?: string;
   style?: StyleProp<ImageStyle>;
   resizeMode?: ImageResizeMode;
+  fallback?: React.ReactNode;
+  showNotice?: boolean;
 };
 
 export default function RecordImage(props: Props) {
@@ -34,13 +30,18 @@ export default function RecordImage(props: Props) {
   );
 }
 
-function DirectImage({ uri, style, resizeMode }: Props) {
+function DirectImage({ uri, style, resizeMode, fallback }: Props) {
   const [failed, setFailed] = useState(false);
-  return failed ? (
-    <View style={[style, styles.notice]}>
-      <Text style={styles.text}>사진을 불러오지 못했어요</Text>
-    </View>
-  ) : (
+  if (failed) {
+    return fallback ? (
+      <>{fallback}</>
+    ) : (
+      <View style={[style, styles.notice]}>
+        <Text style={styles.text}>사진을 불러오지 못했어요</Text>
+      </View>
+    );
+  }
+  return (
     <Image
       source={{ uri }}
       style={style}
@@ -54,49 +55,46 @@ function DirectImage({ uri, style, resizeMode }: Props) {
 function ScannedImage({
   id,
   uri,
-  ownerId,
   style,
   resizeMode,
+  fallback,
+  showNotice,
 }: Props & { id: string }) {
   const subscribe = useCallback(
-    (listener: () => void) => mediaScanStore.subscribe(id, listener, ownerId),
-    [id, ownerId],
+    (listener: () => void) => mediaScanStore.subscribe(id, listener),
+    [id],
   );
   const get = useCallback(() => mediaScanStore.get(id), [id]);
   const state = useSyncExternalStore(subscribe, get);
-  if (isScanReady(state.status))
-    return <DirectImage uri={uri} style={style} resizeMode={resizeMode} />;
-  const pending =
-    (isScanPending(state.status) || state.retrying) && !state.message;
-  const message =
-    state.message ??
-    (state.retrying
-      ? '파일 검사 재시도 중'
-      : pending
-      ? '파일 검사 중'
-      : state.status === 'ERROR'
-      ? '파일 검사에 실패했어요'
-      : ['INFECTED', 'BLOCKED', 'REJECTED'].includes(state.status)
-      ? '표시할 수 없는 사진이에요'
-      : '사진 검사 상태를 확인할 수 없어요');
-  return (
-    <View style={[style, styles.notice]} accessibilityLiveRegion="polite">
-      {pending ? <ActivityIndicator color={colors.primary} /> : null}
-      <Text style={styles.text}>{message}</Text>
-      {!pending ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={event => {
-            event.stopPropagation();
-            mediaScanStore.recheck(id);
-          }}
-          style={styles.retry}
-        >
-          <Text style={styles.retryText}>상태 다시 확인</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
+
+  // 검사를 통과(CLEAN)한 사진만 보여줍니다.
+  if (isScanReady(state.status)) {
+    return (
+      <DirectImage
+        uri={uri}
+        style={style}
+        resizeMode={resizeMode}
+        fallback={fallback}
+      />
+    );
+  }
+
+  // 작성/수정 화면 등에서 명시적으로 상태 안내가 필요한 경우
+  if (showNotice) {
+    const isBlocked = ['INFECTED', 'BLOCKED', 'REJECTED'].includes(
+      state.status.toUpperCase(),
+    );
+    return (
+      <View style={[style, styles.notice]}>
+        <Text style={styles.text}>
+          {isBlocked ? '차단된 사진' : '검사 대기 중'}
+        </Text>
+      </View>
+    );
+  }
+
+  // 일반 게시물 조회 시에는 검사를 통과하지 않은 사진은 표시하지 않습니다.
+  return fallback ? <>{fallback}</> : null;
 }
 
 const styles = StyleSheet.create({
@@ -104,9 +102,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 8,
-    gap: 8,
+    backgroundColor: '#f1f5f9',
   },
   text: { color: colors.textSecondary, fontSize: 12, textAlign: 'center' },
-  retry: { padding: 8, minHeight: 40, justifyContent: 'center' },
-  retryText: { color: colors.primary, fontSize: 12, textAlign: 'center' },
 });
