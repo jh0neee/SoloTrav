@@ -28,10 +28,14 @@ export type RecordListState = {
   error: string | null;
 };
 
+export type SubmitStep = 'idle' | 'saving' | 'uploading' | 'scanning';
+
 export type RecordState = {
   all: RecordListState;
   mine: RecordListState;
   isSubmitting: boolean;
+  submitStep: SubmitStep;
+  submitMessage: string | null;
   submitError: string | null;
 };
 
@@ -58,6 +62,8 @@ const INITIAL: RecordState = {
   all: EMPTY_LIST,
   mine: EMPTY_LIST,
   isSubmitting: false,
+  submitStep: 'idle',
+  submitMessage: null,
   submitError: null,
 };
 
@@ -138,14 +144,28 @@ async function attachImages(
     return { imageError: null };
   }
   if (!recordId) {
+    console.warn('[이미지 업로드] 기록 ID가 없어 사진을 올리지 못했습니다.');
     return {
       imageError:
         '기록은 저장됐지만 사진을 붙일 기록을 찾지 못했습니다.\n기록 수정에서 사진만 다시 올려주세요.',
     };
   }
+
+  console.log(`[이미지 업로드] 시작 — 기록 ID: ${recordId}, 총 ${images.length}장`);
+  images.forEach((img, idx) => {
+    console.log(`[이미지 업로드]   #${idx + 1}: ${img.name} (${img.type}) -> ${img.uri}`);
+  });
+
+  setState({
+    submitStep: 'uploading',
+    submitMessage: `사진 ${images.length}장을 안전하게 올리는 중이에요 📸`,
+  });
+
   try {
     await recordApi.uploadImages(recordId, images);
+    console.log(`[이미지 업로드] 서버 파일 전송 성공 (200 OK) — 기록 ID: ${recordId}`);
   } catch (caught) {
+    console.error('[이미지 업로드] 서버 파일 전송 실패:', caught);
     return {
       imageError: `기록은 저장됐지만 사진 업로드에 실패했습니다.\n${
         toApiError(caught).message
@@ -155,23 +175,56 @@ async function attachImages(
 
   // 업로드 직후: 서버 임시 보관된 사진의 바이러스 검사 완료 상태 확인
   try {
+    setState({
+      submitStep: 'scanning',
+      submitMessage: '사진 바이러스 안전 검사를 준비하고 있어요...',
+    });
+    console.log(`[이미지 검사] 내 기록 재조회 시작 — 최신 이미지 목록 확인용 (기록 ID: ${recordId})`);
     await recordStore.reload('mine');
     const updatedRecord = recordStore.find(recordId);
+    console.log('[이미지 검사] 재조회된 기록의 imageUrls:', updatedRecord?.imageUrls ?? []);
+
     const mediaIds = (updatedRecord?.imageUrls ?? [])
       .map(mediaIdFromUrl)
       .filter((id): id is string => id !== null);
 
+    console.log('[이미지 검사] 검사 대상 media ID 목록:', mediaIds);
+
     if (mediaIds.length > 0) {
-      const scanResult = await mediaScanStore.waitForScan(mediaIds);
+      console.log(`[이미지 검사] waitForScan 실행 — 검사 완료(CLEAN) 대기 시작...`);
+      setState({
+        submitStep: 'scanning',
+        submitMessage: `사진 ${mediaIds.length}장 바이러스 안전 검사 중... 🛡️`,
+      });
+
+      const scanResult = await mediaScanStore.waitForScan(mediaIds, {
+        onProgress: (pollCount, elapsed, cleanCount, totalCount) => {
+          const phrases = [
+            `사진 ${totalCount}장 안전 검사 진행 중... 🛡️`,
+            '안전한 여행 기록을 위해 꼼꼼히 검사하고 있어요 ✨',
+            cleanCount > 0
+              ? `사진 ${totalCount}장 중 ${cleanCount}장 통과 완료! 잠시만 기다려주세요 ⏳`
+              : '악성코드 및 바이러스를 꼼꼼히 확인하고 있어요 🔍',
+            '거의 다 되었어요! 나만의 여행 기록을 완성 중입니다 🚀',
+          ];
+          const message = phrases[(pollCount - 1) % phrases.length];
+          setState({ submitStep: 'scanning', submitMessage: message });
+        },
+      });
+
+      console.log('[이미지 검사] waitForScan 최종 판정:', scanResult);
       if (!scanResult.success) {
         return {
           imageError: scanResult.message ?? '사진 검사에 실패했습니다.',
           retryableMediaId: scanResult.retryableId,
         };
       }
+    } else {
+      console.log('[이미지 검사] media ID가 없어 검사 대기를 건너뜁니다 (기존 URL 또는 외부 이미지).');
     }
     return { imageError: null };
   } catch (caught) {
+    console.error('[이미지 검사] 상태 확인 중 예외 발생:', caught);
     return {
       imageError: `사진 검사 상태 확인 중 오류가 발생했습니다.\n${
         toApiError(caught).message
@@ -251,7 +304,12 @@ export const recordStore = {
     input: TravelRecordInput,
     images: UploadImage[] = [],
   ): Promise<RecordSubmitResult> {
-    setState({ isSubmitting: true, submitError: null });
+    setState({
+      isSubmitting: true,
+      submitStep: 'saving',
+      submitMessage: '여행 기록을 저장하고 있어요...',
+      submitError: null,
+    });
     try {
       const created = await recordApi.create(input);
       const { imageError, retryableMediaId } =
@@ -264,11 +322,16 @@ export const recordStore = {
       // 목록을 다시 받는 동안에도 버튼은 잠가둡니다.
       // 먼저 풀어주면 "올리는 중..." 이 사라졌다가 화면이 닫혀 깜빡입니다.
       await reloadBoth();
-      setState({ isSubmitting: false });
+      setState({ isSubmitting: false, submitStep: 'idle', submitMessage: null });
       return { imageError, retryableMediaId };
     } catch (caught) {
       const error = toApiError(caught);
-      setState({ isSubmitting: false, submitError: error.message });
+      setState({
+        isSubmitting: false,
+        submitStep: 'idle',
+        submitMessage: null,
+        submitError: error.message,
+      });
       throw error;
     }
   },
@@ -282,7 +345,12 @@ export const recordStore = {
     input: TravelRecordInput,
     images: UploadImage[] = [],
   ): Promise<RecordSubmitResult> {
-    setState({ isSubmitting: true, submitError: null });
+    setState({
+      isSubmitting: true,
+      submitStep: 'saving',
+      submitMessage: '여행 기록을 수정하고 있어요...',
+      submitError: null,
+    });
     try {
       await recordApi.update(recordId, input);
       const { imageError, retryableMediaId } = await attachImages(
@@ -290,11 +358,16 @@ export const recordStore = {
         images,
       );
       await reloadBoth();
-      setState({ isSubmitting: false });
+      setState({ isSubmitting: false, submitStep: 'idle', submitMessage: null });
       return { imageError, retryableMediaId };
     } catch (caught) {
       const error = toApiError(caught);
-      setState({ isSubmitting: false, submitError: error.message });
+      setState({
+        isSubmitting: false,
+        submitStep: 'idle',
+        submitMessage: null,
+        submitError: error.message,
+      });
       throw error;
     }
   },

@@ -134,6 +134,8 @@ function RecordScreen() {
         }
         existingImageUrls={editing?.imageUrls ?? []}
         isSubmitting={state.isSubmitting}
+        submitStep={state.submitStep}
+        submitMessage={state.submitMessage}
         submitError={state.submitError}
         onBack={() =>
           setRoute(
@@ -142,49 +144,19 @@ function RecordScreen() {
               : { name: 'feed' },
           )
         }
-        onSubmit={async (input, images) => {
-          try {
-            // 사진만 실패한 경우는 던지지 않고 결과로 옵니다.
-            // 기록은 이미 저장됐으니 화면은 닫고, 사진 얘기만 따로 알립니다.
-            const result = editing
-              ? await recordStore.update(editing.id, input, images)
-              : await recordStore.create(input, images);
-
-            if (editing) {
-              setRoute({ name: 'detail', recordId: editing.id });
-            } else {
-              setRoute({ name: 'feed' });
-              // 방금 올린 기록이 바로 보이도록 내 기록으로 옮겨줍니다.
-              switchScope('mine');
-            }
-
-            if (result.imageError) {
-              if (result.retryableMediaId) {
-                Alert.alert('사진 검사 실패', result.imageError, [
-                  { text: '확인', style: 'cancel' },
-                  {
-                    text: '검사 재시도',
-                    onPress: async () => {
-                      try {
-                        await mediaScanStore.retry(result.retryableMediaId!);
-                        Alert.alert(
-                          '알림',
-                          '사진 검사를 다시 요청했습니다. 잠시 후 확인해주세요.',
-                        );
-                        await recordStore.reload('mine');
-                      } catch {
-                        Alert.alert('오류', '재시도 요청에 실패했습니다.');
-                      }
-                    },
-                  },
-                ]);
-              } else {
-                Alert.alert('사진 검사 안내', result.imageError);
-              }
-            }
-          } catch {
-            // 실패 메시지는 작성 화면 하단에 뜹니다. 입력이 날아가지 않게 열어둡니다.
+        onComplete={() => {
+          if (editing) {
+            setRoute({ name: 'detail', recordId: editing.id });
+          } else {
+            setRoute({ name: 'feed' });
+            // 방금 올린 기록이 바로 보이도록 내 기록으로 옮겨줍니다.
+            switchScope('mine');
           }
+        }}
+        onSubmit={async (input, images) => {
+          return editing
+            ? await recordStore.update(editing.id, input, images)
+            : await recordStore.create(input, images);
         }}
       />
     );

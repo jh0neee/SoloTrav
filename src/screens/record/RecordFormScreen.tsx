@@ -10,8 +10,10 @@
  */
 import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -34,6 +36,33 @@ import {
 } from '../../types/travelRecord';
 import type { UploadImage } from '../../api/recordApi';
 import RecordImage from '../../components/RecordImage';
+import {
+  recordStore,
+  type RecordSubmitResult,
+  type SubmitStep,
+} from '../../records/recordStore';
+import { mediaScanStore } from '../../media/mediaScanStore';
+
+export type ModalStatus =
+  | 'idle'
+  | 'progress'
+  | 'success'
+  | 'warning'
+  | 'retryable'
+  | 'error';
+
+export type StepStatus = 'pending' | 'active' | 'completed' | 'failed';
+
+export type SubmitModalState = {
+  visible: boolean;
+  status: ModalStatus;
+  stepStatuses: [StepStatus, StepStatus, StepStatus];
+  title: string;
+  message: string;
+  subMessage?: string;
+  retryableMediaId?: string;
+  isRetrying?: boolean;
+};
 
 type Props = {
   /** 수정 진입이면 기존 값. 없으면 새 기록 작성입니다. */
@@ -44,9 +73,15 @@ type Props = {
    */
   existingImageUrls?: string[];
   isSubmitting: boolean;
+  submitStep?: SubmitStep;
+  submitMessage?: string | null;
   submitError: string | null;
   onBack: () => void;
-  onSubmit: (input: TravelRecordInput, images: UploadImage[]) => void;
+  onComplete: () => void;
+  onSubmit: (
+    input: TravelRecordInput,
+    images: UploadImage[],
+  ) => Promise<RecordSubmitResult | void>;
 };
 
 const DESCRIPTION_MAX = 300;
@@ -94,12 +129,85 @@ const SUGGESTED_TAGS = [
   '혼밥성공',
 ];
 
+const STEP_LABELS = ['기록 저장', '사진 전송', '안전 검사'];
+
+function StepIndicator({
+  statuses,
+}: {
+  statuses: [StepStatus, StepStatus, StepStatus];
+}) {
+  return (
+    <View style={styles.stepIndicatorContainer}>
+      {STEP_LABELS.map((label, idx) => {
+        const status = statuses[idx];
+        const isCompleted = status === 'completed';
+        const isActive = status === 'active';
+        const isFailed = status === 'failed';
+        const isPending = status === 'pending';
+
+        return (
+          <React.Fragment key={label}>
+            {idx > 0 ? (
+              <View
+                style={[
+                  styles.stepConnectorLine,
+                  statuses[idx - 1] === 'completed' &&
+                    (isActive || isCompleted || isFailed) &&
+                    styles.stepConnectorLineActive,
+                  status === 'failed' && styles.stepConnectorLineFailed,
+                ]}
+              />
+            ) : null}
+
+            <View style={styles.stepItem}>
+              <View
+                style={[
+                  styles.stepCircle,
+                  isCompleted && styles.stepCircleCompleted,
+                  isActive && styles.stepCircleActive,
+                  isFailed && styles.stepCircleFailed,
+                  isPending && styles.stepCirclePending,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.stepCircleText,
+                    isCompleted && styles.stepCircleTextCompleted,
+                    isActive && styles.stepCircleTextActive,
+                    isFailed && styles.stepCircleTextFailed,
+                    isPending && styles.stepCircleTextPending,
+                  ]}
+                >
+                  {isCompleted ? '✓' : isFailed ? '!' : idx + 1}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.stepLabel,
+                  isActive && styles.stepLabelActive,
+                  isCompleted && styles.stepLabelCompleted,
+                  isFailed && styles.stepLabelFailed,
+                ]}
+              >
+                {label}
+              </Text>
+            </View>
+          </React.Fragment>
+        );
+      })}
+    </View>
+  );
+}
+
 function RecordFormScreen({
   initial,
   existingImageUrls = [],
   isSubmitting,
+  submitStep = 'idle',
+  submitMessage,
   submitError,
   onBack,
+  onComplete,
   onSubmit,
 }: Props) {
   // 상태바가 투명(translucent)이라 상단 여백은 화면이 직접 만들어 줍니다.
@@ -121,10 +229,145 @@ function RecordFormScreen({
   /** 사진 고르기 실패(권한 거부 등). 저장 자체와는 별개라 따로 보여줍니다. */
   const [imagePickError, setImagePickError] = useState<string | null>(null);
 
+  /** 결과 및 안내 모달 통합 상태 (토스 스타일 3단계 스텝 바) */
+  const [modalState, setModalState] = useState<SubmitModalState>({
+    visible: false,
+    status: 'idle',
+    stepStatuses: ['pending', 'pending', 'pending'],
+    title: '',
+    message: '',
+  });
+
   const tags = useMemo(() => parseTags(tagText), [tagText]);
   const isDateValid = DATE_PATTERN.test(date);
   const canSubmit =
     isDateValid && description.trim().length > 0 && !isSubmitting;
+
+  /** 실제 서버 저장 시 스텝 상태 실시간 계산 */
+  const currentStepStatuses: [StepStatus, StepStatus, StepStatus] = useMemo(() => {
+    if (modalState.status !== 'progress') {
+      return modalState.stepStatuses;
+    }
+    if (submitStep === 'scanning') {
+      return ['completed', 'completed', 'active'];
+    }
+    if (submitStep === 'uploading') {
+      return ['completed', 'active', 'pending'];
+    }
+    return ['active', 'pending', 'pending'];
+  }, [modalState.status, modalState.stepStatuses, submitStep]);
+
+  const handleSubmit = async () => {
+    if (!canSubmit) {
+      return;
+    }
+    setModalState({
+      visible: true,
+      status: 'progress',
+      stepStatuses: ['active', 'pending', 'pending'],
+      title: isEditing ? '기록을 수정하고 있어요' : '기록을 저장하고 있어요',
+      message: '여행 기록 본문 내용을 저장하고 있습니다.',
+      subMessage: '잠시만 기다려주시면 바로 등록됩니다.',
+    });
+
+    try {
+      const result = await onSubmit(
+        { isAnonymous, safetyGrade, tags, description, date },
+        images,
+      );
+
+      if (result && result.imageError) {
+        if (result.retryableMediaId) {
+          setModalState({
+            visible: true,
+            status: 'retryable',
+            stepStatuses: ['completed', 'completed', 'failed'],
+            title: '사진 검사 일시 지연',
+            message: result.imageError,
+            subMessage: '기록 본문은 안전하게 저장되었습니다.',
+            retryableMediaId: result.retryableMediaId,
+          });
+        } else {
+          const isUploadFail = result.imageError.includes('업로드');
+          setModalState({
+            visible: true,
+            status: 'warning',
+            stepStatuses: isUploadFail
+              ? ['completed', 'failed', 'pending']
+              : ['completed', 'completed', 'failed'],
+            title: isUploadFail ? '사진 전송 실패 안내' : '사진 안전성 검사 안내',
+            message: result.imageError,
+            subMessage: '기록 본문은 안전하게 저장되었습니다.',
+          });
+        }
+      } else {
+        setModalState({
+          visible: true,
+          status: 'success',
+          stepStatuses: ['completed', 'completed', 'completed'],
+          title: isEditing ? '기록 수정이 완료되었어요' : '기록 등록이 완료되었어요',
+          message: '안전성 검사를 모두 마치고 피드에 등록되었습니다.',
+          subMessage: '아래 확인 버튼을 누르면 목록으로 이동합니다.',
+        });
+      }
+    } catch (caught: any) {
+      setModalState({
+        visible: true,
+        status: 'error',
+        stepStatuses: ['failed', 'pending', 'pending'],
+        title: '기록 저장에 실패했어요',
+        message:
+          caught?.message || '일시적인 오류로 저장하지 못했습니다. 다시 시도해 주세요.',
+        subMessage:
+          '작성하신 내용과 선택한 사진은 안전하게 유지되어 있습니다.',
+      });
+    }
+  };
+
+  const handleRetry = async () => {
+    if (!modalState.retryableMediaId) {
+      return;
+    }
+
+    try {
+      setModalState(prev => ({
+        ...prev,
+        isRetrying: true,
+        stepStatuses: ['completed', 'completed', 'active'],
+        title: '사진 재검사 요청 중',
+        message: '사진 검사를 다시 요청하고 있습니다.',
+      }));
+      await mediaScanStore.retry(modalState.retryableMediaId);
+      await recordStore.reload('mine');
+      setModalState({
+        visible: true,
+        status: 'success',
+        stepStatuses: ['completed', 'completed', 'completed'],
+        title: '재검사 요청 완료',
+        message: '사진 검사를 다시 요청했습니다.\n잠시 후 내 기록에서 확인해주세요.',
+        subMessage: '검사가 완료되면 사진이 자동으로 표시됩니다.',
+      });
+    } catch {
+      setModalState(prev => ({
+        ...prev,
+        isRetrying: false,
+        stepStatuses: ['completed', 'completed', 'failed'],
+        title: '재시도 요청 실패',
+        message: '재시도 요청에 실패했습니다.\n네트워크 상태를 확인하고 다시 시도해주세요.',
+      }));
+    }
+  };
+
+  const handleModalAcknowledge = () => {
+    const { status } = modalState;
+    setModalState(prev => ({ ...prev, visible: false }));
+
+    if (status === 'error') {
+      return;
+    }
+
+    onComplete();
+  };
 
   // 이미 올라간 사진도 정원에 포함시켜 셉니다.
   const remainingSlots =
@@ -340,12 +583,7 @@ function RecordFormScreen({
       <View style={styles.footer}>
         {submitError ? <Text style={styles.error}>{submitError}</Text> : null}
         <Pressable
-          onPress={() =>
-            onSubmit(
-              { isAnonymous, safetyGrade, tags, description, date },
-              images,
-            )
-          }
+          onPress={handleSubmit}
           disabled={!canSubmit}
           accessibilityRole="button"
           accessibilityState={{ disabled: !canSubmit }}
@@ -353,7 +591,7 @@ function RecordFormScreen({
         >
           <Text style={[styles.ctaText, !canSubmit && styles.ctaTextOff]}>
             {isSubmitting
-              ? '올리는 중...'
+              ? '처리 중...'
               : isEditing
               ? '수정 완료'
               : '기록 남기기'}
@@ -367,6 +605,102 @@ function RecordFormScreen({
         onSelect={setDate}
         onClose={() => setPickerOpen(false)}
       />
+
+      {/* 결합형 스텝 인디케이터 모달 (토스 스타일) */}
+      <Modal
+        visible={modalState.visible || (isSubmitting && submitStep !== 'idle')}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+          if (modalState.status !== 'progress' && !modalState.isRetrying) {
+            handleModalAcknowledge();
+          }
+        }}
+      >
+        <View style={styles.loadingModalOverlay}>
+          <View style={styles.loadingModalCard}>
+            {/* 토스 스타일 3단계 스텝 바 */}
+            <StepIndicator statuses={currentStepStatuses} />
+
+            {/* 진행 중 미니멀 스피너 */}
+            {modalState.status === 'progress' ||
+            modalState.status === 'idle' ||
+            modalState.isRetrying ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.primary}
+                style={styles.stepProgressSpinner}
+              />
+            ) : null}
+
+            {/* 모달 타이틀 */}
+            <Text style={styles.stepModalTitle}>
+              {modalState.status === 'progress' || modalState.status === 'idle'
+                ? submitStep === 'scanning'
+                  ? '안전성 검사를 진행하고 있어요'
+                  : submitStep === 'uploading'
+                  ? '사진을 전송하고 있어요'
+                  : '기록을 저장하고 있어요'
+                : modalState.title}
+            </Text>
+
+            {/* 모달 메시지 */}
+            <Text style={styles.stepModalMessage}>
+              {modalState.status === 'progress' || modalState.status === 'idle'
+                ? submitMessage || modalState.message || '잠시만 기다려주세요.'
+                : modalState.message}
+            </Text>
+
+            {/* 보조 설명 문구 */}
+            {modalState.subMessage ? (
+              <Text style={styles.stepModalSub}>{modalState.subMessage}</Text>
+            ) : null}
+
+            {/* 상태별 커스텀 액션 버튼 */}
+            {modalState.status === 'retryable' ? (
+              <View style={styles.modalBtnRow}>
+                <Pressable
+                  style={[styles.modalBtnHalf, styles.modalBtnSecondary]}
+                  onPress={handleModalAcknowledge}
+                  disabled={modalState.isRetrying}
+                >
+                  <Text style={styles.modalBtnSecondaryText}>나중에 확인</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalBtnHalf, styles.modalBtnPrimary]}
+                  onPress={handleRetry}
+                  disabled={modalState.isRetrying}
+                >
+                  <Text style={styles.modalBtnPrimaryText}>
+                    {modalState.isRetrying ? '요청 중...' : '검사 재시도'}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : modalState.status !== 'progress' &&
+              modalState.status !== 'idle' ? (
+              <View style={styles.modalBtnSingle}>
+                <Pressable
+                  style={[
+                    styles.modalBtnSingleBtn,
+                    styles.modalBtnPrimary,
+                    modalState.status === 'error' && styles.modalBtnDanger,
+                  ]}
+                  onPress={handleModalAcknowledge}
+                >
+                  <Text style={styles.modalBtnPrimaryText}>
+                    {modalState.status === 'success'
+                      ? '확인'
+                      : modalState.status === 'error'
+                      ? '돌아가기'
+                      : '확인'}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -652,6 +986,188 @@ const styles = StyleSheet.create({
   },
   ctaTextOff: {
     color: colors.ctaDisabledText,
+  },
+  loadingModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingModalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    paddingTop: 32,
+    paddingBottom: 24,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  stepIndicatorContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    width: '100%',
+    paddingHorizontal: 4,
+    marginBottom: 20,
+  },
+  stepItem: {
+    alignItems: 'center',
+    width: 68,
+  },
+  stepConnectorLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: colors.border,
+    marginTop: 13,
+    marginHorizontal: -4,
+  },
+  stepConnectorLineActive: {
+    backgroundColor: colors.primary,
+  },
+  stepConnectorLineFailed: {
+    backgroundColor: colors.danger,
+  },
+  stepCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  stepCircleCompleted: {
+    backgroundColor: colors.primary,
+  },
+  stepCircleActive: {
+    backgroundColor: colors.primary,
+    borderWidth: 3,
+    borderColor: colors.primarySoft,
+  },
+  stepCircleFailed: {
+    backgroundColor: colors.danger,
+  },
+  stepCirclePending: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  stepCircleText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  stepCircleTextCompleted: {
+    color: '#ffffff',
+    fontSize: 13,
+  },
+  stepCircleTextActive: {
+    color: '#ffffff',
+  },
+  stepCircleTextFailed: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  stepCircleTextPending: {
+    color: colors.textTertiary,
+  },
+  stepLabel: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  stepLabelActive: {
+    color: colors.primaryStrong,
+    fontWeight: '700',
+  },
+  stepLabelCompleted: {
+    color: colors.textPrimary,
+    fontWeight: '600',
+  },
+  stepLabelFailed: {
+    color: colors.danger,
+    fontWeight: '700',
+  },
+  stepProgressSpinner: {
+    marginBottom: 10,
+  },
+  stepModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  stepModalMessage: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 6,
+    paddingHorizontal: 8,
+  },
+  stepModalSub: {
+    fontSize: 11,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    lineHeight: 15,
+  },
+
+  modalBtnRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 20,
+    width: '100%',
+  },
+  modalBtnHalf: {
+    flex: 1,
+    minHeight: 48,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnSingle: {
+    marginTop: 20,
+    width: '100%',
+  },
+  modalBtnSingleBtn: {
+    width: '100%',
+    minHeight: 48,
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnPrimary: {
+    backgroundColor: colors.ink,
+  },
+  modalBtnPrimaryText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  modalBtnSecondary: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modalBtnSecondaryText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  modalBtnDanger: {
+    backgroundColor: colors.danger,
   },
 });
 

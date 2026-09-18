@@ -92,10 +92,16 @@ async function executePendingFetch() {
   for (let i = 0; i < ids.length; i += 20) {
     const chunk = ids.slice(i, i + 20);
     try {
+      console.log(`[미디어 상태 조회] 1회 배치 조회 요청 (${chunk.length}개):`, chunk);
       const results =
         chunk.length === 1
           ? [{ ...(await mediaApi.status(chunk[0])), id: chunk[0] }]
           : await mediaApi.statuses(chunk);
+
+      console.log(
+        '[미디어 상태 조회] 응답 수신:',
+        results.map(r => ({ id: r.id, status: r.status })),
+      );
 
       for (const id of chunk) {
         const entry = entryFor(id);
@@ -116,6 +122,7 @@ async function executePendingFetch() {
         }
       }
     } catch (error) {
+      console.warn('[미디어 상태 조회] 조회 실패:', error);
       for (const id of chunk) {
         const entry = entryFor(id);
         entry.fetched = true;
@@ -176,22 +183,50 @@ export const mediaScanStore = {
    */
   async waitForScan(
     ids: string[],
-    options?: { timeoutMs?: number; intervalMs?: number },
+    options?: {
+      timeoutMs?: number;
+      intervalMs?: number;
+      onProgress?: (
+        pollCount: number,
+        elapsed: number,
+        cleanCount: number,
+        totalCount: number,
+      ) => void;
+    },
   ): Promise<ScanWaitResult> {
     const timeoutMs = options?.timeoutMs ?? 15000;
     const intervalMs = options?.intervalMs ?? 1500;
     const startTime = Date.now();
+    let pollCount = 0;
 
     if (ids.length === 0) {
       return { success: true, cleanIds: [], failedIds: [] };
     }
 
+    console.log(
+      `[바이러스 검사] 대기 시작 — 대상 ${ids.length}개:`,
+      ids,
+      `(최대 ${timeoutMs / 1000}초 동안 ${intervalMs / 1000}초 간격 확인)`,
+    );
+
     while (Date.now() - startTime < timeoutMs) {
+      pollCount += 1;
+      const elapsed = Number(((Date.now() - startTime) / 1000).toFixed(1));
+      const currentCleanCount = ids.filter(id =>
+        isScanReady(mediaScanStore.get(id).status),
+      ).length;
+      options?.onProgress?.(pollCount, elapsed, currentCleanCount, ids.length);
+
       try {
         const results =
           ids.length === 1
             ? [{ ...(await mediaApi.status(ids[0])), id: ids[0] }]
             : await mediaApi.statuses(ids);
+
+        console.log(
+          `[바이러스 검사] #${pollCount}회차 상태 응답 (${elapsed}초 경과):`,
+          results.map(r => ({ id: r.id, status: r.status, retryable: r.retryable })),
+        );
 
         for (const result of results) {
           const mediaId = result.id ?? (ids.length === 1 ? ids[0] : undefined);
@@ -213,6 +248,7 @@ export const mediaScanStore = {
           isScanReady(mediaScanStore.get(id).status),
         );
         if (allClean) {
+          console.log(`[바이러스 검사] 🎉 모든 사진 검사 통과 (CLEAN)! 총 소요 시간: ${elapsed}초`);
           return { success: true, cleanIds: ids, failedIds: [] };
         }
 
@@ -228,6 +264,11 @@ export const mediaScanStore = {
               mediaScanStore.get(id).status,
             ),
           );
+          console.warn(`[바이러스 검사] ⚠️ 검사 실패 감지:`, {
+            failedIds: failed,
+            hasMalware,
+            retryableId: retryable,
+          });
           return {
             success: false,
             cleanIds: ids.filter(id =>
@@ -242,12 +283,17 @@ export const mediaScanStore = {
               : '사진 안전성 검사에 실패했습니다.',
           };
         }
-      } catch {
-        // 일시적 오류 시 다음 주기 재시도
+      } catch (err) {
+        console.warn(`[바이러스 검사] #${pollCount}회차 조회 중 일시적 오류:`, err);
       }
 
       await sleep(intervalMs);
     }
+
+    console.warn(
+      `[바이러스 검사] ⏰ 타임아웃 (${timeoutMs / 1000}초 초과) — 미완료 ID:`,
+      ids.filter(id => !isScanReady(mediaScanStore.get(id).status)),
+    );
 
     return {
       success: false,
@@ -263,13 +309,16 @@ export const mediaScanStore = {
    * 자동 재검사가 아니며, 사용자가 실패 안내를 보고 재시도를 누를 때만 호출됩니다.
    */
   async retry(id: string): Promise<void> {
+    console.log(`[바이러스 검사] 수동 재검사 요청 시작 — 대상 ID: ${id}`);
     const entry = entryFor(id);
     publish(entry, { ...entry.state, retrying: true });
     try {
       await mediaApi.retry(id);
+      console.log(`[바이러스 검사] 수동 재검사 요청 성공 — 대상 ID: ${id}`);
       entry.fetched = false;
       publish(entry, { status: 'PENDING', retryable: false, retrying: false });
     } catch (error) {
+      console.error(`[바이러스 검사] 수동 재검사 요청 실패 — 대상 ID: ${id}:`, error);
       publish(entry, {
         ...entry.state,
         retrying: false,
