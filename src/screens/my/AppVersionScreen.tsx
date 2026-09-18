@@ -321,7 +321,6 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   appIconWrapper: {
-  appLauncherIcon: {
     width: 68,
     height: 68,
     borderRadius: 20,
@@ -330,6 +329,11 @@ const styles = StyleSheet.create({
     borderColor: colors.primaryBorder,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 14,
+  },
+  appLauncherIcon: {
+    width: 68,
+    height: 68,
     borderRadius: 18,
     marginBottom: 14,
   },

@@ -89,6 +89,10 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
   const [moderationTarget, setModerationTarget] =
     useState<ModerationTarget | null>(null);
   const [isModerating, setIsModerating] = useState(false);
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteInFlight = useRef(false);
 
   const scrollCommentsToEnd = useCallback(() => {
     requestAnimationFrame(() => {
@@ -249,25 +253,36 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
     }
   };
 
-  const confirmDeleteRecord = () =>
-    Alert.alert('기록 삭제', '이 기록을 삭제할까요?', [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await recordStore.remove(recordId);
-            onBack();
-          } catch (caught) {
-            Alert.alert(
-              '삭제 실패',
-              caught instanceof Error ? caught.message : '다시 시도해주세요.',
-            );
-          }
-        },
-      },
-    ]);
+  const confirmDeleteRecord = () => {
+    Keyboard.dismiss();
+    setDeleteError(null);
+    setDeleteVisible(true);
+  };
+
+  const deleteRecord = async () => {
+    if (deleteInFlight.current) return;
+    deleteInFlight.current = true;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await recordStore.remove(recordId);
+      onBack();
+    } catch (caught) {
+      const error = toApiError(caught);
+      setDeleteError(error.message);
+      if (__DEV__) {
+        console.log('[record:delete] failed', {
+          recordId,
+          status: error.status,
+          code: error.code,
+          message: error.message,
+        });
+      }
+    } finally {
+      deleteInFlight.current = false;
+      setIsDeleting(false);
+    }
+  };
 
   const confirmDeleteComment = (commentId: string) =>
     Alert.alert('댓글 삭제', '이 댓글을 삭제할까요?', [
@@ -487,6 +502,44 @@ function RecordDetailScreen({ recordId, onBack, onEdit }: Props) {
           </Pressable>
         </View>
       </View>
+      {deleteVisible ? (
+        <View style={styles.deleteOverlay} accessibilityViewIsModal>
+          <View style={styles.deleteDialog}>
+            <Text style={styles.deleteTitle}>기록 삭제</Text>
+            <Text style={styles.deleteMessage}>
+              {isDeleting ? '삭제 중입니다...' : '이 기록을 삭제할까요?'}
+            </Text>
+            {deleteError ? (
+              <Text style={styles.ownerDanger} accessibilityRole="alert">
+                삭제 실패: {deleteError}
+              </Text>
+            ) : null}
+            <View style={styles.deleteActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isDeleting}
+                onPress={() => setDeleteVisible(false)}
+                style={styles.deleteButton}
+              >
+                <Text style={styles.ownerAction}>취소</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="기록 삭제 확인"
+                disabled={isDeleting}
+                onPress={deleteRecord}
+                style={styles.deleteButton}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator color={colors.danger} />
+                ) : (
+                  <Text style={[styles.ownerAction, styles.ownerDanger]}>삭제</Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }
@@ -669,6 +722,46 @@ function CommentRow({
 }
 
 const styles = StyleSheet.create({
+  deleteOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    zIndex: 10,
+  },
+  deleteDialog: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    gap: 16,
+  },
+  deleteTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  deleteMessage: {
+    fontSize: 15,
+    color: colors.textPrimary,
+  },
+  deleteActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  deleteButton: {
+    minWidth: 64,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: colors.cream,

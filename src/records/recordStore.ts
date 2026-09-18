@@ -265,17 +265,14 @@ export const recordStore = {
 
   /**
    * 기록 삭제.
-   * 목록에서 먼저 빼서 화면이 즉시 반응하게 하고, 이어서 서버 기준으로 맞춥니다.
+   * 서버 삭제가 성공한 뒤 목록에서 제거합니다. 실패하면 상세 화면을 유지합니다.
    */
   async remove(recordId: string): Promise<void> {
-    const snapshot = { all: state.all, mine: state.mine };
-    removeRecordEverywhere(recordId);
     try {
       await recordApi.remove(recordId);
+      removeRecordEverywhere(recordId);
       await reloadBoth();
     } catch (caught) {
-      // 실패하면 지우기 전으로 되돌립니다.
-      setState(snapshot);
       throw toApiError(caught);
     }
   },

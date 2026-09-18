@@ -156,6 +156,7 @@ function toRecord(dto: TravelRecordDto): TravelRecord | null {
       dto.isAnonymous === true
         ? '익명'
         : firstString(
+            dto.memberInfo?.nickname,
             owner?.nickname,
             owner?.nickName,
             owner?.name,

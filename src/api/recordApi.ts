@@ -65,6 +65,9 @@ export const recordApi = {
 
   /** DELETE /travel-records/{recordId} — 여행 기록 삭제 */
   remove: async (recordId: string): Promise<void> => {
+    if (__DEV__) {
+      console.log('[record:delete] request', ENDPOINTS.travelRecord(recordId));
+    }
     await apiClient.delete(ENDPOINTS.travelRecord(recordId));
   },
 

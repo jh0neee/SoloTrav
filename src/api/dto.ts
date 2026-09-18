@@ -247,7 +247,9 @@ export type TravelRecordDto = {
   date?: string;
   createdAt?: string;
 
-  /** 전체 피드용 작성자. 형태를 몰라 객체/문자열 양쪽을 봅니다. */
+  /** 기록 조회 응답의 작성자 프로필. */
+  memberInfo?: { nickname?: string | null; profileImage?: string | null } | null;
+  /** 이전 응답 형식의 작성자. */
   user?: AuthUserDto;
   author?: AuthUserDto;
   nickname?: string;
